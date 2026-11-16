@@ -69,7 +69,7 @@ def main():
         page.select_option("#birth", "1952")
         page.select_option("#sido", "충청북도")
         page.select_option("#sigungu", "옥천군")
-        page.get_by_role("button", name="시작하기").click()
+        page.get_by_role("button", name="시작하기", exact=True).click()
         page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
         page.wait_for_timeout(3000)
 

@@ -31,6 +31,6 @@ def onboard(page, name="순자", birth="1952", sido="충청북도", sigungu="옥
     page.select_option("#birth", birth)
     page.select_option("#sido", sido)
     page.select_option("#sigungu", sigungu)
-    page.get_by_role("button", name="시작하기").click()
+    page.get_by_role("button", name="시작하기", exact=True).click()
     page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=15000)
     page.wait_for_timeout(800)

@@ -102,7 +102,7 @@ def main():
         page.select_option("#birth", "1952")
         page.select_option("#sido", "충청북도")
         page.select_option("#sigungu", "옥천군")
-        page.get_by_role("button", name="시작하기").click()
+        page.get_by_role("button", name="시작하기", exact=True).click()
         page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
         page.wait_for_timeout(4200)
 
@@ -143,8 +143,7 @@ def main():
         crisp(page, f"{TMP}/e_result.png", 400)
         page.get_by_role("button", name="금빛 상장 만들기").click()
         page.wait_for_timeout(1800)
-        crisp(page, f"{TMP}/f_cert_full.png", 300)
-        crop(f"{TMP}/f_cert_full.png", f"{TMP}/f_cert.png", 0.42)
+        crisp(page, f"{TMP}/f_cert.png", 300)
         page.keyboard.press("Escape")
         page.wait_for_timeout(500)
 
@@ -163,8 +162,7 @@ def main():
         crisp(page, f"{TMP}/h_welfare.png", 400)
         page.get_by_role("button", name="신청 방법 자세히 보기").click()
         page.wait_for_timeout(1000)
-        crisp(page, f"{TMP}/h2_welfare_full.png", 200)
-        crop(f"{TMP}/h2_welfare_full.png", f"{TMP}/h2_welfare_detail.png", 0.16)
+        crisp(page, f"{TMP}/h2_welfare_detail.png", 200)
         page.keyboard.press("Escape")
         page.wait_for_timeout(500)
 
@@ -210,9 +208,14 @@ def main():
         ["1분 두뇌 퀴즈 · 1/3 진행 바", "정답 확인 · 해설", "금빛 상장"],
     )
     compose(
-        [f"{TMP}/g_ranking.png", f"{TMP}/h_welfare.png", f"{TMP}/h2_welfare_detail.png"],
+        [
+            f"{TMP}/g_ranking.png",
+            f"{TMP}/g2_ranking_lower.png",
+            f"{TMP}/h_welfare.png",
+            f"{TMP}/h2_welfare_detail.png",
+        ],
         f"{SHOT}/neulbom_ranking_welfare.png",
-        ["명예의 전당 · 시상대", "맞춤형 복지 혜택", "3단계 신청 안내"],
+        ["명예의 전당 · 시상대", "내 순위 · 상위 %", "맞춤형 복지 혜택", "3단계 신청 안내"],
     )
     compose(
         [f"{TMP}/i_tools.png", f"{TMP}/j_family.png", f"{TMP}/k_dashboard.png"],
