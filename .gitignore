@@ -8,3 +8,5 @@ out/
 *.log
 .cloudflare_token
 *.tsbuildinfo
+__pycache__/
+*.pyc
