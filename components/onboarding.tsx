@@ -5,8 +5,7 @@ import { makeCode, useApp } from "@/lib/storage";
 import { kakaoAuthorizeNow, kakaoConfig, loadKakaoSdk, startKakaoLogin } from "@/lib/share";
 import { UNKNOWN_BIRTH_TIME } from "@/lib/birthtime";
 import { BigButton, Card, useToast } from "./ui";
-import { NeulbomMark } from "./art";
-import { IconHeart, IconSprout, IconSun } from "./icons";
+import { AssetImage, Icon3D, NeulbomMark, type Icon3DName } from "./art";
 import {
   DEFAULT_SIDO,
   DEFAULT_SIGUNGU,
@@ -367,15 +366,29 @@ export function Onboarding() {
     <div className="min-h-dvh bg-paper px-4 pt-[calc(env(safe-area-inset-top,0px)+30px)]">
       <div className="mx-auto flex min-h-[calc(100dvh-60px)] max-w-[460px] flex-col justify-between pb-8">
         <div>
-          <div className="mb-6 text-center">
-            <NeulbomMark size={92} className="floaty mx-auto" />
-            <h1 className="mt-2 text-[2.4rem] font-black leading-none tracking-[-0.06em] text-ink">늘봄</h1>
-            <p className="mt-2.5 text-[0.98rem] font-bold leading-relaxed text-ink/60">
-              언제나, 늘 곁에 있는
-              <br />
-              시니어를 위한 스마트한 생활 플랫폼
-            </p>
-          </div>
+          {/* 초고화질 감성 배너 — 맑은 봄 하늘 · 노란 국화 · 환하게 웃는 가족 */}
+          <section className="mb-4 overflow-hidden rounded-[1.9rem] bg-[#CFE7F7] shadow-card">
+            <div className="relative h-[198px] overflow-hidden">
+              <AssetImage
+                name="onboarding-hero"
+                alt="파란 봄 하늘 아래 노란 국화꽃과 함께 환하게 웃는 가족"
+                priority
+                className="absolute inset-0 h-full w-full object-cover object-[50%_46%]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B2233]/85 via-[#0B2233]/18 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
+                <div className="flex items-center gap-1.5">
+                  <NeulbomMark size={32} />
+                  <h1 className="text-[2rem] font-black leading-none tracking-[-0.055em] text-white">늘봄</h1>
+                </div>
+                <p className="mt-1.5 text-[0.86rem] font-bold leading-snug text-white/90">
+                  언제나, 늘 곁에 있는
+                  <br />
+                  시니어를 위한 스마트한 생활 플랫폼
+                </p>
+              </div>
+            </div>
+          </section>
 
           <Card className="rounded-[1.75rem] p-5">
             <p className="text-center text-[1.06rem] font-black leading-snug text-ink">카카오톡으로 시작해요</p>
@@ -432,16 +445,16 @@ export function Onboarding() {
 
         <div>
           <div className="grid grid-cols-3 gap-2 text-center">
-            {[
-              [<IconSun key="s" size={26} />, "오늘의 운세"],
-              [<IconHeart key="h" size={26} />, "1분 퀴즈"],
-              [<IconSprout key="p" size={26} />, "맞춤 혜택"],
-            ].map(([icon, label], i) => (
-              <div key={i} className="rounded-2xl bg-white/80 p-3 shadow-soft">
-                <span className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-sun-light text-sun-dark">
-                  {icon}
-                </span>
-                <p className="mt-1.5 text-[0.78rem] font-bold text-ink/65">{label}</p>
+            {(
+              [
+                ["icon-3d-sun-fortune", "오늘의 운세"],
+                ["icon-3d-quiz-trophy", "1분 퀴즈"],
+                ["icon-3d-welfare-gift", "맞춤 혜택"],
+              ] as [Icon3DName, string][]
+            ).map(([icon, label]) => (
+              <div key={label} className="rounded-2xl bg-white/85 px-2 pb-2.5 pt-2 shadow-soft">
+                <Icon3D name={icon} size={46} className="mx-auto drop-shadow-[0_6px_10px_rgba(60,80,70,0.16)]" />
+                <p className="mt-1 text-[0.78rem] font-bold text-ink/70">{label}</p>
               </div>
             ))}
           </div>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/health";
 import { koreanDate } from "@/lib/week";
 import { BigButton, useToast } from "./ui";
+import { Icon3D } from "./art";
 import { IconChevron, IconShare, IconStamp } from "./icons";
 import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
 
@@ -83,8 +84,8 @@ export function HealthChallengeCard({ where = "home" }: { where?: "home" | "grou
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-[1.02rem] font-black text-ink">
-              <span aria-hidden className="text-[1.1rem]">🌿</span>
+            <p className="flex items-center gap-2 text-[1.02rem] font-black text-ink">
+              <Icon3D name="icon-3d-health-leaf" size={30} />
               오늘의 건강 챌린지
             </p>
             <p className="mt-0.5 text-[0.82rem] font-semibold text-ink/50">

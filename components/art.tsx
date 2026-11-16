@@ -13,7 +13,8 @@ export type AssetName =
   | "greeting-chrysanthemum"
   | "quiz-couple"
   | "welfare-pension-bg"
-  | "family-greeting-couple";
+  | "family-greeting-couple"
+  | "onboarding-hero";
 
 export function AssetImage({
   name,
@@ -36,6 +37,53 @@ export function AssetImage({
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         fetchPriority={priority ? "high" : "auto"}
+      />
+    </picture>
+  );
+}
+
+/* ================================================================ */
+/* 3D 입체 아이콘 (public/images/icon-3d-*)                           */
+/* ---------------------------------------------------------------- */
+/* - 클레이·글래스 질감의 3D 아이콘. 단색 선 SVG 대신 쓴다.           */
+/* - 640px(표시 크기의 4~8배)로 두어 아이폰 3배 화면에서도 또렷하다.   */
+/* - 모서리는 이미지에 투명하게 새겨 두어 어떤 배경에서도 자연스럽다.  */
+/* ================================================================ */
+
+export type Icon3DName =
+  | "icon-3d-sun-fortune"
+  | "icon-3d-quiz-trophy"
+  | "icon-3d-welfare-gift"
+  | "icon-3d-weather"
+  | "icon-3d-health-leaf"
+  | "icon-3d-magnifier"
+  | "icon-3d-pill"
+  | "icon-3d-mail"
+  | "icon-3d-book";
+
+export function Icon3D({
+  name,
+  size = 48,
+  alt = "",
+  className = "",
+}: {
+  name: Icon3DName;
+  size?: number;
+  alt?: string;
+  className?: string;
+}) {
+  return (
+    <picture className="contents">
+      <source srcSet={`/images/${name}.webp`} type="image/webp" />
+      <img
+        src={`/images/${name}.png`}
+        alt={alt}
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        className={`block shrink-0 rounded-[24%] ${className}`}
+        style={{ width: size, height: size }}
       />
     </picture>
   );

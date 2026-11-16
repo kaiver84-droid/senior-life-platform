@@ -14,7 +14,7 @@ import { HomeCalendarBanner } from "./calendar";
 import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
 import { HealthChallengeCard } from "./health";
 import { SharePreviewSheet } from "./share-sheet";
-import { AssetImage, NeulbomMark, RaisedTile, WeatherArt } from "./art";
+import { AssetImage, Icon3D, NeulbomMark, RaisedTile, WeatherArt, type Icon3DName } from "./art";
 import {
   IconBank,
   IconBook,
@@ -61,6 +61,8 @@ export function HomeTab({
     [profile?.nickname, profile?.birthYear, profile?.birthTime, today]
   );
   const dateLabel = longKoreanDate(today);
+  /** 맑은 날에는 3D 날씨 아이콘, 비·눈·흐림에는 상태를 살린 그림을 쓴다 */
+  const clearSky = !/비|눈|흐림|안개|구름|소나기|천둥|이슬비/.test(weather?.label || "맑음");
 
   useEffect(() => {
     if (!profile) return;
@@ -73,59 +75,47 @@ export function HomeTab({
     };
   }, [profile]);
 
-  const tiles = [
+  const tiles: { key: string; label: string; sub: string; icon: Icon3DName; go: () => void }[] = [
     {
       key: "quiz",
       label: "오늘의 퀴즈",
       sub: todayDaily?.done ? "완료했어요" : "3문제 · 1분",
-      icon: <span className="text-[1.4rem] leading-none">🧠</span>,
-      bg: "bg-sun-light",
-      fg: "text-sun-dark",
+      icon: "icon-3d-quiz-trophy",
       go: () => onNavigate("quiz"),
     },
     {
       key: "welfare",
       label: "정부 지원금",
       sub: "내게 맞는 혜택",
-      icon: <IconBank size={26} />,
-      bg: "bg-leaf-light",
-      fg: "text-leaf-dark",
+      icon: "icon-3d-welfare-gift",
       go: () => onNavigate("welfare"),
     },
     {
       key: "tools",
       label: "돋보기",
       sub: "크게 보기",
-      icon: <IconTools size={26} />,
-      bg: "bg-plum-light",
-      fg: "text-plum-dark",
+      icon: "icon-3d-magnifier",
       go: () => onNavigate("tools"),
     },
     {
       key: "med",
       label: "복약 체크",
       sub: "아침 · 저녁 약",
-      icon: <IconPill size={26} />,
-      bg: "bg-coral-light",
-      fg: "text-coral-dark",
+      icon: "icon-3d-pill",
       go: () => onNavigate("family"),
     },
     {
       key: "anbu",
       label: "안부 전송",
       sub: "카톡으로 인사",
-      icon: <IconMail size={26} />,
-      bg: "bg-sky",
-      fg: "text-[#2F79AE]",
+      icon: "icon-3d-mail",
       go: () => onNavigate("family"),
     },
     {
       key: "guide",
       label: "생활 가이드",
       sub: "1분 카드뉴스",
-      icon: <IconBook size={26} />,
-      bg: "bg-gold-light",
-      fg: "text-[#B08208]",
+      icon: "icon-3d-book",
       go: () => onNavigate("tools"),
     },
   ];
@@ -224,9 +214,11 @@ export function HomeTab({
         onClick={() => setFortuneOpen(true)}
         className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
       >
-        <RaisedTile tone="warm" size={56}>
-          <span className="text-[1.7rem] leading-none">{fortune.zodiacEmoji}</span>
-        </RaisedTile>
+        <Icon3D
+          name="icon-3d-sun-fortune"
+          size={56}
+          className="drop-shadow-[0_10px_16px_rgba(196,138,40,0.32)]"
+        />
         <span className="min-w-0 flex-1">
           <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 운세</span>
           <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
@@ -242,9 +234,13 @@ export function HomeTab({
         onClick={() => setWeatherOpen(true)}
         className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
       >
-        <RaisedTile tone="sky" size={56}>
-          <WeatherArt label={weather?.label || "맑음"} size={36} />
-        </RaisedTile>
+        {clearSky ? (
+          <Icon3D name="icon-3d-weather" size={56} className="drop-shadow-[0_10px_16px_rgba(60,120,180,0.32)]" />
+        ) : (
+          <RaisedTile tone="sky" size={56}>
+            <WeatherArt label={weather?.label || "맑음"} size={36} />
+          </RaisedTile>
+        )}
         <span className="min-w-0 flex-1">
           <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 날씨와 생활팁</span>
           <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
@@ -269,9 +265,7 @@ export function HomeTab({
               onClick={t.go}
               className="card flex flex-col items-start gap-1.5 p-3 text-left active:scale-[0.98]"
             >
-              <span className={`grid h-11 w-11 place-items-center rounded-[0.95rem] ${t.bg} ${t.fg}`}>
-                {t.icon}
-              </span>
+              <Icon3D name={t.icon} size={44} className="drop-shadow-[0_6px_10px_rgba(60,80,70,0.16)]" />
               <span className="block text-[0.9rem] font-black leading-tight text-ink">{t.label}</span>
               <span className="block text-[0.7rem] font-bold leading-tight text-ink/45">{t.sub}</span>
             </button>
