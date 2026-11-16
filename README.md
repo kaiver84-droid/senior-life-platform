@@ -85,19 +85,29 @@ python3 scripts/apply_integrations.py --deploy
 
 ### 카카오 로그인 흐름
 
-1. 온보딩 화면의 **카카오톡으로 시작하기** → `GET /api/auth/kakao?start=1` 이 카카오 인가 화면으로 302
-   (REST 키는 서버에만 있음).
-2. 카카오가 `KAKAO_REDIRECT_URI`(기본 `https://senior-life-platform.pages.dev/`)로 `?code=` 를 돌려준다.
-3. 앱이 그 code 를 `POST /api/auth/kakao` 로 보내면 서버가 토큰 교환 → 프로필 저장.
+1. 온보딩 화면의 **카카오톡으로 시작하기**
+   - `NEXT_PUBLIC_KAKAO_JS_KEY` 가 있으면 Kakao JS SDK(`t1.kakaocdn.net` 2.7.4)를 미리 불러 두고,
+     버튼을 누르는 순간 `Kakao.Auth.authorize({ redirectUri, throughTalk: true })` 를 사용자 제스처 안에서 호출한다.
+   - **iPhone Safari / Android Chrome** 에서는 카카오톡 앱이 바로 열려 **아이디·비밀번호 입력 없이** 동의만 하면 끝난다
+     (SDK 2.7.4 는 iOS 에서 `https://talk-apps.kakao.com/scheme/kakaotalk://inappbrowser?url=<authorize>&web=<web>`
+     유니버설 링크, Android 에서 intent URI 로 카카오톡을 연다. `through_talk` 쿼리 파라미터는 SDK 2.x 에서 쓰지 않는다).
+   - 데스크톱처럼 카카오톡 앱이 없는 환경은 SDK 가 `kauth.kakao.com/oauth/authorize` → 카카오계정 로그인 화면으로 보낸다.
+   - SDK 미로드/키 없음/스크립트 차단 시에만 `GET /api/auth/kakao?start=1`(REST 키 302)로 폴백한다.
+2. 카카오가 `KAKAO_REDIRECT_URI`(기본 `https://senior-life-platform.pages.dev/`)로 `?code=`(취소 시 `?error=`)를 돌려준다.
+3. 앱이 주소창에서 코드를 지우고 `POST /api/auth/kakao` 로 `{ code, redirectUri }` 를 보내면 서버가 토큰 교환 → 프로필 저장.
+   서버는 받은 `redirectUri` 가 자기가 쓸 값(`KAKAO_REDIRECT_URI`)과 다르면 교환하지 않고 400 `redirect_uri_mismatch` 를 돌려준다.
+   (`Kakao.Auth.authorize` 는 JavaScript 키, 토큰 교환은 REST API 키 — 같은 앱의 키라 인가 코드는 그대로 교환된다.)
 
-카카오 콘솔에는 Redirect URI 를 `https://senior-life-platform.pages.dev/` 로 등록하면 되고,
+카카오 콘솔에는 Redirect URI 를 `https://senior-life-platform.pages.dev/` 로 등록하고,
 `https://senior-life-platform.pages.dev/api/auth/kakao` 도 함께 등록해 두면 code 를 직접 확인할 때 편하다.
+JS SDK 간편로그인을 쓰려면 **플랫폼 > Web > 사이트 도메인**에 `https://senior-life-platform.pages.dev`,
+**카카오 로그인 > 일반**에서 카카오 로그인 사용 설정이 켜져 있어야 한다.
 
 ### 환경변수 (전부 선택 — 없으면 데모 모드)
 
 | 변수 | 위치 | 설명 |
 |---|---|---|
-| `NEXT_PUBLIC_KAKAO_JS_KEY` | 빌드 시 | 카카오 JavaScript 키. 있으면 카카오톡 공유 카드(SDK) 사용, 없으면 Web Share/이미지 저장으로 폴백 |
+| `NEXT_PUBLIC_KAKAO_JS_KEY` | 빌드 시 | 카카오 JavaScript 키. 있으면 카카오톡 공유 카드(SDK)와 **카카오톡 원터치 간편로그인**(`Kakao.Auth.authorize`, `throughTalk: true`)에 사용 |
 | `KAKAO_CLIENT_ID` | Functions | 카카오 REST API 키 (`/api/auth/kakao` 토큰 교환) |
 | `KAKAO_CLIENT_SECRET` | Functions | 카카오 클라이언트 시크릿 |
 | `KAKAO_REDIRECT_URI` | Functions | 카카오 로그인 리다이렉트 URI (예: `https://<도메인>/`) |

@@ -9,13 +9,16 @@ export function kakaoConfig(): KakaoConfig {
   return { jsKey, configured: Boolean(jsKey) };
 }
 
-type KakaoWindow = Window & {
-  Kakao?: {
-    isInitialized: () => boolean;
-    init: (key: string) => void;
-    Share: { sendDefault: (payload: unknown) => void };
+type KakaoSdk = {
+  isInitialized: () => boolean;
+  init: (key: string) => void;
+  Share: { sendDefault: (payload: unknown) => void };
+  Auth?: {
+    authorize?: (settings: { redirectUri: string; throughTalk?: boolean; prompt?: string }) => void;
   };
 };
+
+type KakaoWindow = Window & { Kakao?: KakaoSdk };
 
 let sdkLoading: Promise<boolean> | null = null;
 
@@ -46,6 +49,38 @@ export function loadKakaoSdk(): Promise<boolean> {
     document.head.appendChild(s);
   });
   return sdkLoading;
+}
+
+/**
+ * 이미 로드된 Kakao SDK 로 즉시 authorize 를 호출한다(동기).
+ * iOS Safari 는 사용자 제스처 밖에서 앱 스킴/유니버설 링크 이동을 막을 수 있어서,
+ * 버튼 클릭과 같은 작업 안에서 호출해야 카카오톡 앱이 바로 열린다. 호출되면 true.
+ */
+export function kakaoAuthorizeNow(redirectUri: string): boolean {
+  if (typeof window === "undefined") return false;
+  const auth = (window as KakaoWindow).Kakao?.Auth;
+  if (!auth || typeof auth.authorize !== "function") return false;
+  try {
+    auth.authorize({ redirectUri, throughTalk: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 카카오톡 앱 간편로그인(원터치) — 아이디/비밀번호 입력 없이 카카오톡으로 인증한다.
+ *
+ * Kakao.Auth.authorize({ throughTalk: true }) 는 JavaScript 키 + JavaScript SDK 도메인 +
+ * 카카오 로그인 사용 설정이 있는 앱에서만 동작하고, 호출하면 카카오톡 앱(또는 카카오계정 화면)으로
+ * 이동하므로 정상 호출 시 이 함수는 true 를 돌려주고 페이지는 곧 떠난다.
+ * SDK 미로드/미설정/예외일 때만 false 를 돌려주어 호출한 쪽이 서버 경유(/api/auth/kakao?start=1)로 폴백한다.
+ */
+export async function startKakaoLogin(redirectUri: string): Promise<boolean> {
+  if (kakaoAuthorizeNow(redirectUri)) return true;
+  const loaded = await loadKakaoSdk();
+  if (!loaded) return false;
+  return kakaoAuthorizeNow(redirectUri);
 }
 
 export type ShareResult = "kakao" | "share" | "downloaded" | "failed";

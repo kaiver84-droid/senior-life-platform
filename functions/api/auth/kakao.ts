@@ -45,6 +45,8 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
       ok: true,
       ...dbStatus(env),
       kakaoLoginConfigured: Boolean(env.KAKAO_CLIENT_ID),
+      // JS 키가 있으면 클라이언트가 Kakao.Auth.authorize(throughTalk) 간편로그인을 쓸 수 있다
+      kakaoJsConfigured: Boolean(env.NEXT_PUBLIC_KAKAO_JS_KEY),
       redirectUri: env.KAKAO_REDIRECT_URI || `${url.origin}/`,
     });
   }
@@ -106,6 +108,7 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     sido?: string;
     sigungu?: string;
     code?: string;
+    redirectUri?: string;
   };
   try {
     body = await request.json();
@@ -114,8 +117,23 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
   }
 
   if (body.code && !body.nickname) {
-    // 인가 코드 교환 요청을 POST 로 보낸 경우 GET 핸들러 로직을 재사용
+    // 인가 코드를 교환할 때 쓰는 redirect_uri 는 인가 코드를 받을 때와 100% 같아야 한다.
+    // 클라이언트(Kakao.Auth.authorize)가 넘긴 값과 서버가 쓸 값이 다르면 교환하지 않고 알린다.
     const url = new URL(request.url);
+    const serverRedirectUri = env.KAKAO_REDIRECT_URI || `${url.origin}/`;
+    const clientRedirectUri = (body.redirectUri || "").trim();
+    if (clientRedirectUri && clientRedirectUri !== serverRedirectUri) {
+      return json(
+        {
+          ok: false,
+          error: "redirect_uri_mismatch",
+          clientRedirectUri,
+          serverRedirectUri,
+        },
+        400,
+      );
+    }
+    // 인가 코드 교환 요청을 POST 로 보낸 경우 GET 핸들러 로직을 재사용
     url.searchParams.set("code", body.code);
     return onRequestGet({ request: new Request(url.toString()), env });
   }

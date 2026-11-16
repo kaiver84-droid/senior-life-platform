@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { REGIONS, sigunguList } from "@/lib/regions";
 import { useApp } from "@/lib/storage";
+import { kakaoAuthorizeNow, kakaoConfig, loadKakaoSdk, startKakaoLogin } from "@/lib/share";
 import { BigButton, Card, useToast } from "./ui";
 
 const YEARS = Array.from({ length: 44 }, (_, i) => 1930 + i); // 1930 ~ 1973
@@ -15,7 +16,22 @@ export function Onboarding() {
   const [sido, setSido] = useState("충청북도");
   const [sigungu, setSigungu] = useState("옥천군");
   const [busy, setBusy] = useState(false);
-  const [kakao, setKakao] = useState<{ configured: boolean; db: string }>({ configured: false, db: "demo" });
+  const [kakao, setKakao] = useState<{
+    configured: boolean;
+    jsConfigured: boolean;
+    redirectUri: string;
+    ready: boolean;
+    db: string;
+  }>({
+    configured: false,
+    jsConfigured: false,
+    redirectUri: "",
+    ready: false,
+    db: "demo",
+  });
+  const [kakaoStarting, setKakaoStarting] = useState(false);
+  // 카카오가 돌려준 인가 코드 — 서버 설정(redirectUri)을 받은 뒤 교환한다.
+  const codeRef = useRef<string | null>(null);
 
   const sigunguOptions = useMemo(() => sigunguList(sido), [sido]);
 
@@ -24,23 +40,52 @@ export function Onboarding() {
   }, [sigunguOptions, sigungu]);
 
   useEffect(() => {
-    fetch("/api/auth/kakao")
-      .then((r) => r.json())
-      .then((j) => setKakao({ configured: Boolean(j?.kakaoLoginConfigured), db: String(j?.supabase || "demo") }))
-      .catch(() => {});
+    // 카카오 SDK 미리 로드 — 버튼을 누르는 순간 authorize 가 사용자 제스처 안에서 바로 실행되게 한다.
+    // (iOS Safari 는 제스처 밖 이동을 막아 카카오톡 앱이 안 열릴 수 있다)
+    if (kakaoConfig().configured) void loadKakaoSdk();
   }, []);
 
-  // 카카오 로그인 콜백(?code=...) 처리
   useEffect(() => {
+    // 서버가 실제 토큰 교환에 쓰는 redirectUri 를 그대로 받아 둔다(클라이언트와 100% 동일하게 유지).
+    fetch("/api/auth/kakao")
+      .then((r) => r.json())
+      .then((j) => {
+        setKakao({
+          configured: Boolean(j?.kakaoLoginConfigured),
+          jsConfigured: Boolean(j?.kakaoJsConfigured),
+          redirectUri: String(j?.redirectUri || `${window.location.origin}/`),
+          ready: true,
+          db: String(j?.supabase || "demo"),
+        });
+      })
+      .catch(() =>
+        setKakao((k) => ({ ...k, redirectUri: `${window.location.origin}/`, ready: true })),
+      );
+
+    // 카카오 로그인 콜백(?code=... / ?error=...) — 주소창에서 코드를 지우고 보관만 한다
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
-    if (!code) return;
+    const error = params.get("error");
+    if (!code && !error) return;
     window.history.replaceState({}, "", window.location.pathname);
+    if (error) {
+      show("카카오톡 로그인을 취소했어요. 이름과 지역을 직접 골라 주세요.");
+      return;
+    }
+    codeRef.current = code;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 인가 코드 교환 — redirectUri 는 authorize 에 쓸 값과 같은 서버 값을 쓴다
+  useEffect(() => {
+    if (!kakao.ready || !codeRef.current) return;
+    const code = codeRef.current;
+    codeRef.current = null;
     setBusy(true);
     fetch("/api/auth/kakao", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, redirectUri: kakao.redirectUri }),
     })
       .then((r) => r.json())
       .then((j) => {
@@ -57,10 +102,34 @@ export function Onboarding() {
       .catch(() => show("카카오 로그인에 실패했어요. 이름과 지역을 직접 골라 주세요."))
       .finally(() => setBusy(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [kakao.ready, kakao.redirectUri]);
 
-  const startKakao = () => {
-    window.location.href = "/api/auth/kakao?start=1";
+  const startKakao = async () => {
+    if (busy || kakaoStarting) return;
+    const redirectUri = kakao.redirectUri || `${window.location.origin}/`;
+    const fallback = () => {
+      setKakaoStarting(false);
+      window.location.href = "/api/auth/kakao?start=1";
+    };
+    // 1) 카카오 JS SDK 간편로그인: 모바일에서 카카오톡 앱이 바로 열려 아이디/비밀번호 없이 인증한다.
+    //    동의를 마치면 redirectUri 로 ?code= 가 돌아온다. (정상 호출이면 페이지가 떠난다)
+    if (kakao.jsConfigured) {
+      setKakaoStarting(true);
+      // 이미 로드된 SDK 라면 클릭(사용자 제스처) 안에서 곧바로 호출한다
+      if (kakaoAuthorizeNow(redirectUri)) {
+        window.setTimeout(() => setKakaoStarting(false), 8000);
+        return;
+      }
+      const started = await startKakaoLogin(redirectUri);
+      if (started) {
+        window.setTimeout(() => setKakaoStarting(false), 8000);
+        return;
+      }
+      fallback();
+      return;
+    }
+    // 2) SDK 를 쓸 수 없는 환경(구형 브라우저, 스크립트 차단)은 서버를 거치는 인가 화면으로 폴백
+    fallback();
   };
 
   const submit = async () => {
@@ -179,10 +248,10 @@ export function Onboarding() {
               <button
                 type="button"
                 onClick={startKakao}
-                disabled={busy}
+                disabled={busy || kakaoStarting}
                 className="mt-2 w-full rounded-xl bg-[#FEE500] px-4 py-3 text-[1rem] font-extrabold text-[#3C1E1E] shadow-sm transition active:scale-[0.99] disabled:opacity-60"
               >
-                카카오톡으로 시작하기
+                {kakaoStarting ? "카카오톡 여는 중..." : "카카오톡으로 시작하기"}
               </button>
             ) : null}
             <p className="mt-1.5 text-[0.85rem] font-medium text-[#3C1E1E]/80">
