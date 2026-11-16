@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { getFortune, shortFortuneLine } from "@/lib/fortune";
 import { fetchWeather, type WeatherInfo } from "@/lib/weather";
 import { renderGreetingCard, downloadCanvas, THEMES, type GreetingTheme } from "@/lib/canvas";
-import { shareCard, shareMessageText } from "@/lib/share";
+import { kakaoConfig, shareCard, shareMessageText } from "@/lib/share";
 import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
@@ -331,7 +331,9 @@ function GreetingStudio({ show }: { show: (m: string) => void }) {
         </BigButton>
       </div>
       <p className="mt-2 text-center text-[0.78rem] font-medium text-ink/45">
-        카카오 앱 키를 넣으면 카카오톡 공유 카드로, 지금은 휴대폰 공유창으로 바로 보낼 수 있어요.
+        {kakaoConfig().configured
+          ? "카카오톡 공유 카드로 바로 보낼 수 있어요. 친구를 고르면 끝나요."
+          : "휴대폰 공유창으로 보낼 수 있어요. 카카오 앱 키를 넣으면 카카오톡 공유 카드로 바뀌어요."}
       </p>
     </Card>
   );

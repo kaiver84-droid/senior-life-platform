@@ -116,7 +116,12 @@ export function dbStatus(env: DbEnv) {
   const { configured } = supabaseConfig(env);
   return {
     supabase: configured ? "connected" : "demo",
-    kakao: env.KAKAO_CLIENT_ID && env.KAKAO_CLIENT_SECRET ? "connected" : "not-configured",
+    // REST API 키만 있으면 카카오 로그인·공유가 동작한다(Client Secret 은 콘솔에서 '사용 안 함' 가능).
+    kakao: env.KAKAO_CLIENT_ID
+      ? "configured"
+      : env.NEXT_PUBLIC_KAKAO_JS_KEY
+        ? "js-only"
+        : "not-configured",
   };
 }
 
