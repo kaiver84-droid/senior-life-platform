@@ -51,6 +51,9 @@ export type StoredFamilyEvent = {
   createdAt?: string;
 };
 
+/** 날짜(YYYY-MM-DD) → 그날 체크한 건강 챌린지 id 목록 */
+export type StoredHealth = Record<string, string[]>;
+
 export type StoredState = {
   code: string;
   profile: StoredProfile | null;
@@ -59,6 +62,8 @@ export type StoredState = {
   visits: string[];
   /** 가족안부달력 일정 (한 사람당 한 줄에 JSON 배열로 저장) */
   familyEvents: StoredFamilyEvent[];
+  /** 건강생활 챌린지 체크인 (날짜별) */
+  health: StoredHealth;
   updatedAt: string;
 };
 
@@ -75,6 +80,7 @@ const TABLE = {
   visits: "daily_visits",
   rankings: "rankings_weekly",
   family: "family_events",
+  health: "health_checks",
 };
 
 /** PostgREST 호출 (모임 API 등 다른 모듈에서도 같은 키·헤더로 쓴다) */
@@ -113,6 +119,7 @@ function memoryMerge(code: string, patch: Partial<StoredState>): StoredState {
       med: {},
       visits: [],
       familyEvents: [],
+      health: {},
       updatedAt: new Date().toISOString(),
     };
   const next: StoredState = {
@@ -123,6 +130,7 @@ function memoryMerge(code: string, patch: Partial<StoredState>): StoredState {
     med: patch.med ?? cur.med,
     visits: patch.visits ?? cur.visits,
     familyEvents: patch.familyEvents ?? cur.familyEvents,
+    health: patch.health ?? cur.health ?? {},
     updatedAt: new Date().toISOString(),
   };
   store.set(code, next);
@@ -231,6 +239,39 @@ export async function saveFamilyEvents(env: DbEnv, code: string, events: StoredF
   return { ok: true, mode: "supabase" as const };
 }
 
+/**
+ * 건강생활 챌린지 체크인 — 날짜별 한 줄에 체크한 id 배열을 저장한다.
+ * 빈 배열이면 그날 도장을 모두 지운다(모두 해제한 경우).
+ */
+export async function saveHealth(env: DbEnv, code: string, date: string, ids: string[]) {
+  const { configured } = supabaseConfig(env);
+  const clean = Array.from(new Set(ids.filter((x) => typeof x === "string" && x))).slice(0, 10);
+  if (!configured) {
+    const cur = memoryGet(code);
+    const health: StoredHealth = { ...(cur?.health ?? {}) };
+    if (clean.length) health[date] = clean;
+    else delete health[date];
+    memoryMerge(code, { health });
+    return { ok: true, mode: "demo" as const };
+  }
+  if (!clean.length) {
+    const res = await sbRequest(env, `${TABLE.health}?user_code=eq.${encodeURIComponent(code)}&check_date=eq.${date}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+    if (!res.ok) throw new Error(`supabase health delete ${res.status}: ${await res.text()}`);
+    return { ok: true, mode: "supabase" as const };
+  }
+  const res = await sbRequest(env, `${TABLE.health}?on_conflict=user_code,check_date`, {
+    method: "POST",
+    body: JSON.stringify([
+      { user_code: code, check_date: date, challenges: clean, updated_at: new Date().toISOString() },
+    ]),
+  });
+  if (!res.ok) throw new Error(`supabase health ${res.status}: ${await res.text()}`);
+  return { ok: true, mode: "supabase" as const };
+}
+
 export async function saveVisit(env: DbEnv, code: string, date: string) {
   const { configured } = supabaseConfig(env);
   if (!configured) {
@@ -251,7 +292,7 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
   const { configured } = supabaseConfig(env);
   if (!configured) return memoryGet(code);
 
-  const [users, quiz, med, visits, family] = await Promise.all([
+  const [users, quiz, med, visits, family, health] = await Promise.all([
     sbRequest(env, `${TABLE.users}?code=eq.${encodeURIComponent(code)}&limit=1`).then((r) => (r.ok ? r.json() : [])),
     sbRequest(
       env,
@@ -266,6 +307,10 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
     sbRequest(env, `${TABLE.family}?user_code=eq.${encodeURIComponent(code)}&limit=1`).then((r) =>
       r.ok ? r.json() : []
     ),
+    sbRequest(
+      env,
+      `${TABLE.health}?user_code=eq.${encodeURIComponent(code)}&order=check_date.desc&limit=30`
+    ).then((r) => (r.ok ? r.json() : [])),
   ]);
 
   const u = Array.isArray(users) ? users[0] : null;
@@ -274,6 +319,13 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
   const medMap: Record<string, { morning: boolean; evening: boolean }> = {};
   (Array.isArray(med) ? med : []).forEach((m: { check_date: string; morning: boolean; evening: boolean }) => {
     medMap[m.check_date] = { morning: m.morning, evening: m.evening };
+  });
+
+  const healthMap: StoredHealth = {};
+  (Array.isArray(health) ? health : []).forEach((h: { check_date: string; challenges: string[] }) => {
+    if (!h?.check_date) return;
+    const ids = Array.isArray(h.challenges) ? h.challenges.filter((x) => typeof x === "string") : [];
+    if (ids.length) healthMap[h.check_date] = ids;
   });
 
   return {
@@ -316,6 +368,7 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
     familyEvents: (Array.isArray(family) && family[0] && Array.isArray(family[0].events)
       ? family[0].events
       : []) as StoredFamilyEvent[],
+    health: healthMap,
     updatedAt: new Date().toISOString(),
   };
 }

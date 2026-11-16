@@ -16,7 +16,10 @@ export type Profile = {
 
 import type { FamilyEvent } from "./calendar";
 
-export type QuizType = "choseong" | "lyrics" | "spot";
+export type QuizType = "choseong" | "lyrics" | "spot" | "ox" | "nonsense";
+
+/** 날짜별 건강생활 챌린지 체크인 — { "2026-11-16": ["water", "walk"] } */
+export type HealthChecks = Record<string, string[]>;
 
 export type QuizLog = {
   date: string; // YYYY-MM-DD (KST)
@@ -52,6 +55,8 @@ export type AppState = {
   visits: string[];
   /** 가족안부달력에 저장한 가족 일정 */
   familyEvents: FamilyEvent[];
+  /** 날짜별 건강생활 챌린지 체크인(완료 도장) */
+  health: HealthChecks;
   fontSize: 18 | 21 | 24;
   lastVisit: string;
 };
@@ -119,6 +124,21 @@ export type GroupPostInfo = {
   cheeredByMe: boolean;
 };
 
+/** 모임원들과 함께 보는 오늘의 건강 챌린지 달성률 */
+export type GroupHealthSummary = {
+  /** 챌린지 종류 수 (5) */
+  total: number;
+  memberCount: number;
+  /** 오늘 한 가지라도 체크한 모임원 수 */
+  joined: number;
+  /** joined / memberCount % */
+  rate: number;
+  /** 내가 오늘 체크한 개수 */
+  myDone: number;
+  /** 챌린지별로 오늘 체크한 사람 수 */
+  cells: { id: string; label: string; emoji: string; done: number }[];
+};
+
 export type GroupDetail = GroupSummary & {
   creatorCode: string;
   members: GroupMemberInfo[];
@@ -130,6 +150,8 @@ export type GroupDetail = GroupSummary & {
   /** 이번 주 모임 달성률 % (참여 일수 / 목표) */
   weeklyRate: number;
   totalPoints: number;
+  /** 오늘의 건강 챌린지 현황 (서버·오프라인 공용) */
+  health?: GroupHealthSummary | null;
   myRank: number | null;
   top: { name: string; points: number } | null;
 };

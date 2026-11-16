@@ -10,11 +10,13 @@ import {
   DEMO_GROUP_ID,
   DEMO_MEMBERS,
   demoAttendedSet,
+  demoHealthIds,
   demoPoints,
   demoSeedPosts,
   demoWeekDays,
   randomGroupCode,
 } from "./group-demo";
+import { buildGroupHealth } from "./health";
 import { kstDate, weekIdOf } from "./week";
 import { ACTIVE_GROUP_KEY, type MeStatsInput } from "./groups";
 
@@ -105,9 +107,12 @@ function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): 
   const week = weekIdOf(today);
   const demoAttended = demoAttendedSet(today);
 
+  const healthDoneBy: { code: string; ids: string[] }[] = [];
+
   const members: GroupMemberInfo[] = g.members.map((m) => {
     const isMe = m.code === code;
     if (m.role === "demo") {
+      healthDoneBy.push({ code: m.code, ids: demoHealthIds(m.code, today) });
       return {
         code: m.code,
         name: m.name,
@@ -120,13 +125,15 @@ function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): 
         rank: 0,
       };
     }
+    const myHealth = isMe && Array.isArray(me?.health) ? me!.health!.filter((x) => typeof x === "string") : [];
+    healthDoneBy.push({ code: m.code, ids: myHealth });
     return {
       code: m.code,
       name: m.name,
       isMe,
       isLeader: m.role === "leader",
       isDemo: false,
-      todayAttended: isMe ? Boolean(me?.today) : false,
+      todayAttended: (isMe ? Boolean(me?.today) : false) || myHealth.length > 0,
       weekDays: isMe ? Math.max(0, Math.round(me?.days ?? 0)) : 0,
       points: isMe ? Math.max(0, Math.round(me?.points ?? 0)) : 0,
       rank: 0,
@@ -174,6 +181,7 @@ function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): 
     attendanceRate: memberCount ? Math.round((todayAttended / memberCount) * 100) : 0,
     weeklyRate: memberCount ? Math.min(100, Math.round((weekSum / (memberCount * weeklyGoal)) * 100)) : 0,
     totalPoints: members.reduce((a, m) => a + m.points, 0),
+    health: buildGroupHealth(healthDoneBy, code),
     myRank: mine?.rank ?? null,
     top: members[0] ? { name: members[0].name, points: members[0].points } : null,
   };

@@ -22,6 +22,9 @@ export const onRequestGet = async ({ env }: Ctx) =>
         "family",
         "family-calendar",
         "local-news",
+        "health-challenge",
+        "ox-nonsense-quiz",
+        "share-preview",
       ],
     }),
     { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }

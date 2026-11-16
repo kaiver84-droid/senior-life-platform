@@ -54,6 +54,19 @@ export function demoTattended(code: string, date: string): boolean {
   return demoAttendedSet(date).has(code);
 }
 
+/**
+ * 체험 회원이 오늘 찍은 건강 챌린지 (0~5개).
+ * 출석한 회원은 2~5개, 출석하지 않은 회원은 0~1개가 되도록 날짜·코드로만 정해진다.
+ * 모임의 ‘오늘 건강 챌린지 참여 인원’이 매일 조금씩 달라 보이게 한다.
+ */
+export function demoHealthIds(code: string, date: string): string[] {
+  const ids = ["water", "walk", "stretch", "medicine", "family"];
+  const attended = demoAttendedSet(date).has(code);
+  const h = fnv(`${date}|h|${code}`);
+  const count = attended ? 2 + (h % 4) : h % 2;
+  return ids.slice(0, Math.min(ids.length, count));
+}
+
 /** 체험 모임의 첫 게시글 (DB 가 비어 있을 때만 쓰인다) */
 export function demoSeedPosts(): { code: string; name: string; content: string; hoursAgo: number }[] {
   return [

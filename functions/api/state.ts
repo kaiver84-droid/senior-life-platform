@@ -1,4 +1,4 @@
-import { dbStatus, getState, saveFamilyEvents, saveMed, saveQuizLog, saveVisit, upsertUser } from "../../lib/db";
+import { dbStatus, getState, saveFamilyEvents, saveHealth, saveMed, saveQuizLog, saveVisit, upsertUser } from "../../lib/db";
 import type { DbEnv, StoredFamilyEvent } from "../../lib/db";
 
 type Ctx = { request: Request; env: DbEnv };
@@ -47,6 +47,8 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     med?: Record<string, { morning: boolean; evening: boolean }>;
     visits?: string[];
     familyEvents?: StoredFamilyEvent[];
+    /** 날짜별 건강 챌린지 체크인 — { "2026-11-16": ["water","walk"] } */
+    health?: Record<string, string[]>;
     today?: string;
   };
   try {
@@ -66,6 +68,18 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     const med = body.med?.[today];
     if (med) await saveMed(env, body.code, today, med.morning, med.evening);
     if (Array.isArray(body.familyEvents)) await saveFamilyEvents(env, body.code, body.familyEvents);
+    if (body.health && typeof body.health === "object") {
+      // 오늘 것을 먼저, 이어서 최근 날짜 몇 개까지 저장한다(다른 기기에서 찍은 도장도 함께).
+      const todayIds = Array.isArray(body.health[today]) ? body.health[today] : [];
+      await saveHealth(env, body.code, today, todayIds);
+      const others = Object.entries(body.health)
+        .filter(([d]) => d !== today && /^\d{4}-\d{2}-\d{2}$/.test(d))
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+        .slice(0, 6);
+      for (const [d, ids] of others) {
+        if (Array.isArray(ids)) await saveHealth(env, body.code, d, ids);
+      }
+    }
     await saveVisit(env, body.code, today);
     return json({ ok: true, mode, savedAt: new Date().toISOString() });
   } catch (e) {

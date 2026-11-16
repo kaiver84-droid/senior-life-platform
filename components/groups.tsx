@@ -3,8 +3,10 @@
 import React, { useMemo, useState } from "react";
 import { useGroup } from "@/lib/group-store";
 import { timeAgo } from "@/lib/groups";
-import { shareLink, shareMessageText } from "@/lib/share";
-import { kstDate } from "@/lib/week";
+import { kstDate, koreanDate } from "@/lib/week";
+import { useApp } from "@/lib/storage";
+import { HealthChallengeCard } from "./health";
+import { SharePreviewSheet } from "./share-sheet";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import {
   IconChevron,
@@ -349,6 +351,9 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             </BigButton>
           </div>
 
+          {/* 오늘의 건강 챌린지 — 모임원과 함께 원터치 체크인 */}
+          <HealthChallengeCard where="group" />
+
           {/* 오늘 출석 */}
           <Card className="fade-up p-4">
             <div className="flex items-center justify-between">
@@ -539,11 +544,13 @@ function GroupSheet({
   onChange: (m: SheetKind) => void;
 }) {
   const { groups, activeId, detail, select, create, join, inviteLink } = useGroup();
+  const { profile, today } = useApp();
   const { show } = useToast();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const open = mode !== null;
   const link = useMemo(() => (detail ? inviteLink(detail.id) : ""), [detail, inviteLink]);
@@ -578,25 +585,6 @@ function GroupSheet({
     show("모임에 들어왔어요! 🎉");
     setCode("");
     onClose();
-  };
-
-  const invite = async () => {
-    if (!detail) return;
-    const result = await shareLink({
-      title: `[늘봄] ${detail.name}에 초대합니다`,
-      description: `초대 코드 ${detail.id} · 함께 두뇌 퀴즈 풀고 순위를 겨뤄요!`,
-      url: link,
-      buttonTitle: "모임 들어가기",
-    });
-    show(
-      result === "kakao"
-        ? "카카오톡으로 초대장을 보냈어요. 보낼 사람을 골라 주세요."
-        : result === "share"
-          ? "공유 창이 열렸어요. 카카오톡을 골라 주세요."
-          : result === "downloaded"
-            ? "초대 링크를 복사했어요. 카카오톡 대화창에 붙여넣어 보내세요."
-            : "초대장을 보내지 못했어요. 링크 복사를 눌러 주세요."
-    );
   };
 
   const copy = async () => {
@@ -768,7 +756,7 @@ function GroupSheet({
             <p className="mt-1 break-all text-[0.84rem] font-semibold text-ink/70">{link}</p>
           </div>
 
-          <BigButton variant="sun" size="lg" full onClick={() => void invite()}>
+          <BigButton variant="sun" size="lg" full onClick={() => setShareOpen(true)}>
             <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
               TALK
             </span>
@@ -783,6 +771,35 @@ function GroupSheet({
             자동으로 이 모임에 들어옵니다.
           </p>
         </div>
+      ) : null}
+
+      {detail ? (
+        <SharePreviewSheet
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          data={{
+            kind: "invite",
+            badge: "우리 모임 초대",
+            emoji: "👥",
+            headline: `${detail.name}에 함께해요`,
+            sub: `초대 코드 ${detail.id} · 두뇌 퀴즈로 순위를 겨뤄요`,
+            message: "누르면 바로 모임에 들어와요.",
+            stats: [
+              { value: `${detail.memberCount}명`, label: "모임원" },
+              { value: `${detail.weeklyRate}%`, label: "이번 주 달성률" },
+            ],
+            name: profile?.nickname,
+            dateLabel: koreanDate(today),
+            title: `[늘봄] ${detail.name}에 초대합니다`,
+            description: `초대 코드 ${detail.id} · 함께 두뇌 퀴즈 풀고 순위를 겨뤄요!`,
+            buttonTitle: "모임 들어가기",
+            text: `${profile?.nickname || "가족"} 님이 ${detail.name}에 초대했어요! 초대 코드 ${detail.id}`,
+            link,
+            filename: `모임초대_${detail.id}.png`,
+            sheetTitle: "카카오톡으로 모임 초대",
+            sheetSubtitle: "가족 단톡방에 이렇게 보여요",
+          }}
+        />
       ) : null}
     </Sheet>
   );

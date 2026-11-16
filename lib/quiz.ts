@@ -15,17 +15,26 @@ export const QUIZ_TYPE_LABEL: Record<QuizType, string> = {
   choseong: "초성 퀴즈",
   lyrics: "옛날 노래 가사",
   spot: "틀린 그림 찾기",
+  ox: "OX 건강 상식",
+  nonsense: "넌센스·아재개그",
 };
 
 export const QUIZ_TYPE_EMOJI: Record<QuizType, string> = {
   choseong: "🧩",
   lyrics: "🎵",
   spot: "🔍",
+  ox: "⭕",
+  nonsense: "😄",
 };
 
-/* 문제 데이터: 초성 47 · 노래 69 · 틀린 그림 32 = 148문항
+/** 화면의 주제 고르기 순서 */
+export const QUIZ_TYPE_ORDER: QuizType[] = ["choseong", "lyrics", "spot", "ox", "nonsense"];
+
+/* 문제 데이터: 초성 47 · 노래 69 · 틀린 그림 32 · OX 30 · 넌센스 30 = 208문항
    초성은 정답 글자의 실제 초성에서, 노래 보기는 검증된 가사에서 만들었습니다.
-   (scripts/audit_quiz.py 로 초성·정답 위치·9칸 정확성을 다시 확인할 수 있어요.) */
+   OX 는 건강·생활 상식 중 널리 알려진 내용만, 넌센스는 시니어가 부담 없이 웃을 수 있는
+   말장난·수수께끼로 골랐습니다.
+   (scripts/audit_quiz.py 로 초성·정답 위치·9칸·OX 2지선다·넌센스를 다시 확인할 수 있어요.) */
 
 // 초성 47문항 · 노래 69문항 · 틀린 그림 32문항
 const CHOSEONG: Question[] = [
@@ -2269,14 +2278,805 @@ const SPOT: Question[] = [
   },
 ];
 
+/* OX 30문항 — ⭕/❌ 두 보기. 맞으면 0번(⭕), 틀리면 1번(❌).
+   힌트는 정답을 흘리지 않고, 해설은 이유를 한 줄로 알려 줍니다. */
+const OX: Question[] = [
+  {
+    id: "ox-water-early",
+    type: "ox",
+    prompt: "목이 마르기 전에 미리 물을 마시는 것이 좋다",
+    hint: "어르신은 갈증을 늦게 느끼신대요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 나이가 들면 목마름을 늦게 느껴서, 시간을 정해 두고 미리 마시는 편이 좋아요.",
+  },
+  {
+    id: "ox-stretch-circulation",
+    type: "ox",
+    prompt: "가벼운 스트레칭은 혈액 순환을 돕는다",
+    hint: "아침에 기지개를 켜면 몸이 가볍죠",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 5분만 천천히 늘려도 굳은 근육이 풀리고 피가 잘 돌아요.",
+  },
+  {
+    id: "ox-cold-antibiotic",
+    type: "ox",
+    prompt: "감기에는 항생제를 먹으면 빨리 낫는다",
+    hint: "감기의 원인을 생각해 보세요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "감기는 바이러스 때문에 생겨서 항생제(세균용 약)가 듣지 않아요. 물과 휴식이 먼저예요.",
+  },
+  {
+    id: "ox-juice-sugar",
+    type: "ox",
+    prompt: "과일 주스는 과일보다 당이 많을 수 있다",
+    hint: "한 잔에 과일이 몇 개 들어갈까요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 주스 한 잔에는 과일 두세 개의 당이 들어가고, 씹는 섬유질은 줄어요.",
+  },
+  {
+    id: "ox-bp-stop",
+    type: "ox",
+    prompt: "혈압약은 기분이 좋아지면 스스로 끊어도 된다",
+    hint: "혈압은 느끼기 어려운 것이 문제예요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "끊으면 혈압이 다시 오를 수 있어요. 약은 꼭 의사 선생님과 상의한 뒤에 바꿔요.",
+  },
+  {
+    id: "ox-fever-cover",
+    type: "ox",
+    prompt: "열이 나면 이불을 두껍게 덮고 땀을 빼야 한다",
+    hint: "열을 내보내야 할 때는 어떻게 할까요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "두껍게 덮으면 열이 더 오를 수 있어요. 얇게 덮고 물을 자주 마시는 편이 좋아요.",
+  },
+  {
+    id: "ox-handwash",
+    type: "ox",
+    prompt: "손 씻기는 감기와 장염을 예방하는 데 도움이 된다",
+    hint: "비누로 30초",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 비누로 30초 씻는 것만으로도 감기·장염이 크게 줄어요.",
+  },
+  {
+    id: "ox-walk30",
+    type: "ox",
+    prompt: "하루 30분 걷기는 심장 건강에 좋다",
+    hint: "숨이 약간 찰 정도면 충분해요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 한 번에 30분이 어려우면 10분씩 세 번 나눠 걸어도 좋아요.",
+  },
+  {
+    id: "ox-sitting",
+    type: "ox",
+    prompt: "오래 앉아 있으면 다리 혈액 순환에 좋다",
+    hint: "다리가 붓지는 않으세요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "오래 앉아 있으면 피가 잘 돌지 않아 다리가 붓고 저려요. 한 시간마다 일어나 걸어 주세요.",
+  },
+  {
+    id: "ox-winter-sun",
+    type: "ox",
+    prompt: "겨울에도 자외선 차단이 필요하다",
+    hint: "눈이 부신 겨울날을 떠올려 보세요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 겨울 햇살도 자외선이 있어서 야외 활동이 길면 모자나 자외선 차단제가 도움이 돼요.",
+  },
+  {
+    id: "ox-knee-rest",
+    type: "ox",
+    prompt: "무릎이 아프면 움직이지 않고 누워만 있어야 한다",
+    hint: "움직이지 않으면 근육은 어떻게 될까요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "오히려 근육이 약해져 무릎이 더 불편해질 수 있어요. 통증이 심할 때는 의사와 상의하고, 가벼운 근력 운동을 꾸준히 하는 게 도움이 돼요.",
+  },
+  {
+    id: "ox-muscle-age",
+    type: "ox",
+    prompt: "나이가 들면 근육량이 줄어든다",
+    hint: "힘이 예전 같지 않다는 느낌",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 그래서 단백질과 가벼운 근력 운동으로 근육을 지켜 주는 것이 중요해요.",
+  },
+  {
+    id: "ox-vitamin-more",
+    type: "ox",
+    prompt: "비타민은 많이 먹을수록 더 좋다",
+    hint: "약도 지나치면 탈이 나죠",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "너무 많이 먹으면 오히려 몸에 해가 될 수 있어요. 필요한 만큼만 드세요.",
+  },
+  {
+    id: "ox-salt-bp",
+    type: "ox",
+    prompt: "짠 음식을 많이 먹으면 혈압이 오를 수 있다",
+    hint: "국물과 장아찌",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 국물은 조금만, 김치·장아찌는 양을 줄이면 혈압 관리에 도움이 돼요.",
+  },
+  {
+    id: "ox-bp-120",
+    type: "ox",
+    prompt: "혈압은 항상 120/80 이어야만 정상이다",
+    hint: "나이와 상황에 따라 조금씩 달라요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "보통 140/90 미만이면 괜찮은 편이에요. 숫자 하나에 놀라지 말고 병원에서 재어 보세요.",
+  },
+  {
+    id: "ox-strength-70",
+    type: "ox",
+    prompt: "70대에도 근력 운동은 효과가 있다",
+    hint: "의자에서 일어나기만 해도 운동이에요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 의자에서 일어나기, 벽 짚고 앉았다 일어나기 같은 동작만으로도 다리 힘이 좋아져요.",
+  },
+  {
+    id: "ox-coffee-sleep",
+    type: "ox",
+    prompt: "커피를 마시면 누구나 잠을 못 잔다",
+    hint: "사람마다 다르답니다",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "사람마다 달라요. 다만 늦은 오후 커피는 잠을 얕게 만들 수 있으니 낮에만 드셔 보세요.",
+  },
+  {
+    id: "ox-breath-stop",
+    type: "ox",
+    prompt: "운동 중 숨이 심하게 차면 잠시 멈추는 것이 좋다",
+    hint: "욕심내지 않는 것이 건강",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 숨이 차면 잠시 쉬고, 가슴 통증이나 어지럼증이 있으면 바로 운동을 멈추세요.",
+  },
+  {
+    id: "ox-fever-med",
+    type: "ox",
+    prompt: "감기에 걸리면 무조건 해열제를 먹어야 한다",
+    hint: "열은 몸이 싸우는 신호예요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "열이 심하거나 힘드실 때만 드셔도 돼요. 물을 마시고 푹 쉬는 것이 먼저예요.",
+  },
+  {
+    id: "ox-night-water",
+    type: "ox",
+    prompt: "밤에 물을 많이 마시면 화장실에 자주 가게 된다",
+    hint: "잠자기 전 한 잔은 조심",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 물은 낮에 넉넉히 드시고, 자기 전에는 목을 적실 만큼만 드세요.",
+  },
+  {
+    id: "ox-protein",
+    type: "ox",
+    prompt: "나이가 들면 단백질이 부족해지기 쉽다",
+    hint: "달걀·두부·생선",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 한 끼에 달걀 하나, 두부 한 조각처럼 단백질 반찬을 챙겨 드세요.",
+  },
+  {
+    id: "ox-phone-dry",
+    type: "ox",
+    prompt: "스마트폰을 오래 보면 눈이 건조해질 수 있다",
+    hint: "눈을 깜빡이는 횟수가 줄어요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 20분에 한 번 눈을 감고 먼 곳을 바라봐 주시면 좋아요.",
+  },
+  {
+    id: "ox-water-once",
+    type: "ox",
+    prompt: "물은 하루에 한 번 몰아 마시는 것이 좋다",
+    hint: "한꺼번에 마시면 어떻게 될까요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "한꺼번에 마시면 몸이 다 쓰지 못해요. 한두 시간마다 나눠 마시는 게 좋아요.",
+  },
+  {
+    id: "ox-sleep10",
+    type: "ox",
+    prompt: "잠은 하루 10시간 이상 자는 것이 가장 좋다",
+    hint: "너무 많이 자도 하루가 무거워요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "보통 7~8시간이면 충분해요. 자는 시간이 길어도 낮에 졸리면 한 번 상담해 보세요.",
+  },
+  {
+    id: "ox-young-only",
+    type: "ox",
+    prompt: "운동은 젊을 때만 효과가 있다",
+    hint: "오늘 시작해도 늦지 않아요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "아무리 늦게 시작해도 근력·균형이 좋아져요. 무리하지 않고 조금씩 늘려 가면 돼요.",
+  },
+  {
+    id: "ox-warmup",
+    type: "ox",
+    prompt: "운동 전 준비운동은 부상을 줄여 준다",
+    hint: "몸을 먼저 데워 주세요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 제자리 걷기·발목 돌리기로 3~5분 몸을 풀면 넘어지거나 다칠 위험이 줄어요.",
+  },
+  {
+    id: "ox-cold-exercise",
+    type: "ox",
+    prompt: "감기에 걸리면 꼭 운동을 해서 땀을 내야 한다",
+    hint: "몸이 아플 때는 쉬는 게 약",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "열이 나거나 몸살이 있으면 운동은 쉬세요. 가벼운 산책은 괜찮지만 무리는 금물이에요.",
+  },
+  {
+    id: "ox-stairs",
+    type: "ox",
+    prompt: "계단 오르내리기는 적당히 하면 다리 힘에 도움이 된다",
+    hint: "손잡이가 있는 계단이면 더 안전해요",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 0,
+    explain: "맞아요. 난간을 꼭 잡고 무릎이 아프지 않을 만큼만 오르내리세요.",
+  },
+  {
+    id: "ox-less-water-old",
+    type: "ox",
+    prompt: "나이가 들면 물을 예전보다 적게 마셔도 된다",
+    hint: "갈증을 잘 못 느끼는 것과 물이 필요 없는 것은 다르답니다",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "아니에요. 나이가 들면 갈증을 느끼는 감각이 둔해질 뿐, 몸에 필요한 물은 그대로예요.",
+  },
+  {
+    id: "ox-any-drink-med",
+    type: "ox",
+    prompt: "약은 물 대신 아무 음료로 먹어도 괜찮다",
+    hint: "자몽 주스와 함께 먹으면",
+    options: [
+      "⭕ 맞아요",
+      "❌ 아니에요",
+    ],
+    answer: 1,
+    explain: "약은 미지근한 물과 드세요. 자몽 주스 같은 음료는 약과 부딪칠 수 있어요.",
+  },
+];
+
+/* 넌센스·아재개그 30문항 — 4지선다. 정답은 널리 알려진 말장난·수수께끼의 답. */
+const NONSENSE: Question[] = [
+  {
+    id: "ns-hot-fruit",
+    type: "nonsense",
+    prompt: "세상에서 가장 뜨거운 과일은 무엇일까요?",
+    hint: "'하늘 천(天)' 자가 들어 있어요",
+    options: [
+      "딸기",
+      "수박",
+      "천도복숭아",
+      "참외",
+    ],
+    answer: 2,
+    explain: "'천(天) 도(熱)' 복숭아! 이름에 뜨거울 열(熱)이 들어 있어요. 크게 웃으셨죠?",
+  },
+  {
+    id: "ns-king-fall",
+    type: "nonsense",
+    prompt: "임금님이 넘어지면 무엇이 될까요?",
+    hint: "영어로 임금은 'king'",
+    options: [
+      "킹콩",
+      "킹크랩",
+      "킹스맨",
+      "킹카",
+    ],
+    answer: 0,
+    explain: "킹(king)이 콩 하고 넘어져서 '킹콩'이에요. 오늘 하루도 넘어지지 마세요!",
+  },
+  {
+    id: "ns-dog-teach",
+    type: "nonsense",
+    prompt: "개가 사람을 가르치면 무엇이 될까요?",
+    hint: "학교에서 하는 일이에요",
+    options: [
+      "개인교수",
+      "개인과외",
+      "개인기",
+      "개인정보",
+    ],
+    answer: 0,
+    explain: "개가 사람을 가르치니 '개인교수'예요. 혼자 공부하실 때도 개인교수처럼 차분히!",
+  },
+  {
+    id: "ns-cow-laugh",
+    type: "nonsense",
+    prompt: "소가 크게 웃으면 무엇이 될까요?",
+    hint: "아침에 마시는 그것",
+    options: [
+      "치즈",
+      "버터",
+      "우유",
+      "요구르트",
+    ],
+    answer: 2,
+    explain: "소가 '우유' 하고 웃어서 우유가 됐어요. 웃음은 정말 몸에 좋아요.",
+  },
+  {
+    id: "ns-banana-laugh",
+    type: "nonsense",
+    prompt: "바나나가 웃으면 무엇이 될까요?",
+    hint: "발로 차는 동작이에요",
+    options: [
+      "바나나킥",
+      "바나나우유",
+      "바나나껍질",
+      "바나나빵",
+    ],
+    answer: 0,
+    explain: "바나나가 웃으며 '킥'! 그래서 바나나킥이에요. 축구할 때 떠오르시죠?",
+  },
+  {
+    id: "ns-fish-opposite",
+    type: "nonsense",
+    prompt: "'물고기'의 반대말은 무엇일까요?",
+    hint: "고기는 고기인데 물이 아니에요",
+    options: [
+      "갈비탕",
+      "불고기",
+      "생선구이",
+      "찜닭",
+    ],
+    answer: 1,
+    explain: "물고기의 반대는 '불고기'! 물(水) 대신 불(火)이 들어가니까요. 오늘 저녁은 불고기 어떠세요?",
+  },
+  {
+    id: "ns-up-opposite",
+    type: "nonsense",
+    prompt: "'업(up)'의 반대말은 무엇일까요?",
+    hint: "컴퓨터에서 많이 들어 보셨죠",
+    options: [
+      "업그레이드",
+      "다운",
+      "리셋",
+      "로딩",
+    ],
+    answer: 1,
+    explain: "업의 반대는 '다운'이에요. 올라가면 내려오는 것, 참 쉬우면서도 웃기죠?",
+  },
+  {
+    id: "ns-long-country",
+    type: "nonsense",
+    prompt: "세상에서 가장 길쭉한 나라는 어디일까요?",
+    hint: "남미에 있고, 남북으로 아주 길어요",
+    options: [
+      "칠레",
+      "이집트",
+      "캐나다",
+      "호주",
+    ],
+    answer: 0,
+    explain: "칠레는 남북으로 4,300km나 되는 길쭉한 나라예요. 그래서 '가장 긴 나라'라고 불러요.",
+  },
+  {
+    id: "ns-small-country",
+    type: "nonsense",
+    prompt: "세상에서 가장 작은 나라는 어디일까요?",
+    hint: "로마 안에 있는 나라예요",
+    options: [
+      "모나코",
+      "바티칸",
+      "싱가포르",
+      "몰타",
+    ],
+    answer: 1,
+    explain: "바티칸 시국은 로마 안에 있는 아주 작은 나라예요. 걸어서 금방 한 바퀴 돌 수 있어요.",
+  },
+  {
+    id: "ns-elephant-fridge",
+    type: "nonsense",
+    prompt: "코끼리를 냉장고에 넣는 방법은 무엇일까요?",
+    hint: "아주 단순하게 생각해 보세요",
+    options: [
+      "냉장고를 새로 산다",
+      "코끼리를 작게 만든다",
+      "냉장고 문을 열고 넣는다",
+      "코끼리에게 부탁한다",
+    ],
+    answer: 2,
+    explain: "문을 열고 넣으면 돼요. 어렵게 생각할 것 없이 한 걸음씩!",
+  },
+  {
+    id: "ns-elephant-out",
+    type: "nonsense",
+    prompt: "냉장고에 넣은 코끼리를 다시 꺼내는 방법은 무엇일까요?",
+    hint: "넣을 때와 반대로",
+    options: [
+      "냉장고를 뒤집는다",
+      "코끼리가 스스로 나온다",
+      "그냥 둔다",
+      "문을 열고 꺼낸다",
+    ],
+    answer: 3,
+    explain: "넣을 때처럼 문을 열고 꺼내면 끝이에요. 순서대로 하면 어려운 일도 쉬워져요.",
+  },
+  {
+    id: "ns-zoo-elephant",
+    type: "nonsense",
+    prompt: "동물원에 코끼리가 한 마리도 없는 이유는 무엇일까요?",
+    hint: "앞의 두 문제를 떠올려 보세요",
+    options: [
+      "코끼리가 너무 커서",
+      "냉장고에 있으니까",
+      "동물원이 문을 닫아서",
+      "코끼리가 아파서",
+    ],
+    answer: 1,
+    explain: "아까 냉장고에 넣어 두었으니까요! 이어지는 이야기가 재미있어서 오래 웃게 되는 문제예요.",
+  },
+  {
+    id: "ns-comb",
+    type: "nonsense",
+    prompt: "입은 하나인데 이가 수십 개인 것은 무엇일까요?",
+    hint: "머리를 빗을 때 씁니다",
+    options: [
+      "숟가락",
+      "빗",
+      "연필",
+      "칫솔",
+    ],
+    answer: 1,
+    explain: "바로 빗이에요. 이빨이 촘촘하지만 먹지는 못하죠.",
+  },
+  {
+    id: "ns-four-legs",
+    type: "nonsense",
+    prompt: "다리 네 개가 있는데 걸을 수 없는 것은 무엇일까요?",
+    hint: "방에 하나쯤 있죠",
+    options: [
+      "냉장고",
+      "의자",
+      "책상",
+      "자동차",
+    ],
+    answer: 2,
+    explain: "책상은 네 다리가 있어도 늘 그 자리에 있어요. 의자도 네 발이지만 앉는 물건이라 책상이 더 알맞아요.",
+  },
+  {
+    id: "ns-sphinx",
+    type: "nonsense",
+    prompt: "아침에는 네 발, 점심에는 두 발, 저녁에는 세 발로 걷는 것은 무엇일까요?",
+    hint: "태어나서 늙어 가는 모습이에요",
+    options: [
+      "강아지",
+      "거북이",
+      "사람",
+      "기차",
+    ],
+    answer: 2,
+    explain: "사람이에요. 아기는 네 발로 기고, 어른은 두 발, 늙으면 지팡이를 짚어 세 발이 되죠.",
+  },
+  {
+    id: "ns-car",
+    type: "nonsense",
+    prompt: "차는 차인데 마시지 못하는 차는 무엇일까요?",
+    hint: "역에 가면 볼 수 있어요",
+    options: [
+      "녹차",
+      "기차",
+      "홍차",
+      "보리차",
+    ],
+    answer: 1,
+    explain: "기차는 마시는 차가 아니라 타는 차예요. 같은 소리, 다른 뜻이라 재미있죠.",
+  },
+  {
+    id: "ns-chicken-leg",
+    type: "nonsense",
+    prompt: "사람이 먹을 수 있는 다리는 무엇일까요?",
+    hint: "시장에서 파는 그것",
+    options: [
+      "책상다리",
+      "안경다리",
+      "닭다리",
+      "의자다리",
+    ],
+    answer: 2,
+    explain: "닭다리만 먹을 수 있죠. 책상다리·안경다리는 맛이 없어요.",
+  },
+  {
+    id: "ns-clock-hands",
+    type: "nonsense",
+    prompt: "손이 세 개인 것은 무엇일까요?",
+    hint: "벽에 걸려 있고 째깍째깍",
+    options: [
+      "부채",
+      "우산",
+      "가위",
+      "시계",
+    ],
+    answer: 3,
+    explain: "시계에는 시침·분침·초침, 세 개의 '손'이 있답니다.",
+  },
+  {
+    id: "ns-traffic-eyes",
+    type: "nonsense",
+    prompt: "눈이 세 개인 것은 무엇일까요?",
+    hint: "길을 건널 때 마주 보는 것",
+    options: [
+      "안경",
+      "주사위",
+      "부엌",
+      "신호등",
+    ],
+    answer: 3,
+    explain: "신호등은 빨강·노랑·초록 세 개의 '눈'으로 우리에게 말을 해요.",
+  },
+  {
+    id: "ns-dice-faces",
+    type: "nonsense",
+    prompt: "얼굴이 여섯 개인 것은 무엇일까요?",
+    hint: "윷놀이 옆에 두는 물건",
+    options: [
+      "주사위",
+      "축구공",
+      "달력",
+      "시계",
+    ],
+    answer: 0,
+    explain: "주사위는 여섯 면이 모두 다른 얼굴이에요. 하나부터 여섯까지 숫자가 새겨져 있죠.",
+  },
+  {
+    id: "ns-fan-wings",
+    type: "nonsense",
+    prompt: "날개는 있지만 하늘을 날지 못하는 것은 무엇일까요?",
+    hint: "더울 때 틀어 놓는 것",
+    options: [
+      "비행기",
+      "새",
+      "연",
+      "선풍기",
+    ],
+    answer: 3,
+    explain: "선풍기의 날개는 돌기만 하지 하늘로 날지는 않아요. 시원하게 돌아가 주는 것이 고마울 뿐이죠.",
+  },
+  {
+    id: "ns-nail-head",
+    type: "nonsense",
+    prompt: "머리는 있는데 목이 없는 것은 무엇일까요?",
+    hint: "망치로 두드려 박는 것",
+    options: [
+      "바늘",
+      "연필",
+      "숟가락",
+      "못",
+    ],
+    answer: 3,
+    explain: "못에는 머리가 있지만 목은 없어요. 망치로 톡 치면 박히죠.",
+  },
+  {
+    id: "ns-saw-teeth",
+    type: "nonsense",
+    prompt: "이는 있는데 입이 없는 것은 무엇일까요?",
+    hint: "나무를 자를 때 씁니다",
+    options: [
+      "가위",
+      "칼",
+      "톱",
+      "망치",
+    ],
+    answer: 2,
+    explain: "톱에는 날카로운 이가 촘촘하게 있지만 먹을 것은 없어요.",
+  },
+  {
+    id: "ns-dream",
+    type: "nonsense",
+    prompt: "눈을 감으면 보이고 눈을 뜨면 보이지 않는 것은 무엇일까요?",
+    hint: "자는 동안 만나는 세상",
+    options: [
+      "별",
+      "그림자",
+      "꿈",
+      "구름",
+    ],
+    answer: 2,
+    explain: "꿈이에요. 잠들면 펼쳐지고 눈을 뜨면 사라지죠. 좋은 꿈 꾸세요!",
+  },
+  {
+    id: "ns-three-days",
+    type: "nonsense",
+    prompt: "'사흘'은 며칠을 말할까요?",
+    hint: "'나흘'과 헷갈리기 쉬워요",
+    options: [
+      "2일",
+      "3일",
+      "4일",
+      "5일",
+    ],
+    answer: 1,
+    explain: "사흘은 3일이에요. 나흘은 4일, 닷새는 5일이란 뜻이랍니다.",
+  },
+  {
+    id: "ns-mirror-hand",
+    type: "nonsense",
+    prompt: "거울 속의 내가 오른손을 들면 거울 속 나는 어떻게 할까요?",
+    hint: "거울은 좌우를 바꿔 보여 줘요",
+    options: [
+      "오른손을 든다",
+      "왼손을 든다",
+      "두 손을 든다",
+      "아무것도 안 든다",
+    ],
+    answer: 1,
+    explain: "거울 속 나는 왼손을 들어요. 내 오른쪽이 거울에서는 왼쪽으로 보이니까요.",
+  },
+  {
+    id: "ns-fastest",
+    type: "nonsense",
+    prompt: "세상에서 가장 빠른 것은 무엇일까요?",
+    hint: "눈 깜빡할 사이에 어디든 가지요",
+    options: [
+      "생각",
+      "빛",
+      "소리",
+      "바람",
+    ],
+    answer: 0,
+    explain: "생각만 하면 어디든 갈 수 있으니 '생각'이 가장 빠르다는 농담이 있어요. (빛도 아주 빠르지만요!)",
+  },
+  {
+    id: "ns-bread-four",
+    type: "nonsense",
+    prompt: "빵 3개를 4명이 먹으려면 어떻게 해야 할까요?",
+    hint: "웃음이 나는 답이에요",
+    options: [
+      "4명이 3개를 나눌 수 없다",
+      "빵을 숨긴다",
+      "빵을 하나 더 산다",
+      "빵을 모두 버린다",
+    ],
+    answer: 2,
+    explain: "빵을 하나 더 사서 넷이 하나씩 먹으면 돼요. 참 쉽죠?",
+  },
+  {
+    id: "ns-short-month",
+    type: "nonsense",
+    prompt: "1년 중 가장 짧은 달은 몇 월일까요?",
+    hint: "윤년에는 하루가 더 있어요",
+    options: [
+      "1월",
+      "2월",
+      "3월",
+      "12월",
+    ],
+    answer: 1,
+    explain: "2월은 28일(윤년 29일)로 가장 짧아요. 그래서 2월은 금방 지나가죠.",
+  },
+  {
+    id: "ns-sweet-potato",
+    type: "nonsense",
+    prompt: "고구마가 화가 나면 무엇이 될까요?",
+    hint: "불에 구운 고구마",
+    options: [
+      "군고구마",
+      "삶은 감자",
+      "감자튀김",
+      "고구마 줄기",
+    ],
+    answer: 0,
+    explain: "화가 나서 불이 붙으면 '군고구마'가 된대요. 따뜻한 군고구마 하나 드실래요?",
+  },
+];
+
 export const QUIZ_POOLS: Record<QuizType, Question[]> = {
   choseong: CHOSEONG,
   lyrics: LYRICS,
   spot: SPOT,
+  ox: OX,
+  nonsense: NONSENSE,
 };
 
 /** 전체 문제 은행 (연습 모드에서 모두 활용) */
-export const ALL_QUESTIONS: Question[] = [...CHOSEONG, ...LYRICS, ...SPOT];
+export const ALL_QUESTIONS: Question[] = [...CHOSEONG, ...LYRICS, ...SPOT, ...OX, ...NONSENSE];
 
 export const QUIZ_TOTAL_COUNT = ALL_QUESTIONS.length;
 
@@ -2289,12 +3089,19 @@ function hashStr(s: string): number {
   return h >>> 0;
 }
 
-/** 그날의 3문제 (초성 1 · 노래 1 · 틀린 그림 1) — 날짜가 같으면 항상 같음 */
+/**
+ * 그날의 3문제 — 날짜가 같으면 항상 같다.
+ * 1번은 초성, 2번은 옛날 노래로 고정하고, 3번은 틀린 그림·OX·넌센스를 날짜에 따라 돌아가며 낸다.
+ * 그래서 며칠만 풀어도 OX·넌센스 문제를 자연스럽게 만나게 된다.
+ */
 export function dailyQuestions(date: string): Question[] {
   const c = CHOSEONG[hashStr(date + "|ch") % CHOSEONG.length];
   const l = LYRICS[hashStr(date + "|ly") % LYRICS.length];
-  const s = SPOT[hashStr(date + "|sp") % SPOT.length];
-  return [c, l, s];
+  const rotating: Question[][] = [SPOT, OX, NONSENSE];
+  const slot = hashStr(date + "|third") % rotating.length;
+  const pool = rotating[slot];
+  const third = pool[hashStr(date + "|t" + slot) % pool.length];
+  return [c, l, third];
 }
 
 function pickRandom(pool: Question[], avoid: Set<string>): Question {
@@ -2304,14 +3111,28 @@ function pickRandom(pool: Question[], avoid: Set<string>): Question {
 }
 
 /**
- * 연습 모드용 3문제 — 유형마다 하나씩 무작위로 고른다.
+ * 연습 모드용 3문제.
+ * - `only` 를 주면 그 주제에서 3문제를 고른다(‘주제 골라 풀기’).
+ * - 주지 않으면 서로 다른 유형 5가지 중 무작위 3가지를 골라 하나씩 낸다.
  * 점수·연속 출석·순위와는 무관한 두뇌 훈련용이고,
  * excludeIds 에 방금 푼 문제 id 를 넣으면 같은 문제가 바로 다시 나오지 않는다.
  */
-export function practiceQuestions(excludeIds: string[] = []): Question[] {
+export function practiceQuestions(excludeIds: string[] = [], only?: QuizType): Question[] {
   const avoid = new Set(excludeIds);
-  const picks = [pickRandom(CHOSEONG, avoid), pickRandom(LYRICS, avoid), pickRandom(SPOT, avoid)];
-  return picks;
+  if (only) {
+    const pool = QUIZ_POOLS[only];
+    const used = new Set(avoid);
+    const picked: Question[] = [];
+    for (let i = 0; i < Math.min(3, pool.length); i++) {
+      const rest = pool.filter((q) => !used.has(q.id));
+      const q = pickRandom(rest.length ? rest : pool, used);
+      picked.push(q);
+      used.add(q.id);
+    }
+    return picked;
+  }
+  const shuffled = [...QUIZ_TYPE_ORDER].sort(() => Math.random() - 0.5).slice(0, 3);
+  return shuffled.map((t) => pickRandom(QUIZ_POOLS[t], avoid));
 }
 
 export function calcPoints(correct: number, total: number, seconds: number): number {

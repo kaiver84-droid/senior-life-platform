@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * 카카오톡 공유 · 휴대폰 공유창 · 링크/이미지 복사 폴백.
+ *
+ * 2단계 고도화 내용
+ * - 만든 카드 이미지를 Kakao.Share.uploadImage 로 먼저 올려 **내 카드 그대로** 카톡 피드에 보낸다.
+ *   (업로드가 막힌 앱이면 사이트 대표 이미지로 자동 대체)
+ * - SDK 미설정·도메인 미등록(4019)·카톡 인앱브라우저·공유 취소를 구분해
+ *   `ShareOutcome` 으로 돌려주고 화면이 알맞은 안내를 보여 줄 수 있게 한다.
+ * - 어느 단계에서 막혀도 마지막에는 이미지 저장 + 링크 복사로 반드시 끝난다.
+ */
 import { canvasToFile, downloadCanvas } from "./canvas";
 
 export type KakaoConfig = { jsKey: string; configured: boolean };
@@ -12,7 +22,10 @@ export function kakaoConfig(): KakaoConfig {
 type KakaoSdk = {
   isInitialized: () => boolean;
   init: (key: string) => void;
-  Share: { sendDefault: (payload: unknown) => void };
+  Share: {
+    sendDefault: (payload: unknown) => unknown;
+    uploadImage?: (settings: { file: File }) => Promise<{ infos?: { original?: { url?: string } } }>;
+  };
   Auth?: {
     authorize?: (settings: { redirectUri: string; throughTalk?: boolean; prompt?: string }) => void;
   };
@@ -70,11 +83,7 @@ export function kakaoAuthorizeNow(redirectUri: string): boolean {
 
 /**
  * 카카오톡 앱 간편로그인(원터치) — 아이디/비밀번호 입력 없이 카카오톡으로 인증한다.
- *
- * Kakao.Auth.authorize({ throughTalk: true }) 는 JavaScript 키 + JavaScript SDK 도메인 +
- * 카카오 로그인 사용 설정이 있는 앱에서만 동작하고, 호출하면 카카오톡 앱(또는 카카오계정 화면)으로
- * 이동하므로 정상 호출 시 이 함수는 true 를 돌려주고 페이지는 곧 떠난다.
- * SDK 미로드/미설정/예외일 때만 false 를 돌려주어 호출한 쪽이 서버 경유(/api/auth/kakao?start=1)로 폴백한다.
+ * SDK 미로드/미설정/예외일 때만 false 를 돌려주어 호출한 쪽이 서버 경유로 폴백한다.
  */
 export async function startKakaoLogin(redirectUri: string): Promise<boolean> {
   if (kakaoAuthorizeNow(redirectUri)) return true;
@@ -82,6 +91,271 @@ export async function startKakaoLogin(redirectUri: string): Promise<boolean> {
   if (!loaded) return false;
   return kakaoAuthorizeNow(redirectUri);
 }
+
+/* ------------------------------------------------------------------ */
+/* 공유 결과                                                            */
+/* ------------------------------------------------------------------ */
+
+export type ShareChannel = "kakao" | "share" | "saved" | "copied" | "failed";
+
+/** 왜 다른 길로 내려갔는지 — 화면 안내 문구를 고르는 데 쓴다 */
+export type ShareReason =
+  | "ok"
+  | "sdk_absent"
+  | "domain_not_registered"
+  | "kakao_refused"
+  | "inapp_browser"
+  | "share_absent"
+  | "cancelled"
+  | "copy_failed";
+
+export type ShareOutcome = {
+  kind: ShareChannel;
+  reason: ShareReason;
+  /** 사용자에게 그대로 보여 줄 한 줄 안내 */
+  message: string;
+  /** 카카오 업로드로 만든 이미지 주소(있으면) */
+  imageUrl?: string;
+};
+
+export function isKakaoInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /KAKAOTALK/i.test(navigator.userAgent);
+}
+
+/** 카카오 SDK 오류에서 '도메인 미등록(4019)'을 알아본다 */
+function kakaoReason(err: unknown): ShareReason {
+  const anyErr = err as { code?: number | string; message?: string; status?: number } | null;
+  const code = anyErr?.code ?? anyErr?.status;
+  const text = `${anyErr?.message ?? ""} ${String(err ?? "")}`;
+  if (String(code) === "4019" || text.includes("4019") || /domain/i.test(text)) {
+    return "domain_not_registered";
+  }
+  return "kakao_refused";
+}
+
+export function shareOutcomeMessage(outcome: ShareOutcome): string {
+  switch (outcome.kind) {
+    case "kakao":
+      return "카카오톡으로 보냈어요. 보낼 사람을 골라 주세요.";
+    case "share":
+      return outcome.reason === "cancelled"
+        ? "공유를 멈췄어요. 다시 보내실 수 있어요."
+        : "공유 창을 열었어요. 카카오톡을 골라 주세요.";
+    case "saved":
+      return "이미지를 저장하고 글을 복사했어요. 카카오톡 대화창에 붙여넣어 보내세요.";
+    case "copied":
+      return "링크를 복사했어요. 카카오톡 대화창에 붙여넣어 보내세요.";
+    default:
+      return "공유가 되지 않았어요. 이미지 저장을 먼저 눌러 보세요.";
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 작은 도구들                                                          */
+/* ------------------------------------------------------------------ */
+
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* 아래 예비 방법으로 */
+  }
+  try {
+    if (typeof document === "undefined") return false;
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+export function saveImage(canvas: HTMLCanvasElement, filename: string): boolean {
+  try {
+    downloadCanvas(canvas, filename);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 카카오에 카드 이미지를 올려 공개 주소를 받는다(실패하면 null → 대표 이미지 사용) */
+async function uploadKakaoImage(canvas: HTMLCanvasElement, filename: string): Promise<string | null> {
+  const w = window as KakaoWindow;
+  if (!w.Kakao?.Share?.uploadImage) return null;
+  const file = await canvasToFile(canvas, filename);
+  if (!file) return null;
+  try {
+    const res = await w.Kakao.Share.uploadImage({ file });
+    const url = res?.infos?.original?.url;
+    return url && /^https?:\/\//.test(url) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 카카오 피드 보내기                                                   */
+/* ------------------------------------------------------------------ */
+
+export type ShareLinkOptions = {
+  title: string;
+  description: string;
+  link: string;
+  buttonTitle?: string;
+  imageUrl?: string;
+};
+
+async function kakaoSendFeed(opts: ShareLinkOptions, imageUrl: string): Promise<ShareOutcome> {
+  const w = window as KakaoWindow;
+  try {
+    const ret = w.Kakao?.Share.sendDefault({
+      objectType: "feed",
+      content: {
+        title: opts.title,
+        description: opts.description,
+        imageUrl,
+        imageWidth: 1200,
+        imageHeight: 630,
+        link: { mobileWebUrl: opts.link, webUrl: opts.link },
+      },
+      buttons: [
+        {
+          title: opts.buttonTitle || "늘봄 열기",
+          link: { mobileWebUrl: opts.link, webUrl: opts.link },
+        },
+      ],
+      installTalk: true,
+    });
+    if (ret && typeof (ret as Promise<unknown>).then === "function") await ret;
+    return { kind: "kakao", reason: "ok", message: shareOutcomeMessage({ kind: "kakao", reason: "ok", message: "" }), imageUrl };
+  } catch (err) {
+    const reason = kakaoReason(err);
+    return { kind: "failed", reason, message: "" };
+  }
+}
+
+/**
+ * 카드 이미지를 카카오톡으로 보낸다.
+ * 1) Kakao.Share.uploadImage 로 내 카드 이미지를 올려 피드 카드로 전송
+ * 2) 업로드가 막히면 사이트 대표 이미지로 피드 카드 전송
+ * 3) SDK 가 없거나 도메인 미등록(4019)이면 실패를 그대로 알려 준다(화면이 다음 길로 안내)
+ */
+export async function sendKakaoCard(opts: ShareLinkOptions & { canvas?: HTMLCanvasElement; filename?: string }): Promise<ShareOutcome> {
+  const loaded = await loadKakaoSdk();
+  if (!loaded) return { kind: "failed", reason: "sdk_absent", message: "" };
+
+  let imageUrl = opts.imageUrl || "";
+  if (opts.canvas) {
+    const uploaded = await uploadKakaoImage(opts.canvas, opts.filename || "neulbom-card.png");
+    if (uploaded) imageUrl = uploaded;
+  }
+  if (!imageUrl) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    imageUrl = `${origin}/share-card.png`;
+  }
+  return kakaoSendFeed(opts, imageUrl);
+}
+
+/* ------------------------------------------------------------------ */
+/* 휴대폰 공유창                                                        */
+/* ------------------------------------------------------------------ */
+
+export async function shareViaDevice(opts: {
+  title: string;
+  text: string;
+  link?: string;
+  canvas?: HTMLCanvasElement;
+  filename?: string;
+}): Promise<ShareOutcome> {
+  const { title, text, link, canvas, filename } = opts;
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return { kind: "failed", reason: "share_absent", message: "" };
+  }
+  try {
+    if (canvas) {
+      const file = await canvasToFile(canvas, filename || "neulbom-card.png");
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title, text });
+        return { kind: "share", reason: "ok", message: "" };
+      }
+    }
+    await navigator.share({ title, text, url: link });
+    return { kind: "share", reason: "ok", message: "" };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return { kind: "share", reason: "cancelled", message: "" };
+    }
+    return { kind: "failed", reason: "share_absent", message: "" };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 한 번에: 카카오 → 공유창 → 저장+복사                                  */
+/* ------------------------------------------------------------------ */
+
+export type SmartShareInput = {
+  title: string;
+  description: string;
+  /** 공유할 링크(모임 초대·퀴즈 결과 등). 없으면 현재 주소 */
+  link?: string;
+  buttonTitle?: string;
+  text: string;
+  canvas?: HTMLCanvasElement;
+  filename?: string;
+  imageUrl?: string;
+};
+
+/**
+ * 카드/링크를 가능한 가장 좋은 길로 보낸다.
+ * 결과의 kind 와 reason 으로 화면이 안내를 고른다.
+ */
+export async function smartShare(input: SmartShareInput): Promise<ShareOutcome> {
+  const link = input.link || (typeof window !== "undefined" ? window.location.origin : "");
+  const feed: ShareLinkOptions = {
+    title: input.title,
+    description: input.description,
+    link,
+    buttonTitle: input.buttonTitle,
+    imageUrl: input.imageUrl,
+  };
+
+  const kakao = await sendKakaoCard({ ...feed, canvas: input.canvas, filename: input.filename });
+  if (kakao.kind === "kakao") return kakao;
+
+  const device = await shareViaDevice({
+    title: input.title,
+    text: input.text,
+    link,
+    canvas: input.canvas,
+    filename: input.filename,
+  });
+  if (device.kind === "share") return device;
+
+  // 마지막 안전장치 — 이미지 저장 + 글 복사. 둘 중 하나만 되어도 쓸 수 있다.
+  const saved = input.canvas ? saveImage(input.canvas, input.filename || "neulbom-card.png") : false;
+  const copied = await copyText(`${input.text}\n${link}`);
+  if (saved) {
+    return { kind: "saved", reason: kakao.reason === "ok" ? "share_absent" : kakao.reason, message: "" };
+  }
+  if (copied) return { kind: "copied", reason: "copy_failed", message: "" };
+  return { kind: "failed", reason: "copy_failed", message: "" };
+}
+
+/* ------------------------------------------------------------------ */
+/* 예전 화면과의 호환                                                   */
+/* ------------------------------------------------------------------ */
 
 export type ShareResult = "kakao" | "share" | "downloaded" | "failed";
 
@@ -93,68 +367,10 @@ export async function shareCard(opts: {
   description: string;
   text: string;
 }): Promise<ShareResult> {
-  const { canvas, filename, title, description, text } = opts;
-  const url = typeof window !== "undefined" ? window.location.origin : "";
-
-  // 1) 카카오 JS SDK 가 설정되어 있으면 링크 카드로 전송
-  try {
-    const ok = await loadKakaoSdk();
-    if (ok) {
-      const w = window as KakaoWindow;
-      w.Kakao?.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title,
-          description,
-          imageUrl: `${url}/share-card.png`,
-          imageWidth: 1200,
-          imageHeight: 630,
-          link: { mobileWebUrl: url, webUrl: url },
-        },
-        buttons: [{ title: "나도 해보기", link: { mobileWebUrl: url, webUrl: url } }],
-        installTalk: true,
-      });
-      return "kakao";
-    }
-  } catch {
-    /* 아래 폴백으로 */
-  }
-
-  // 2) Web Share API (카카오톡이 공유 목록에 뜬다)
-  try {
-    const file = await canvasToFile(canvas, filename);
-    if (file && typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title, text });
-      return "share";
-    }
-    if (typeof navigator !== "undefined" && navigator.share) {
-      await navigator.share({ title, text, url });
-      return "share";
-    }
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") return "share";
-  }
-
-  // 3) 이미지 저장 + 글 복사
-  let saved = false;
-  try {
-    downloadCanvas(canvas, filename);
-    saved = true;
-  } catch {
-    saved = false;
-  }
-  try {
-    await navigator.clipboard?.writeText(text);
-  } catch {
-    /* 클립보드 권한이 없어도 이미지 저장은 성공 */
-  }
-  return saved ? "downloaded" : "failed";
+  const outcome = await smartShare(opts);
+  return outcome.kind === "kakao" ? "kakao" : outcome.kind === "share" ? "share" : outcome.kind === "failed" ? "failed" : "downloaded";
 }
 
-/**
- * 링크(모임 초대 · 퀴즈 결과)를 카카오톡으로 보낸다.
- * 카카오 JS 키가 없으면 휴대폰 공유창 → 클립보드 순서로 내려간다.
- */
 export async function shareLink(opts: {
   title: string;
   description: string;
@@ -162,65 +378,23 @@ export async function shareLink(opts: {
   buttonTitle?: string;
   imageUrl?: string;
 }): Promise<ShareResult> {
-  const { title, description, url, buttonTitle } = opts;
-  const image = opts.imageUrl || `${url.split("?")[0].replace(/\/$/, "")}/share-card.png`;
-
-  try {
-    const ok = await loadKakaoSdk();
-    if (ok) {
-      const w = window as KakaoWindow;
-      w.Kakao?.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title,
-          description,
-          imageUrl: image,
-          imageWidth: 1200,
-          imageHeight: 630,
-          link: { mobileWebUrl: url, webUrl: url },
-        },
-        buttons: [{ title: buttonTitle || "늘봄 열기", link: { mobileWebUrl: url, webUrl: url } }],
-        installTalk: true,
-      });
-      return "kakao";
-    }
-  } catch {
-    /* 아래 폴백으로 */
-  }
-
-  try {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      await navigator.share({ title, text: `${title}\n${description}`, url });
-      return "share";
-    }
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") return "share";
-  }
-
-  try {
-    await navigator.clipboard.writeText(`${title}\n${description}\n${url}`);
-    return "downloaded";
-  } catch {
-    return "failed";
-  }
+  const outcome = await smartShare({
+    title: opts.title,
+    description: opts.description,
+    link: opts.url,
+    buttonTitle: opts.buttonTitle,
+    text: `${opts.title}\n${opts.description}`,
+    imageUrl: opts.imageUrl,
+  });
+  return outcome.kind === "kakao" ? "kakao" : outcome.kind === "share" ? "share" : outcome.kind === "failed" ? "failed" : "downloaded";
 }
 
 export async function shareText(opts: { title: string; text: string }): Promise<ShareResult> {
   const url = typeof window !== "undefined" ? window.location.href : "";
-  try {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      await navigator.share({ title: opts.title, text: opts.text, url });
-      return "share";
-    }
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") return "share";
-  }
-  try {
-    await navigator.clipboard.writeText(`${opts.text}\n${url}`);
-    return "downloaded";
-  } catch {
-    return "failed";
-  }
+  const outcome = await shareViaDevice({ title: opts.title, text: opts.text, link: url });
+  if (outcome.kind === "share") return "share";
+  const copied = await copyText(`${opts.text}\n${url}`);
+  return copied ? "downloaded" : "failed";
 }
 
 export function shareMessageText(result: ShareResult): string {

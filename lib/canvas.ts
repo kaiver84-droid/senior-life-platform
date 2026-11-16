@@ -795,6 +795,185 @@ export async function renderAnbuCard(
   ctx.fillText("늘봄 neulbom", W / 2, 1108);
 }
 
+/* ------------------------------------------------------------------ */
+/* 공유 카드 (카카오톡 미리보기 · 공유 시트) — 1200×630 고화질           */
+/* ------------------------------------------------------------------ */
+
+export type ShareCardKind = "quiz" | "health" | "greeting" | "invite";
+
+export type ShareCardInput = {
+  kind: ShareCardKind;
+  /** 위쪽 작은 배지 (예: 오늘의 두뇌 퀴즈) */
+  badge: string;
+  /** 오른쪽에 크게 놓는 이모지 */
+  emoji: string;
+  /** 가장 큰 문장 — 두 줄까지 자동으로 나눈다 */
+  headline: string;
+  /** 그 아래 보조 문장 */
+  sub?: string;
+  /** 인사말처럼 따뜻한 한 줄 */
+  message?: string;
+  /** 카드 아래 숫자 배지 (최대 3개) */
+  stats?: { label: string; value: string }[];
+  name?: string;
+  dateLabel?: string;
+  footer?: string;
+};
+
+const SHARE_PALETTE: Record<
+  ShareCardKind,
+  { top: string; bottom: string; accent: string; soft: string; dot: string }
+> = {
+  quiz: { top: "#FFF8E3", bottom: "#FFE9AE", accent: "#8A5A0B", soft: "#FFF3CF", dot: "rgba(201,162,39,0.22)" },
+  health: { top: "#EDF9F1", bottom: "#CDEBD9", accent: "#1B6B45", soft: "#E3F5E9", dot: "rgba(62,156,107,0.20)" },
+  greeting: { top: "#FFF2F6", bottom: "#FFDCE8", accent: "#A84066", soft: "#FFE9F0", dot: "rgba(214,109,146,0.18)" },
+  invite: { top: "#EAF7F8", bottom: "#CDEDEF", accent: "#0F6F76", soft: "#E1F3F4", dot: "rgba(24,147,155,0.18)" },
+};
+
+export async function renderShareCard(canvas: HTMLCanvasElement, input: ShareCardInput): Promise<void> {
+  const W = 1200;
+  const H = 630;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  await document.fonts.ready;
+
+  const pal = SHARE_PALETTE[input.kind] ?? SHARE_PALETTE.quiz;
+
+  // 배경
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, pal.top);
+  bg.addColorStop(1, pal.bottom);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 배경 장식 (동그라미)
+  ctx.fillStyle = pal.dot;
+  [
+    [W - 120, 60, 190],
+    [W - 40, 240, 110],
+    [80, H - 40, 150],
+    [260, H - 10, 70],
+  ].forEach(([x, y, r]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // 흰 카드
+  ctx.save();
+  ctx.shadowColor = "rgba(20,33,58,0.18)";
+  ctx.shadowBlur = 36;
+  ctx.shadowOffsetY = 14;
+  ctx.fillStyle = "#FFFFFF";
+  rr(ctx, 56, 56, W - 112, H - 112, 46);
+  ctx.fill();
+  ctx.restore();
+
+  // 오른쪽 큰 이모지
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `150px ${FONT}`;
+  ctx.fillText(input.emoji || "🌱", W - 210, 300);
+  ctx.restore();
+
+  // 배지
+  ctx.save();
+  ctx.font = `800 27px ${FONT}`;
+  const badgeText = input.badge || "늘봄";
+  const badgeW = ctx.measureText(badgeText).width + 62;
+  ctx.fillStyle = pal.soft;
+  rr(ctx, 100, 96, badgeW, 56, 28);
+  ctx.fill();
+  ctx.fillStyle = pal.accent;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(badgeText, 131, 126);
+  ctx.restore();
+
+  // 제목 — 최대 두 줄, 아래에 보조 문장 한 줄
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#14213A";
+  ctx.font = `900 56px ${FONT}`;
+  let y = 236;
+  const headLines = wrap(ctx, input.headline, 720).slice(0, 2);
+  headLines.forEach((line) => {
+    ctx.fillText(line, 100, y);
+    y += 60;
+  });
+
+  if (input.sub) {
+    ctx.fillStyle = "#4A5670";
+    ctx.font = `600 30px ${FONT}`;
+    const subLines = wrap(ctx, input.sub, 720).slice(0, 1);
+    subLines.forEach((line) => {
+      ctx.fillText(line, 100, y + 12);
+    });
+    y += 44;
+  }
+
+  // 따뜻한 한 줄은 자리가 남을 때만(제목이 한 줄일 때) 넣는다.
+  if (input.message && y <= 360) {
+    ctx.fillStyle = pal.accent;
+    ctx.font = `800 30px ${FONT}`;
+    wrap(ctx, input.message, 720)
+      .slice(0, 1)
+      .forEach((line) => {
+        ctx.fillText(line, 100, y + 6);
+      });
+  }
+  ctx.restore();
+
+  // 숫자 배지 — 세 칸을 같은 너비로 나눠 값은 크게, 이름은 아래에 작게
+  const stats = (input.stats ?? []).slice(0, 3);
+  if (stats.length) {
+    const total = 1016;
+    const gap = 14;
+    const w = (total - gap * (stats.length - 1)) / stats.length;
+    const sy = 402;
+    const sh = 88;
+    stats.forEach((st, i) => {
+      const x = 100 + i * (w + gap);
+      ctx.save();
+      ctx.fillStyle = pal.soft;
+      rr(ctx, x, sy, w, sh, 24);
+      ctx.fill();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#14213A";
+      ctx.font = `900 36px ${FONT}`;
+      ctx.fillText(st.value, x + w / 2, sy + 33);
+      ctx.fillStyle = pal.accent;
+      ctx.font = `700 22px ${FONT}`;
+      ctx.fillText(st.label, x + w / 2, sy + 68);
+      ctx.restore();
+    });
+  }
+
+  // 이름 · 날짜 · 브랜드
+  ctx.save();
+  ctx.textAlign = "right";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#8A93A6";
+  ctx.font = `600 26px ${FONT}`;
+  const meta = [input.name, input.dateLabel].filter(Boolean).join(" · ");
+  if (meta) ctx.fillText(meta, W - 100, 556);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#8A93A6";
+  ctx.font = `700 25px ${FONT}`;
+  ctx.fillText(input.footer || "늘봄 · 언제나 곁에 있는 생활 플랫폼", 100, 556);
+  ctx.restore();
+}
+
+export function renderShareCardSafe(canvas: HTMLCanvasElement, input: ShareCardInput): Promise<void> {
+  return renderShareCard(canvas, input).catch(() => {});
+}
+
 export function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
   const url = canvas.toDataURL("image/png");
   const a = document.createElement("a");

@@ -7,7 +7,14 @@ const INVITE_KEY = "seniorLife.pendingGroup";
 /** 마지막으로 보던 모임 */
 export const ACTIVE_GROUP_KEY = "seniorLife.activeGroup";
 
-export type MeStatsInput = { name?: string; points?: number; days?: number; today?: boolean };
+export type MeStatsInput = {
+  name?: string;
+  points?: number;
+  days?: number;
+  today?: boolean;
+  /** 오늘 이 기기에서 찍은 건강 챌린지 id — 서버 저장 전에도 모임 달성률에 바로 반영한다 */
+  health?: string[];
+};
 
 export type GroupActionBody = {
   action: "create" | "join" | "select" | "leave" | "post" | "cheer";
@@ -99,6 +106,8 @@ export async function fetchGroups(params: {
   q.set("mePoints", String(Math.max(0, Math.round(params.me?.points ?? 0))));
   q.set("meDays", String(Math.max(0, Math.round(params.me?.days ?? 0))));
   if (params.me?.today) q.set("meToday", "1");
+  const health = (params.me?.health ?? []).filter((x) => typeof x === "string" && x);
+  if (health.length) q.set("meHealth", health.join(","));
   try {
     const res = await fetch(`/api/groups?${q.toString()}`, { headers: { accept: "application/json" } });
     if (!res.ok) return null;

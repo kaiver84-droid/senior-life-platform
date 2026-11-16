@@ -14,10 +14,12 @@ import type { DbEnv } from "../../lib/db";
 import {
   DEMO_MEMBERS,
   demoAttendedSet,
+  demoHealthIds,
   demoPoints,
   demoWeekDays,
   randomGroupCode,
 } from "../../lib/group-demo";
+import { buildGroupHealth } from "../../lib/health";
 import { kstDate, weekIdOf, weekRange } from "../../lib/week";
 import type {
   GroupDetail,
@@ -60,8 +62,16 @@ type PostRow = {
 };
 type QuizRow = { user_code: string; points: number; quiz_date?: string };
 type VisitRow = { user_code: string; visit_date: string };
+type HealthRow = { user_code: string; challenges: string[] };
 
-export type MeStats = { name?: string; points?: number; days?: number; today?: boolean };
+export type MeStats = {
+  name?: string;
+  points?: number;
+  days?: number;
+  today?: boolean;
+  /** 이 기기에서 방금 찍은 오늘의 건강 챌린지 id (서버 저장 전에도 화면에 바로 반영) */
+  health?: string[];
+};
 
 async function sbGet<T>(env: DbEnv, path: string): Promise<T[]> {
   const res = await sbRequest(env, path);
@@ -114,7 +124,7 @@ async function buildDetail(
   );
   const inList = realCodes.length ? `(${realCodes.map(enc).join(",")})` : null;
 
-  const [quizRows, visitRows] = inList
+  const [quizRows, visitRows, healthRows] = inList
     ? await Promise.all([
         sbGet<QuizRow>(
           env,
@@ -124,14 +134,23 @@ async function buildDetail(
           env,
           `daily_visits?visit_date=gte.${start}&visit_date=lte.${end}&user_code=in.${inList}&select=user_code,visit_date`
         ),
+        // 오늘의 건강 챌린지 — 테이블이 아직 없으면 빈 목록으로 넘어간다.
+        sbGet<HealthRow>(
+          env,
+          `health_checks?check_date=eq.${today}&user_code=in.${inList}&select=user_code,challenges`
+        ).catch(() => [] as HealthRow[]),
       ])
-    : [[], []];
+    : [[], [], []];
 
   const pointsBy = new Map<string, number>();
   const quizToday = new Set<string>();
   quizRows.forEach((q) => {
     pointsBy.set(q.user_code, (pointsBy.get(q.user_code) || 0) + Number(q.points || 0));
     if (q.quiz_date === today) quizToday.add(q.user_code);
+  });
+  const healthBy = new Map<string, string[]>();
+  healthRows.forEach((h) => {
+    if (Array.isArray(h.challenges)) healthBy.set(h.user_code, h.challenges);
   });
   const daysBy = new Map<string, Set<string>>();
   visitRows.forEach((v) => {
@@ -141,10 +160,14 @@ async function buildDetail(
   });
 
   const demoAttended = demoAttendedSet(today);
+  /** 모임원별 오늘 체크한 건강 챌린지 (체험 회원은 날짜 기반 예시값) */
+  const healthDoneBy: { code: string; ids: string[] }[] = [];
 
   const members: GroupMemberInfo[] = memberRows.map((m) => {
     const isMe = m.user_code === code;
     if (m.role === "demo") {
+      const demoHealth = demoHealthIds(m.user_code, today);
+      healthDoneBy.push({ code: m.user_code, ids: demoHealth });
       return {
         code: m.user_code,
         name: m.name,
@@ -161,12 +184,18 @@ async function buildDetail(
     let points = pointsBy.get(m.user_code) ?? 0;
     let weekDays = myDays.size;
     let todayAttended = myDays.has(today) || quizToday.has(m.user_code);
-    // 내 기록은 기기 기록이 서버보다 앞설 수 있어 큰 쪽을 쓴다(퀴즈를 막 풀고 저장 전인 순간).
+    let healthIds = healthBy.get(m.user_code) ?? [];
+    // 내 기록은 기기 기록이 서버보다 앞설 수 있어 큰 쪽을 쓴다(방금 찍고 저장 전인 순간).
     if (isMe && me) {
       points = Math.max(points, Math.round(Number(me.points) || 0));
       weekDays = Math.max(weekDays, Math.round(Number(me.days) || 0));
       todayAttended = todayAttended || Boolean(me.today);
+      const local = Array.isArray(me.health) ? me.health.filter((x) => typeof x === "string") : [];
+      if (local.length > healthIds.length) healthIds = local;
     }
+    // 건강 챌린지를 한 가지라도 찍었으면 오늘 참여로 본다.
+    if (healthIds.length) todayAttended = true;
+    healthDoneBy.push({ code: m.user_code, ids: healthIds });
     return {
       code: m.user_code,
       name: m.name,
@@ -211,6 +240,7 @@ async function buildDetail(
     ? Math.min(100, Math.round((weekSum / (memberCount * weeklyGoal)) * 100))
     : 0;
   const totalPoints = members.reduce((a, m) => a + m.points, 0);
+  const health = buildGroupHealth(healthDoneBy, code);
   const mine = members.find((m) => m.isMe) ?? null;
   const myMembership = memberRows.find((m) => m.user_code === code);
 
@@ -230,6 +260,7 @@ async function buildDetail(
     attendanceRate,
     weeklyRate,
     totalPoints,
+    health,
     myRank: mine?.rank ?? null,
     top: members[0] ? { name: members[0].name, points: members[0].points } : null,
   };
@@ -306,11 +337,17 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
   const code = (p.get("code") || "").trim().toUpperCase();
   if (!code) return json({ ok: false, error: "code_required" }, 400);
   const groupId = (p.get("group") || "").trim().toUpperCase() || null;
+  const meHealth = (p.get("meHealth") || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 10);
   const me: MeStats = {
     name: p.get("meName") || undefined,
     points: Number(p.get("mePoints") || 0),
     days: Number(p.get("meDays") || 0),
     today: p.get("meToday") === "1",
+    health: meHealth,
   };
 
   try {

@@ -5,13 +5,15 @@ import { getFortune, shortFortuneLine, type Fortune } from "@/lib/fortune";
 import { JISIN_LINES } from "@/lib/birthtime";
 import { fetchWeather, type WeatherInfo } from "@/lib/weather";
 import { renderGreetingCard, downloadCanvas, THEMES, type GreetingTheme } from "@/lib/canvas";
-import { kakaoConfig, shareCard, shareMessageText } from "@/lib/share";
+import { kakaoConfig } from "@/lib/share";
 import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
 import { Badge, BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
 import { HomeCalendarBanner } from "./calendar";
 import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
+import { HealthChallengeCard } from "./health";
+import { SharePreviewSheet } from "./share-sheet";
 import { HeroScene, NeulbomMark, WeatherArt } from "./art";
 import {
   IconBank,
@@ -205,6 +207,9 @@ export function HomeTab({
 
       {/* 오늘의 모임 미션 */}
       <GroupMissionBanner onJoin={() => onNavigate("quiz")} />
+
+      {/* 오늘의 건강생활 챌린지 — 원터치 완료 도장 */}
+      <HealthChallengeCard where="home" />
 
       {/* 오늘의 운세 */}
       <button
@@ -467,6 +472,7 @@ function GreetingSheet({
   const [message, setMessage] = useState(PRESETS[0]);
   const [rendering, setRendering] = useState(true);
   const [drawn, setDrawn] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const shared = useRef(false);
 
@@ -487,25 +493,13 @@ function GreetingSheet({
     show("인사카드를 저장했어요. 사진첩에서 확인해 보세요.");
   }, [profile, today, show]);
 
-  const send = useCallback(async () => {
-    if (!canvasRef.current || !profile) return;
-    const result = await shareCard({
-      canvas: canvasRef.current,
-      filename: `인사카드_${profile.nickname}_${today}.png`,
-      title: `${profile.nickname} 님의 오늘 안부`,
-      description: message,
-      text: `${message} - ${profile.nickname} 드림 (늘봄)`,
-    });
-    show(shareMessageText(result));
-  }, [profile, today, message, show]);
-
-  // 홈의 '카카오톡으로 보내기' → 카드가 그려진 뒤 한 번만 공유한다
+  // 홈의 '카카오톡으로 보내기' → 카드가 그려진 뒤 공유 미리보기 시트를 한 번만 연다
   useEffect(() => {
     if (!autoShare || shared.current || !drawn) return;
     if (!canvasRef.current || !canvasRef.current.width) return;
     shared.current = true;
-    void send();
-  }, [autoShare, drawn, send]);
+    setShareOpen(true);
+  }, [autoShare, drawn]);
 
   return (
     <Sheet open onClose={onClose} title="오늘의 안부 인사카드" subtitle="내 이름이 들어간 카드를 만들어 보내요">
@@ -575,7 +569,7 @@ function GreetingSheet({
         <BigButton variant="white" onClick={save}>
           <IconDownload size={22} /> 저장
         </BigButton>
-        <BigButton variant="sun" onClick={send}>
+        <BigButton variant="sun" onClick={() => setShareOpen(true)}>
           <IconShare size={22} /> 카톡으로 보내기
         </BigButton>
       </div>
@@ -584,6 +578,30 @@ function GreetingSheet({
           ? "카카오톡 공유 카드로 바로 보낼 수 있어요. 친구를 고르면 끝나요."
           : "휴대폰 공유창으로 보낼 수 있어요. 카카오 앱 키를 넣으면 카카오톡 공유 카드로 바뀌어요."}
       </p>
+
+      <SharePreviewSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        sourceCanvas={canvasRef}
+        data={{
+          kind: "greeting",
+          badge: "오늘의 안부 인사",
+          emoji: "💌",
+          headline: `${profile?.nickname || "가족"} 님이 보내는 안부`,
+          sub: message,
+          message: shortFortuneLine(fortune),
+          name: profile?.nickname,
+          dateLabel: koreanDate(today),
+          title: `${profile?.nickname || "가족"} 님의 오늘 안부`,
+          description: message,
+          buttonTitle: "답장 보내기",
+          text: `${message} - ${profile?.nickname || ""} 드림 (늘봄)`,
+          link: typeof window !== "undefined" ? window.location.origin : "",
+          filename: `인사카드_${profile?.nickname || "늘봄"}_${today}.png`,
+          sheetTitle: "카카오톡으로 안부 보내기",
+          sheetSubtitle: "단톡방에 이렇게 보여요",
+        }}
+      />
     </Sheet>
   );
 }

@@ -7,11 +7,11 @@ import {
   calcPoints,
   QUIZ_TYPE_LABEL,
   QUIZ_TYPE_EMOJI,
+  QUIZ_TYPE_ORDER,
   QUIZ_TOTAL_COUNT,
   type Question,
 } from "@/lib/quiz";
 import { renderCertificate, downloadCanvas } from "@/lib/canvas";
-import { shareCard, shareLink, shareMessageText } from "@/lib/share";
 import { useApp } from "@/lib/storage";
 import { useGroup } from "@/lib/group-store";
 import { siteOrigin } from "@/lib/groups";
@@ -19,6 +19,8 @@ import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { IconChevron, IconClock, IconDownload, IconShare, IconTrophy } from "./icons";
 import { RankingPanel } from "./ranking";
+import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
+import type { QuizType } from "@/lib/types";
 
 export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { today, todayDaily, completeQuiz, weekPoints, streak } = useApp();
@@ -63,10 +65,13 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 
   const start = () => startSet(dailyQs, false);
 
-  /** 연습 모드: 점수·연속 출석·순위와 무관한 두뇌 훈련용 3문제 */
-  const startPractice = (excludeFrom?: Question[]) => {
+  /**
+   * 연습 모드: 점수·연속 출석·순위와 무관한 두뇌 훈련용 3문제.
+   * `only` 를 주면 그 주제(초성·노래·그림·OX·넌센스)에서만 3문제를 낸다.
+   */
+  const startPractice = (excludeFrom?: Question[], only?: QuizType) => {
     const exclude = [...dailyQs, ...(excludeFrom ?? [])].map((x) => x.id);
-    startSet(practiceQuestions(exclude), true);
+    startSet(practiceQuestions(exclude, only), true);
   };
 
   const q: Question | undefined = qs[index];
@@ -144,7 +149,9 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
               <br />
               준비됐어요
             </p>
-            <p className="mt-1 text-[0.9rem] font-semibold text-ink/55">초성 · 옛날 노래 · 틀린 그림 찾기</p>
+            <p className="mt-1 text-[0.9rem] font-semibold text-ink/55">
+              초성 · 옛날 노래 · 틀린 그림 · OX · 넌센스
+            </p>
           </div>
 
           <div className="mt-4 space-y-2">
@@ -168,6 +175,35 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           <p className="mt-2 text-center text-[0.8rem] font-medium text-ink/45">
             하루 3문제는 점수에 들어가요. 다 푼 뒤에는 연습 모드로 더 즐길 수 있어요.
           </p>
+
+          {/* 주제 골라 바로 풀기 — OX·넌센스를 오늘 바로 만나 볼 수 있다 */}
+          <div className="mt-4 border-t border-ink/8 pt-3.5">
+            <p className="text-[0.92rem] font-extrabold text-ink/65">주제 골라 바로 풀기</p>
+            <p className="mt-0.5 text-[0.78rem] font-semibold text-ink/45">
+              점수와 상관없이 좋아하는 주제로 3문제를 풀어 볼 수 있어요.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5" data-quiz-topics>
+              {QUIZ_TYPE_ORDER.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  data-quiz-topic={t}
+                  onClick={() => startPractice(undefined, t)}
+                  className="flex min-h-[42px] items-center gap-1 rounded-full border-2 border-ink/10 bg-white px-3 text-[0.84rem] font-extrabold text-ink/75"
+                >
+                  <span aria-hidden>{QUIZ_TYPE_EMOJI[t]}</span>
+                  {QUIZ_TYPE_LABEL[t]}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => startPractice()}
+                className="flex min-h-[42px] items-center gap-1 rounded-full border-2 border-brand/30 bg-brand-light px-3 text-[0.84rem] font-extrabold text-brand-dark"
+              >
+                <span aria-hidden>🎲</span> 섞어서 3문제
+              </button>
+            </div>
+          </div>
         </Card>
       ) : null}
 
@@ -212,7 +248,45 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
               </span>
             </div>
 
-            {q.type === "spot" ? (
+            {q.type === "ox" ? (
+              <div className="mt-3">
+                <div className="rounded-[1.4rem] bg-sky px-4 py-7 text-center">
+                  <p className="text-[0.84rem] font-extrabold tracking-tight text-brand-dark/70">이 말이 맞을까요?</p>
+                  <p className="mt-2 text-[1.28rem] font-black leading-snug text-ink">{q.prompt}</p>
+                  <p className="mt-2 text-[0.86rem] font-semibold text-ink/50">힌트: {q.hint}</p>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
+                  {q.options.map((opt, i) => {
+                    const isPicked = picked === i;
+                    const isAnswer = checked && i === q.answer;
+                    const isWrong = checked && isPicked && i !== q.answer;
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() => choose(i)}
+                        disabled={checked}
+                        data-quiz-option={i}
+                        aria-label={i === 0 ? "맞아요" : "아니에요"}
+                        className={`flex min-h-[132px] flex-col items-center justify-center gap-1 rounded-[1.4rem] border-2 px-2 py-3 transition ${
+                          isAnswer
+                            ? "border-leaf bg-leaf-light"
+                            : isWrong
+                              ? "border-coral bg-coral-light"
+                              : isPicked
+                                ? "border-brand bg-brand-light"
+                                : "border-ink/8 bg-white"
+                        }`}
+                      >
+                        <span className="text-[2.6rem] leading-none">{i === 0 ? "⭕" : "❌"}</span>
+                        <span className="text-[1.02rem] font-black text-ink">
+                          {i === 0 ? "맞아요" : "아니에요"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : q.type === "spot" ? (
               <div className="mt-3">
                 <p className="text-center text-[1.08rem] font-extrabold leading-snug">{q.prompt}</p>
                 <p className="mt-1 text-center text-[0.88rem] font-semibold text-ink/50">{q.hint}</p>
@@ -420,6 +494,8 @@ function ResultAndCertificate({
   const { profile, today } = useApp();
   const { detail: groupDetail, inviteLink } = useGroup();
   const [certOpen, setCertOpen] = useState(false);
+  /** 공유 미리보기 시트 — 상장 그대로 / 모임에 알리기 */
+  const [share, setShare] = useState<null | "cert" | "group">(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const save = useCallback(() => {
@@ -427,18 +503,6 @@ function ResultAndCertificate({
     downloadCanvas(canvasRef.current, `상장_${profile.nickname}_${today}.png`);
     show("상장을 저장했어요. 사진첩에서 확인해 보세요.");
   }, [profile, today, show]);
-
-  const send = useCallback(async () => {
-    if (!canvasRef.current || !profile) return;
-    const result = await shareCard({
-      canvas: canvasRef.current,
-      filename: `상장_${profile.nickname}_${today}.png`,
-      title: `${profile.nickname} 님의 두뇌 퀴즈 상장`,
-      description: `정답 ${correct}문제 · ${points}점`,
-      text: `오늘의 두뇌 퀴즈 ${correct}/${total}문제 정답! ${profile.nickname} (늘봄)`,
-    });
-    show(shareMessageText(result));
-  }, [profile, correct, total, points, today, show]);
 
   const praise =
     correct === total ? "완벽해요! 오늘 두뇌가 아주 맑아요" : correct > 0 ? "잘하셨어요! 내일도 함께해요" : "괜찮아요. 내일 다시 도전해요";
@@ -466,19 +530,7 @@ function ResultAndCertificate({
         </div>
         {groupDetail ? (
           <div className="mt-2">
-            <BigButton
-              variant="sun"
-              full
-              onClick={async () => {
-                const result = await shareLink({
-                  title: `${profile?.nickname || "가족"} 님의 오늘 두뇌 퀴즈 결과`,
-                  description: `${total}문제 중 ${correct}문제 정답! ${groupDetail.name}에서 함께 겨뤄요.`,
-                  url: inviteLink(groupDetail.id) || siteOrigin(),
-                  buttonTitle: "모임에서 함께하기",
-                });
-                show(shareMessageText(result));
-              }}
-            >
+            <BigButton variant="sun" full onClick={() => setShare("group")}>
               <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
                 TALK
               </span>
@@ -530,11 +582,51 @@ function ResultAndCertificate({
           <BigButton variant="white" onClick={save}>
             <IconDownload size={22} /> 저장
           </BigButton>
-          <BigButton variant="sun" onClick={send}>
+          <BigButton variant="sun" onClick={() => setShare("cert")}>
             <IconShare size={22} /> 자랑하기
           </BigButton>
         </div>
       </Sheet>
+
+      <SharePreviewSheet
+        open={share !== null}
+        onClose={() => setShare(null)}
+        sourceCanvas={canvasRef}
+        data={{
+          kind: "quiz",
+          badge: "오늘의 두뇌 퀴즈",
+          emoji: correct === total ? "🏆" : "🧠",
+          headline: `${profile?.nickname || "가족"} 님, ${total}문제 중 ${correct}문제 정답!`,
+          sub: `오늘 ${points}점을 모았어요.`,
+          message: groupDetail ? `${groupDetail.name}에서 함께 겨뤄요.` : undefined,
+          stats: [
+            { value: `${correct}/${total}`, label: "정답" },
+            { value: `${points}점`, label: "획득" },
+          ],
+          name: profile?.nickname,
+          dateLabel: koreanDate(today),
+          title:
+            share === "group"
+              ? `${profile?.nickname || "가족"} 님의 오늘 두뇌 퀴즈 결과`
+              : `${profile?.nickname || "가족"} 님의 두뇌 퀴즈 상장`,
+          description:
+            share === "group" && groupDetail
+              ? `${total}문제 중 ${correct}문제 정답! ${groupDetail.name}에서 함께 겨뤄요.`
+              : `정답 ${correct}문제 · ${points}점`,
+          buttonTitle: share === "group" ? "모임에서 함께하기" : "나도 해보기",
+          text: `오늘의 두뇌 퀴즈 ${correct}/${total}문제 정답! ${points}점 (늘봄)`,
+          link:
+            share === "group" && groupDetail
+              ? inviteLink(groupDetail.id) || siteOrigin()
+              : siteOrigin(),
+          filename: `상장_${profile?.nickname || "늘봄"}_${today}.png`,
+          sheetTitle: share === "group" ? "모임에 결과 알리기" : "퀴즈 상장 자랑하기",
+          sheetSubtitle:
+            share === "group"
+              ? "가족 단톡방에 결과 카드를 보내요"
+              : "단톡방에 상장이 이렇게 보여요",
+        }}
+      />
     </>
   );
 }

@@ -261,3 +261,22 @@ insert into public.group_members (group_id, user_code, name, role) values
   ('FAM101', 'FAM7G4', '조말순', 'demo'), ('FAM101', 'FAM8H6', '윤정희', 'demo'),
   ('FAM101', 'FAM9J8', '장미숙', 'demo'), ('FAM101', 'FAMA0K', '임금자', 'demo')
 on conflict (group_id, user_code) do nothing;
+
+/* ------------------------------------------------------------------ */
+/* 8. 건강생활 챌린지 체크인 (2단계)                                   */
+/*    사람 × 하루 한 줄에 체크한 챌린지 id 배열                       */
+/*    water · walk · stretch · medicine · family                      */
+/* ------------------------------------------------------------------ */
+create table if not exists public.health_checks (
+  id          bigserial primary key,
+  user_code   text not null references public.users(code) on delete cascade,
+  check_date  date not null default (now() at time zone 'Asia/Seoul')::date,
+  challenges  text[] not null default '{}',
+  updated_at  timestamptz not null default now(),
+  unique (user_code, check_date)
+);
+
+create index if not exists health_date_idx on public.health_checks (check_date);
+create index if not exists health_user_idx on public.health_checks (user_code, check_date desc);
+
+alter table public.health_checks enable row level security;

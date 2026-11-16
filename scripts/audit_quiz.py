@@ -8,8 +8,10 @@
    - 초성 표기 형식: 음절 사이 공백, 낱말 사이 ' · '
 3. 노래: 보기 4개·중복 없음, answer 범위 유효, '___' 빈칸 유무 일관성
 4. 틀린 그림: 9칸, 서로 다른 그림은 정확히 1개, 그 위치가 answer
-5. 보기 순서: 정답 인덱스가 0~3(또는 0~8)에 고르게 분포 (한 곳에 40% 이상 몰리면 경고)
-6. 해설·힌트 비어 있지 않음
+5. OX: 보기 정확히 2개(⭕ 맞아요 / ❌ 아니에요), answer 0~1, 힌트·해설 비어 있지 않음
+6. 넌센스: 4지선다·보기 중복 없음·answer 범위 유효·힌트·해설 비어 있지 않음
+7. 보기 순서: 정답 인덱스가 보기 수에 고르게 분포 (한 곳에 40% 이상 몰리면 경고)
+8. 해설·힌트 비어 있지 않음, 전체 문항 200개 이상
 
 사용: python3 scripts/audit_quiz.py
 """
@@ -147,12 +149,54 @@ def check_spot(items, errors, warnings):
             errors.append(f"{q['id']}: 해설 비어 있음")
 
 
+OX_OPTIONS = ["⭕ 맞아요", "❌ 아니에요"]
+
+
+def check_ox(items, errors, warnings):
+    for q in items:
+        opts = q["options"]
+        ans = q["answer"]
+        if len(opts) != 2:
+            errors.append(f"{q['id']}: OX 보기 개수 {len(opts)} (2개여야 함)")
+            continue
+        if opts != OX_OPTIONS:
+            errors.append(f"{q['id']}: OX 보기는 {OX_OPTIONS} 이어야 함 — 실제 {opts}")
+        if ans not in (0, 1):
+            errors.append(f"{q['id']}: OX answer 범위 오류 {ans}")
+        if not q["prompt"].strip():
+            errors.append(f"{q['id']}: prompt 비어 있음")
+        if len(q["prompt"]) > 60:
+            warnings.append(f"{q['id']}: OX 문장 길이 {len(q['prompt'])}자 (한 줄 표시 확인 권장)")
+        if not q["explain"].strip() or not q["hint"].strip():
+            errors.append(f"{q['id']}: 힌트/해설이 비어 있음")
+
+
+def check_nonsense(items, errors, warnings):
+    for q in items:
+        opts = q["options"]
+        ans = q["answer"]
+        if len(opts) != 4:
+            errors.append(f"{q['id']}: 넌센스 보기 개수 {len(opts)} (4개여야 함)")
+        if len(set(opts)) != len(opts):
+            errors.append(f"{q['id']}: 보기에 중복이 있음 {opts}")
+        if not (0 <= ans < len(opts)):
+            errors.append(f"{q['id']}: answer 범위 오류 {ans}")
+        if not q["prompt"].strip():
+            errors.append(f"{q['id']}: prompt 비어 있음")
+        if not q["explain"].strip() or not q["hint"].strip():
+            errors.append(f"{q['id']}: 힌트/해설이 비어 있음")
+        if len(q["prompt"]) > 60:
+            warnings.append(f"{q['id']}: prompt 길이 {len(q['prompt'])}자 (화면 확인 권장)")
+
+
 def main():
     src = read(SRC)
     choseong = parse_blocks(src, "CHOSEONG")
     lyrics = parse_blocks(src, "LYRICS")
     spot = parse_blocks(src, "SPOT")
-    everything = choseong + lyrics + spot
+    ox = parse_blocks(src, "OX")
+    nonsense = parse_blocks(src, "NONSENSE")
+    everything = choseong + lyrics + spot + ox + nonsense
 
     errors, warnings = [], []
 
@@ -161,25 +205,41 @@ def main():
         if n > 1:
             errors.append(f"id 중복: {qid} x{n}")
 
+    groups = (("choseong", choseong), ("lyrics", lyrics), ("spot", spot), ("ox", ox), ("nonsense", nonsense))
     for q in everything:
-        expect_type = "choseong" if q in choseong else "lyrics" if q in lyrics else "spot"
+        expect_type = next((name for name, items in groups if any(x is q for x in items)), "?")
         if q["type"] != expect_type:
             errors.append(f"{q['id']}: type {q['type']} (기대 {expect_type})")
 
     check_choseong(choseong, errors, warnings)
     check_lyrics(lyrics, errors, warnings)
     check_spot(spot, errors, warnings)
+    check_ox(ox, errors, warnings)
+    check_nonsense(nonsense, errors, warnings)
 
     # 정답 위치 분포
     dist_report = {}
-    for name, items, size in (("choseong", choseong, 4), ("lyrics", lyrics, 4), ("spot", spot, 9)):
+    for name, items, size in (
+        ("choseong", choseong, 4),
+        ("lyrics", lyrics, 4),
+        ("spot", spot, 9),
+        ("ox", ox, 2),
+        ("nonsense", nonsense, 4),
+    ):
         c = Counter(q["answer"] for q in items)
         dist_report[name] = [c.get(i, 0) for i in range(size)]
         top = max(dist_report[name])
-        if items and top / len(items) >= 0.4:
+        # 2지선다는 50%가 이상적이라 경고 기준을 70%로 둔다.
+        limit = 0.7 if size == 2 else 0.4
+        if items and top / len(items) >= limit:
             warnings.append(f"{name}: 정답 {dist_report[name].index(top)}번에 {top}/{len(items)} 집중")
 
-    print(f"초성 {len(choseong)} · 노래 {len(lyrics)} · 그림 {len(spot)} · 합계 {len(everything)}")
+    if len(everything) < 200:
+        errors.append(f"전체 문항 {len(everything)}개 — 200개 이상이어야 함")
+    print(
+        f"초성 {len(choseong)} · 노래 {len(lyrics)} · 그림 {len(spot)} · "
+        f"OX {len(ox)} · 넌센스 {len(nonsense)} · 합계 {len(everything)}"
+    )
     print("정답 위치 분포:", json.dumps(dist_report, ensure_ascii=False))
     for w in warnings:
         print("WARN", w)

@@ -4,6 +4,8 @@
 
 **늘봄 — 언제나, 늘 곁에 있는 시니어를 위한 스마트한 생활 플랫폼**
 
+> 2단계(2026-11-16): **건강생활 챌린지 · OX/넌센스 퀴즈(208문항) · 카카오톡 공유 미리보기 시트** 를 더했습니다.
+
 카카오톡 웹뷰(모바일 390×844)에 맞춘 **어르신 종합 생활 플랫폼**입니다.
 청록(`#18939B`) + 따뜻한 노랑(`#F5B82E`)의 하트·새싹 로고, 크림 배경(`#F9F7F1`),
 딥네이비(`#173B5E`) 버튼과 골드 CTA 로 구성한 시니어 친화 디자인입니다.
@@ -17,12 +19,13 @@ Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Page
 | # | 기능 | 화면 |
 |---|---|---|
 | ① | 오늘의 운세(띠·생년월일) + 날씨 생활 팁 + 이름이 들어간 안부 인사카드(Canvas 1080×1350) 생성·저장·카카오 공유 | 홈 |
-| ② | 1분 두뇌 퀴즈(초성 / 옛날 노래 가사 / 틀린 그림 찾기, 하루 3문제, 정답 확인 단계) + 금빛 상장 PNG | 퀴즈 |
+| ② | 1분 두뇌 퀴즈 — **초성 · 옛날 노래 · 틀린 그림 · OX 건강 상식 · 넌센스·아재개그 5종 208문항**, 하루 3문제(3번째는 날마다 유형이 바뀜), 주제 골라 바로 풀기, 금빛 상장 PNG | 퀴즈 |
 | ②′ | 명예의 전당 — 알약형 4탭(**우리 모임** · 전국 · 지역별 · 개근왕), 1·2·3위 시상대, 4~10위, 내 순위·상위 %, 우리 모임 달성률 배너 | 랭킹 |
 | ③ | 출생연도·거주지 기반 맞춤 지원금 14종 + 3단계 행동 지침 + 문의처 전화 연결 | 혜택 |
 | ④ | 카메라 돋보기 1~4배(손전등·화면 밝게), 카드뉴스(보이스피싱·KTX·카톡 글씨·병원) | 더보기 → 도구 |
 | ⑤ | 아침/저녁 복약 체크 + 원터치 안부 카드 + 자녀 확인 대시보드(`/family`) | 더보기 → 가족 |
 | ⑥ | **우리 모임** — 모임 만들기/초대 코드 가입, `?group=XXXXXX` 초대로 자동 가입, 회원별 오늘 출석 도장 · 이번 주 달성률 게이지 · 모임 전용 한 줄 게시판(응원) | 홈 · 모임 |
+| ②″ | **오늘의 건강생활 챌린지** — 물 5잔·15분 걷기·스트레칭·복약·가족 안부 5가지를 원터치 완료 도장으로 체크, 내 진행률과 **모임원 함께 달성률**을 홈·모임 탭에서 표시, 기록은 이 기기 + Supabase(`health_checks`)에 저장 | 홈 · 모임 |
 | ⑤′ | **가족안부달력** — 자녀 생일·기념일·가족 일정·병원약속(매년 반복·D-Day) 과 **우리동네 소식**(지역 행사·축제·무료 강좌·복지) 을 한 달 달력에 점으로 구분해 보여 주고, 날짜별 상세·일정 추가/수정/삭제·카톡 알리기까지 한 화면에서 | 홈 배너 · 가족 · `/family` |
 
 ## 실행
@@ -144,9 +147,10 @@ JS SDK 간편로그인을 쓰려면 **플랫폼 > Web > 사이트 도메인**에
 
 `supabase/schema.sql` 을 Supabase SQL Editor 에서 실행하면
 `users`, `quiz_logs`, `rankings_weekly`, `med_checks`, `daily_visits`, `family_links`, `anbu_messages`,
-`family_events`, **`groups`·`group_members`·`group_posts`·`group_cheers`**
+`family_events`, **`groups`·`group_members`·`group_posts`·`group_cheers`**, **`health_checks`**
 테이블과 주간 집계 함수(`refresh_weekly_rankings`), 상위 10명 뷰(`v_weekly_top`)가 만들어집니다.
-모임 테이블만 따로 적용하려면 `supabase/groups.sql` 을 실행합니다(체험 모임 `FAM101` 시드 포함).
+모임 테이블만 따로 적용하려면 `supabase/groups.sql`(체험 모임 `FAM101` 시드 포함),
+건강 챌린지 테이블만 따로 적용하려면 `supabase/health.sql` 을 실행합니다.
 
 키가 없을 때는 `lib/db.ts` 의 **메모리 폴백**이 동작해 저장·가족 대시보드가 라이브에서도 그대로 보입니다.
 (브라우저 `localStorage` 가 원본이고, 서버는 보조 저장소입니다.)
@@ -158,7 +162,7 @@ app/
   page.tsx          탭 셸(홈/퀴즈/랭킹/혜택/도구/가족) · 늘봄 로고 헤더 · 설정 시트
   family/page.tsx   자녀 확인 대시보드
   layout.tsx        메타데이터 · OG 이미지
-components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, calendar, onboarding, ui, icons, art)
+components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, calendar, onboarding, groups, health, share-sheet, ui, icons, art)
 lib/
   fortune.ts        띠·운세 결정론(날짜+생년월일 시드)
   weather.ts        Open-Meteo 실시간 날씨 + 생활 팁(실패 시 폴백)
@@ -167,12 +171,14 @@ lib/
   rankings.ts       주간 순위 생성(지역·띠·개근) · 상위 10명/상위 %
   calendar.ts       가족안부달력 일정 모델 · 매년 반복·D-Day·월간 달력 계산
   local-news.ts     우리동네 소식(지역 행사·축제·무료 강좌·복지) 데이터 · 지역별 생성
-  canvas.ts         인사카드·상장·안부카드 Canvas 렌더러
+  canvas.ts         인사카드·상장·안부카드·공유 카드(1200×630) Canvas 렌더러
+  share.ts          카카오톡 공유(이미지 업로드·피드) → 공유창 → 저장/복사 폴백
   storage.tsx       localStorage 상태 + 가족 코드 (+ 가족 일정 추가/수정/삭제)
   groups.ts         모임 API 호출 · 초대 링크(?group=) 기억 · 시간 표기
   group-store.tsx   모임 상태(목록·상세·오늘 출석·달성률)와 만들기/가입/글쓰기/응원
   group-demo.ts     체험 모임 회원의 날짜·주차 기반 결정론 데이터(서버·오프라인 공용)
   group-local.ts    서버에 못 붙을 때의 localStorage 모임 폴백
+  health.ts         건강생활 챌린지 5가지 정의 · 날짜별 체크 계산 · 모임 요약
   db.ts             Supabase(PostgREST) 연결 + 메모리 폴백
 functions/api/      Pages Functions (auth/kakao, state, rankings, groups, health)
 supabase/schema.sql DB 스키마
@@ -182,7 +188,10 @@ supabase/groups.sql 모임 테이블 + 체험 모임 시드
 ## 검증
 
 - `npm run typecheck`, `npm run build` 통과
+- 문제 감사: `python3 scripts/audit_quiz.py` — 초성·노래·그림·**OX 2지선다·넌센스 4지선다** 검증(208문항, 0 errors)
 - 모임 API 검증(실제 Supabase): `node e2e/test_groups_api.mjs` — 만들기·가입·글쓰기·응원·선택·나가기·오류 처리 24항목
+- 건강 챌린지 저장·모임 반영 검증(실제 Supabase): `node e2e/test_health_api.mjs` — 저장·복원·줄이기·모임 health 요약 12항목
+- 2단계 로컬 UI 검증: `python3 e2e/test_phase2_local.py` — 건강 챌린지 도장·새로고침 유지·OX/넌센스 주제 풀이·공유 미리보기(건강·인사카드·모임 초대) 27항목
 - 모임 라이브 E2E: `python3 e2e/test_live_groups.py`
   (홈 모임 배너·모임 현황·미션 → 체험 모임 가입·출석·달성률·게시판 → 초대 링크 → 모임 만들기 →
    `?group=CODE` 자동 가입 → 랭킹 4탭/시상대/달성률 → 퀴즈 공동 배지·결과 알리기 → 더보기 도구·가족·달력)
@@ -192,6 +201,9 @@ supabase/groups.sql 모임 테이블 + 체험 모임 시드
 - 카카오 로그인 검증: `BASE=https://senior-life-platform.pages.dev python3 e2e/test_kakao_talk.py`
 - 로그인 전용 첫 화면 + 최초 1회 설정(이름·태어난해·태어난시간·지역) + 재로그인 스킵 검증:
   `python3 e2e/test_kakao_onboarding.py` (카카오 인가만 스텁, 저장·조회는 같은 핸들러 + 실제 Supabase)
+- 2단계 라이브 E2E(스크린샷 포함): `python3 e2e/test_live_phase2.py` → 35항목
+  (건강 챌린지 저장·새로고침·다른 기기 복원, OX/넌센스 출제, 공유 미리보기, 모임 함께 달성률, 기존 기능 회귀)
+  → `downloads/neulbom_health_challenge.png`, `downloads/neulbom_ox_nonsense_quiz.png`, `downloads/neulbom_kakao_share_modal.png`
 - 스크린샷: `python3 e2e/capture_neulbom.py` →
   `downloads/neulbom_home.png`, `neulbom_quiz.png`, `neulbom_ranking_welfare.png`, `neulbom_tools_family.png`
 

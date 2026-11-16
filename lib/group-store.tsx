@@ -16,6 +16,7 @@ import {
   type MeStatsInput,
 } from "./groups";
 import { localAction, localPayload } from "./group-local";
+import { healthOf } from "./health";
 import { kstDate, weekRange } from "./week";
 import type { GroupDetail, GroupSummary, GroupsPayload } from "./types";
 
@@ -72,14 +73,27 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     state.visits.forEach((d) => {
       if (d >= start && d <= end) days.add(d);
     });
-    const todayDone = Boolean(todayDaily?.done) || days.has(today);
+    Object.entries(state.health ?? {}).forEach(([d, ids]) => {
+      if (Array.isArray(ids) && ids.length && d >= start && d <= end) days.add(d);
+    });
+    const healthToday = healthOf(state.health, today);
+    const todayDone = Boolean(todayDaily?.done) || days.has(today) || healthToday.length > 0;
     return {
       name: profile?.nickname,
       points: weekPoints,
       days: days.size,
       today: todayDone,
+      health: healthToday,
     };
-  }, [state.quizLogs, state.med, state.visits, todayDaily?.done, weekPoints, profile?.nickname]);
+  }, [
+    state.quizLogs,
+    state.med,
+    state.visits,
+    state.health,
+    todayDaily?.done,
+    weekPoints,
+    profile?.nickname,
+  ]);
   meRef.current = me;
 
   const apply = useCallback((p: GroupsPayload) => {
@@ -122,7 +136,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       void refresh();
     }, 250);
     return () => clearTimeout(t);
-  }, [appReady, code, me.name, me.points, me.days, me.today, refresh]);
+  }, [appReady, code, me.name, me.points, me.days, me.today, me.health?.join(","), refresh]);
 
   const runAction = useCallback(
     async (body: Omit<GroupActionBody, "code" | "me">): Promise<ActionResult & { groupId?: string }> => {

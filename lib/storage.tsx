@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AppState, DailyQuiz, Profile, QuizLog, QuizType } from "./types";
+import type { AppState, DailyQuiz, HealthChecks, Profile, QuizLog, QuizType } from "./types";
+import { HEALTH_IDS, healthOf, mergeHealth } from "./health";
 import type { FamilyEvent } from "./calendar";
 import { isValidDateKey, newEventId } from "./calendar";
 import { kstDate, weekIdOf } from "./week";
@@ -17,6 +18,7 @@ function emptyState(): AppState {
     med: {},
     visits: [],
     familyEvents: [],
+    health: {},
     fontSize: 18,
     lastVisit: "",
   };
@@ -30,8 +32,9 @@ function read(): AppState {
     const parsed = JSON.parse(raw) as AppState;
     if (!parsed || parsed.version !== 1) return emptyState();
     const merged = { ...emptyState(), ...parsed };
-    // 예전에 저장된 기록에는 가족 일정이 없으므로 빈 목록으로 채운다.
+    // 예전에 저장된 기록에는 가족 일정·건강 체크가 없으므로 빈 값으로 채운다.
     if (!Array.isArray(merged.familyEvents)) merged.familyEvents = [];
+    if (!merged.health || typeof merged.health !== "object" || Array.isArray(merged.health)) merged.health = {};
     return merged;
   } catch {
     return emptyState();
@@ -64,6 +67,9 @@ export function calcStreak(state: AppState, today: string = kstDate()): number {
   state.quizLogs.forEach((q) => days.add(q.date));
   Object.entries(state.med).forEach(([d, m]) => {
     if (m.morning || m.evening) days.add(d);
+  });
+  Object.entries(state.health ?? {}).forEach(([d, ids]) => {
+    if (Array.isArray(ids) && ids.length) days.add(d);
   });
   state.visits.forEach((d) => days.add(d));
 
@@ -103,6 +109,12 @@ type Ctx = {
   weekId: string;
   weekPoints: number;
   todayDaily: DailyQuiz | null;
+  /** 오늘 찍은 건강 챌린지 id 목록 */
+  healthToday: string[];
+  /** 건강 챌린지를 찍거나 풀 때 — 이제 체크되어 있으면 true */
+  toggleHealth: (id: string) => boolean;
+  /** 서버에 저장된 기록을 이 기기 기록과 합친다(다른 기기에서 찍은 도장 포함) */
+  syncFromServer: () => Promise<void>;
   saveProfile: (p: Omit<Profile, "id" | "createdAt"> & { id?: string }) => Profile;
   updateProfile: (patch: Partial<Profile>) => void;
   logout: () => void;
@@ -152,12 +164,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           med: state.med,
           visits: state.visits.slice(-30),
           familyEvents: state.familyEvents,
+          health: state.health,
           today: kstDate(),
         }),
       }).catch(() => {});
     }, 1200);
     return () => clearTimeout(t);
-  }, [ready, state.profile, state.quizLogs, state.med, state.visits, state.familyEvents]);
+  }, [ready, state.profile, state.quizLogs, state.med, state.visits, state.familyEvents, state.health]);
+
+  // 앱을 열 때 서버에 남아 있는 기록(다른 기기에서 찍은 도장 포함)을 한 번 합쳐 온다.
+  const syncedRef = useRef(false);
+  const profileId = state.profile?.id ?? "";
+  useEffect(() => {
+    if (!ready || !profileId || syncedRef.current) return;
+    syncedRef.current = true;
+    void syncFromServer();
+    // syncFromServer 는 profile 이 바뀔 때 새로 만들어지지만, 여기서는 한 번만 부른다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, profileId]);
 
   const saveProfile = useCallback((p: Omit<Profile, "id" | "createdAt"> & { id?: string }) => {
     const now = new Date();
@@ -249,6 +273,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, familyEvents: s.familyEvents.filter((ev) => ev.id !== id) }));
   }, []);
 
+  const toggleHealth = useCallback((id: string) => {
+    if (!HEALTH_IDS.includes(id)) return false;
+    const today = kstDate();
+    const cur = healthOf(state.health, today);
+    const on = !cur.includes(id);
+    setState((s) => {
+      const list = healthOf(s.health, today);
+      const nextIds = on ? [...list, id] : list.filter((x) => x !== id);
+      const health: HealthChecks = { ...s.health };
+      if (nextIds.length) health[today] = nextIds;
+      else delete health[today];
+      return { ...s, health };
+    });
+    return on;
+  }, [state.health]);
+
+  /**
+   * 서버(Supabase)에 남아 있는 기록을 이 기기와 합친다.
+   * 다른 기기에서 찍은 건강 챌린지 도장·복약·퀴즈 기록이 새로고침·재로그인 뒤에도 이어진다.
+   * 서버가 없거나 비어 있으면 이 기기 기록을 그대로 둔다.
+   */
+  const syncFromServer = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const profile = state.profile;
+    if (!profile) return;
+    try {
+      const res = await fetch(`/api/state?code=${encodeURIComponent(makeCode(profile.id))}`, {
+        headers: { accept: "application/json" },
+      });
+      if (!res.ok) return;
+      const j = await res.json();
+      const remote = j?.ok ? j.state : null;
+      if (!remote) return;
+      setState((s) => {
+        const health = mergeHealth(s.health, remote.health);
+        const med = { ...(remote.med ?? {}), ...s.med };
+        const have = new Set(s.quizLogs.map((q) => q.date));
+        const extra = Array.isArray(remote.quizLogs)
+          ? remote.quizLogs.filter((q: QuizLog) => q?.date && !have.has(q.date))
+          : [];
+        const familyEvents =
+          s.familyEvents.length === 0 && Array.isArray(remote.familyEvents) ? remote.familyEvents : s.familyEvents;
+        return {
+          ...s,
+          health,
+          med,
+          quizLogs: [...s.quizLogs, ...extra].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-120),
+          familyEvents,
+        };
+      });
+    } catch {
+      /* 서버를 못 봐도 이 기기 기록으로 그대로 동작 */
+    }
+  }, [state.profile]);
+
   const setFontSize = useCallback((size: 18 | 21 | 24) => {
     setState((s) => ({ ...s, fontSize: size }));
   }, []);
@@ -263,6 +342,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [state.quizLogs, weekId]
   );
   const todayDaily = state.daily && state.daily.date === today ? state.daily : null;
+  const healthToday = healthOf(state.health, today);
   const code = state.profile ? makeCode(state.profile.id) : "";
 
   const value: Ctx = {
@@ -276,6 +356,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     weekId,
     weekPoints,
     todayDaily,
+    healthToday,
+    toggleHealth,
+    syncFromServer,
     saveProfile,
     updateProfile,
     logout,
