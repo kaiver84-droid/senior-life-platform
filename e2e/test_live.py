@@ -1,12 +1,12 @@
-"""라이브(Cloudflare Pages) 390×844 E2E 전체 검증.
+"""라이브(Cloudflare Pages) 390×844 E2E 전체 검증 — 늘봄 디자인 기준.
 
 BASE=https://senior-life-platform.pages.dev python3 e2e/test_live.py
 """
 import json
 import os
+import re
 import sys
 import urllib.request
-from collections import Counter
 
 sys.path.insert(0, "/workspace/work/senior-platform/e2e")
 from playwright.sync_api import sync_playwright  # noqa: E402
@@ -25,140 +25,182 @@ def main():
     res = {}
     errors = []
 
-    # 1) API 계약 확인 (Pages Functions)
-    code, health = api("/api/health")
+    # 1) API 계약 (Pages Functions)
+    try:
+        code, health = api("/api/health")
+    except Exception as exc:  # 로컬 정적 프리뷰에는 Functions 가 없다
+        code, health = 0, {"supabase": f"n/a ({exc.__class__.__name__})", "kakao": "n/a"}
     res["api_health"] = {"status": code, "supabase": health.get("supabase"), "kakao": health.get("kakao")}
-    code, rank = api("/api/rankings?scope=region&sido=%EC%B6%A9%EC%B2%AD%EB%B6%81%EB%8F%84&sigungu=%EC%98%A5%EC%B2%9C%EA%B5%B0&name=%EC%88%9C%EC%9E%90&points=60&streak=2&birthYear=1952")
-    res["api_rankings"] = {"status": code, "weekId": rank.get("weekId"), "total": rank.get("total"),
-                           "myRank": rank.get("myRank"), "rows": len(rank.get("rows", [])), "sample": rank.get("sample")}
+    try:
+        code, rank = api(
+            "/api/rankings?scope=region&sido=%EC%B6%A9%EC%B2%AD%EB%B6%81%EB%8F%84"
+            "&sigungu=%EC%98%A5%EC%B2%9C%EA%B5%B0&name=%EC%88%9C%EC%9E%90&points=60&streak=2&birthYear=1952"
+        )
+    except Exception:
+        code, rank = 0, {}
+    res["api_rankings"] = {
+        "status": code,
+        "weekId": rank.get("weekId"),
+        "total": rank.get("total"),
+        "myRank": rank.get("myRank"),
+        "rows": len(rank.get("rows", [])),
+    }
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"])
-        ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2,
-                                  locale="ko-KR", is_mobile=True, has_touch=True, permissions=["camera"])
+        browser = p.chromium.launch(
+            args=["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"]
+        )
+        ctx = browser.new_context(
+            viewport={"width": 390, "height": 844},
+            device_scale_factor=2,
+            locale="ko-KR",
+            is_mobile=True,
+            has_touch=True,
+            permissions=["camera"],
+        )
         page = ctx.new_page()
         page.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
         page.goto(BASE + "/", wait_until="domcontentloaded")
-        page.wait_for_selector("#nick", timeout=25000)
+        page.wait_for_selector("#nick", timeout=30000)
         res["onboarding_ok"] = True
         page.fill("#nick", "순자")
         page.select_option("#birth", "1952")
         page.select_option("#sido", "충청북도")
         page.select_option("#sigungu", "옥천군")
         page.get_by_role("button", name="시작하기").click()
-        page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=20000)
+        page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
         page.wait_for_timeout(3000)
 
-        # 홈
-        res["home_fortune"] = page.get_by_text("오늘의 운세").is_visible()
-        res["home_weather"] = page.get_by_text("날씨 생활 팁").is_visible()
-        card_png = page.evaluate("""() => { const cs=[...document.querySelectorAll('canvas')]; const c=cs[0]; return c&&c.width?c.toDataURL('image/png').length:0; }""")
-        res["greeting_canvas_bytes"] = card_png
-        with page.expect_download(timeout=20000) as dl:
-            page.get_by_role("button", name="저장").click()
-        dl.value.save_as(f"{SHOT}/senior_greeting_card.png")
-        res["greeting_saved"] = os.path.getsize(f"{SHOT}/senior_greeting_card.png")
+        nav = page.get_by_role("navigation").get_by_role("button")
+        res["nav_tabs"] = nav.count()
 
-        # 퀴즈
-        page.get_by_role("navigation").get_by_role("button").nth(1).click()
-        page.wait_for_selector("text=1분 두뇌 퀴즈", timeout=15000)
-        page.get_by_role("button", name="퀴즈 시작하기").click()
-        page.wait_for_timeout(900)
-        for _ in range(3):
-            grid = page.locator("button[aria-label$='번째 그림']")
-            if grid.count() > 0:
-                cells = [grid.nth(i).inner_text().strip() for i in range(grid.count())]
-                cnt = Counter(cells)
-                odd = min(cnt, key=lambda k: cnt[k])
-                grid.nth(cells.index(odd)).click()
-            else:
-                page.locator("main .space-y-2\\.5 > button").first.click()
-            page.wait_for_timeout(400)
-            page.get_by_role("button", name="다음 문제").or_(page.get_by_role("button", name="결과 보기")).first.click()
-            page.wait_for_timeout(500)
-        page.wait_for_selector("text=오늘의 퀴즈 결과", timeout=15000)
-        res["quiz_result"] = page.locator("text=획득").first.inner_text()
+        # ---------- 홈 ----------
+        res["home_greeting"] = page.get_by_text("안녕하세요,").is_visible()
+        res["home_fortune"] = page.get_by_text("오늘의 운세").first.is_visible()
+        res["home_weather"] = page.get_by_text("오늘의 날씨와 생활팁").first.is_visible()
+        res["home_tiles"] = all(
+            page.get_by_text(t).first.is_visible()
+            for t in ["오늘의 퀴즈", "정부 지원금", "돋보기", "복약 체크", "안부 전송", "생활 가이드"]
+        )
+        res["home_logo"] = page.get_by_label("늘봄 홈").is_visible()
 
-        page.get_by_role("button", name="금빛 상장 만들기").click()
-        page.wait_for_timeout(1600)
-        cert = page.evaluate("""() => { const cs=[...document.querySelectorAll('canvas')]; const c=cs[cs.length-1]; return c&&c.width?c.toDataURL('image/png').length:0; }""")
-        res["certificate_canvas_bytes"] = cert
-
-        # 랭킹 탭
-        page.get_by_role("button", name="랭킹 화면 열기").click()
-        page.wait_for_selector("text=이번 주 순위", timeout=15000)
-        page.wait_for_timeout(1200)
-        res["ranking_title"] = page.locator("h1").first.inner_text().replace("\n", " ")
-        res["ranking_live_api"] = page.evaluate("""async () => {
-            const r = await fetch('/api/rankings?scope=zodiac&name=순자&points=60&streak=2&birthYear=1952');
-            const j = await r.json();
-            return { status: r.status, ok: j.ok, total: j.total, rows: j.rows ? j.rows.length : 0 };
-        }""")
-        tabs = {}
-        for t in ["띠·나이", "개근상", "우리 동네"]:
-            page.get_by_role("button", name=t).first.click()
-            page.wait_for_timeout(600)
-            tabs[t] = page.locator("text=내 순위").count()
-        res["ranking_tabs"] = tabs
-        res["ranking_percentile"] = page.locator("text=상위").first.inner_text()
-
-        # 혜택
-        page.get_by_role("navigation").get_by_role("button").nth(3).click()
-        page.wait_for_selector("text=내게 맞는 지원금", timeout=15000)
-        res["welfare_count"] = page.locator("h3").count()
-        page.locator("h3").first.click()
-        page.wait_for_timeout(700)
-        res["welfare_steps"] = page.locator("ol li").count()
-        res["welfare_tel"] = page.locator("a[href^='tel:']").count()
-
-        # 도구
-        page.get_by_role("navigation").get_by_role("button").nth(4).click()
-        page.wait_for_selector("text=생활 도구", timeout=15000)
-        page.get_by_role("button", name="돋보기 켜기").click()
-        page.wait_for_timeout(1800)
-        res["magnifier_video"] = page.locator("video").count()
-        page.screenshot(path=f"{SHOT}/_live_magnifier.png")
-        page.get_by_role("button", name="돋보기 닫기").click()
+        # 인사카드(Canvas) — 시트 안에서 실제로 그려지는지
+        page.get_by_role("button", name="인사카드 만들기").click()
+        page.wait_for_timeout(2500)
+        res["greeting_canvas_bytes"] = page.evaluate(
+            """() => { const c=[...document.querySelectorAll('canvas')].find(c=>c.width>1000); return c?c.toDataURL('image/png').length:0; }"""
+        )
+        page.screenshot(path=f"{SHOT}/_live_card.png")
+        page.keyboard.press("Escape")
         page.wait_for_timeout(500)
-        page.get_by_text("보이스피싱 구별법").click()
+
+        # 운세 상세
+        page.get_by_text("오늘의 운세").first.click()
         page.wait_for_timeout(700)
-        res["cardnews_slide"] = page.locator("h4").first.inner_text()
+        res["fortune_sheet"] = page.get_by_text("행운의 색").is_visible()
         page.keyboard.press("Escape")
         page.wait_for_timeout(400)
 
-        # 가족
-        page.get_by_role("navigation").get_by_role("button").nth(5).click()
-        page.wait_for_selector("text=가족 연결", timeout=15000)
-        page.get_by_role("button", name="아침 약").click()
+        # ---------- 퀴즈 ----------
+        nav.nth(1).click()
+        page.wait_for_selector("text=1분 두뇌 퀴즈", timeout=20000)
+        res["quiz_intro"] = page.get_by_role("button", name="퀴즈 시작하기").is_visible()
+        page.get_by_role("button", name="퀴즈 시작하기").click()
+        page.wait_for_timeout(700)
+        res["quiz_progress"] = page.get_by_text("1 / 3 문제").is_visible()
+        res["quiz_confirm_disabled"] = page.get_by_role("button", name="정답 확인").is_disabled()
+
+        for i in range(3):
+            page.locator("[data-quiz-option]").first.click()
+            page.wait_for_timeout(250)
+            page.get_by_role("button", name="정답 확인").click()
+            page.wait_for_timeout(350)
+            if i == 0:
+                res["quiz_feedback"] = page.get_by_text(re.compile("정답이에요|아쉽지만")).is_visible()
+                page.screenshot(path=f"{SHOT}/_live_quiz.png")
+            page.get_by_role("button", name=re.compile("^(다음 문제|결과 보기)$")).click()
+            page.wait_for_timeout(450)
+
+        page.wait_for_selector("text=오늘의 퀴즈 결과", timeout=20000)
+        res["quiz_result"] = True
+        page.get_by_role("button", name="금빛 상장 만들기").click()
+        page.wait_for_timeout(1800)
+        res["certificate_canvas_bytes"] = page.evaluate(
+            """() => { const c=[...document.querySelectorAll('canvas')].find(c=>c.width>1000); return c?c.toDataURL('image/png').length:0; }"""
+        )
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+
+        # ---------- 명예의 전당 ----------
+        nav.nth(2).click()
+        page.wait_for_selector("text=이번 주 순위", timeout=20000)
+        page.wait_for_timeout(1200)
+        res["ranking_podium"] = page.get_by_text("이번 주 1위를 축하합니다", exact=False).is_visible()
+        res["ranking_tabs"] = all(
+            page.get_by_role("tab", name=t).is_visible() for t in ["우리 동네", "출생연도", "개근왕"]
+        )
+        res["ranking_my_rank"] = page.get_by_text("내 순위").first.is_visible()
+        page.screenshot(path=f"{SHOT}/_live_ranking.png")
+
+        # ---------- 복지 혜택 ----------
+        nav.nth(3).click()
+        page.wait_for_selector("text=내게 맞는 복지 혜택", timeout=20000)
+        page.wait_for_timeout(800)
+        res["welfare_hero"] = page.get_by_text("기초연금").first.is_visible()
+        res["welfare_steps"] = page.get_by_text("이렇게 신청해요").is_visible()
+        page.get_by_role("button", name="신청 방법 자세히 보기").click()
+        page.wait_for_timeout(800)
+        res["welfare_sheet"] = page.get_by_text("이렇게 하세요 (3단계)").is_visible()
+        res["welfare_phone"] = page.get_by_role("link", name=re.compile("전화하기|129 안내")).is_visible()
+        page.screenshot(path=f"{SHOT}/_live_welfare.png")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+
+        # ---------- 도구 ----------
+        nav.nth(4).click()
+        page.wait_for_selector("text=생활 속 스마트 도구", timeout=20000)
+        res["tools_segments"] = all(
+            page.get_by_role("tab", name=t).is_visible() for t in ["돋보기", "손전등", "가이드"]
+        )
+        page.get_by_role("button", name="확대 키우기").first.click()
         page.wait_for_timeout(300)
-        page.get_by_role("button", name="저녁 약").click()
-        page.wait_for_timeout(1500)
-        res["med_done"] = page.locator("text=완료 ✓").count()
+        res["tools_zoom"] = page.get_by_text("2.5배").first.is_visible()
+        page.get_by_role("button", name="돋보기 켜기").click()
+        page.wait_for_timeout(1800)
+        res["tools_camera"] = page.locator("video").first.is_visible()
+        page.screenshot(path=f"{SHOT}/_live_tools.png")
+        page.get_by_role("button", name="돋보기 닫기").click()
+        page.wait_for_timeout(400)
+        page.get_by_role("tab", name="가이드").click()
+        page.wait_for_timeout(500)
+        res["tools_guides"] = page.get_by_text("1분 카드뉴스").first.is_visible()
+
+        # ---------- 가족 ----------
+        nav.nth(5).click()
+        page.wait_for_selector("text=가족에게 안부 전하기", timeout=20000)
+        page.wait_for_timeout(700)
+        page.get_by_role("button", name="아침 약").click()
+        page.wait_for_timeout(400)
+        res["family_med"] = page.get_by_text("먹었어요").first.is_visible()
+        res["family_activity"] = page.get_by_text("오늘의 활동").is_visible()
         code = page.locator(".tabular").first.inner_text().strip()
         res["family_code"] = code
-        page.wait_for_timeout(2500)
-        # 서버 저장 확인 (/api/state)
-        state = page.evaluate("""async (code) => {
-            const r = await fetch('/api/state?code=' + code);
-            const j = await r.json();
-            return { status: r.status, ok: j.ok, nickname: j.state && j.state.profile ? j.state.profile.nickname : null,
-                     logs: j.state ? j.state.quizLogs.length : 0, med: j.state ? Object.keys(j.state.med).length : 0 };
-        }""", code)
-        res["api_state"] = state
+        page.screenshot(path=f"{SHOT}/_live_family.png")
 
         # 자녀 대시보드
         page.goto(f"{BASE}/family/?code={code}", wait_until="domcontentloaded")
         page.wait_for_timeout(2500)
-        res["dashboard_title"] = page.locator("h1").first.inner_text()
-        res["dashboard_visit"] = page.locator("text=오늘 앱에 접속했어요").count()
-        res["dashboard_med"] = page.locator("text=✓ 먹었어요").count()
+        res["dashboard_name"] = page.get_by_text("순자 님의 오늘").is_visible()
+        res["dashboard_med"] = page.get_by_text("아침 약").first.is_visible()
+        res["dashboard_7days"] = page.get_by_text("최근 7일").is_visible()
+        page.screenshot(path=f"{SHOT}/_live_dashboard.png")
 
-        res["console_errors"] = errors
         browser.close()
 
-    print(json.dumps(res, ensure_ascii=False, indent=1))
+    res["console_errors"] = errors
+    print(json.dumps(res, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

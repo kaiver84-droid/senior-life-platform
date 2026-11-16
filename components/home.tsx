@@ -1,27 +1,56 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getFortune, shortFortuneLine } from "@/lib/fortune";
+import { getFortune, shortFortuneLine, type Fortune } from "@/lib/fortune";
 import { fetchWeather, type WeatherInfo } from "@/lib/weather";
 import { renderGreetingCard, downloadCanvas, THEMES, type GreetingTheme } from "@/lib/canvas";
 import { kakaoConfig, shareCard, shareMessageText } from "@/lib/share";
 import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
-import { Badge, BigButton, Card, SectionTitle, Stars, useToast } from "./ui";
-import { IconDownload, IconShare, IconStar } from "./icons";
+import { Badge, BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
+import { HeroScene, NeulbomMark, WeatherArt } from "./art";
+import {
+  IconBank,
+  IconBook,
+  IconCalendar,
+  IconChevron,
+  IconDownload,
+  IconMail,
+  IconPill,
+  IconQuiz,
+  IconSend,
+  IconShare,
+  IconSparkle,
+  IconTools,
+  IconTrophy,
+} from "./icons";
 
 const PRESETS = ["오늘도 건강하세요", "행복한 하루 보내세요", "손주가 보고 싶은 날", "우리 함께 힘내요"];
+
+const WEEKDAY = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+
+function longKoreanDate(dateStr: string): { date: string; day: string } {
+  const d = new Date(dateStr + "T00:00:00Z");
+  return {
+    date: `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`,
+    day: WEEKDAY[d.getUTCDay()],
+  };
+}
 
 export function HomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { profile, streak, today, todayDaily, weekPoints } = useApp();
   const { show } = useToast();
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [fortuneOpen, setFortuneOpen] = useState(false);
+  const [weatherOpen, setWeatherOpen] = useState(false);
+  const [studio, setStudio] = useState<{ open: boolean; autoShare: boolean }>({ open: false, autoShare: false });
 
   const fortune = useMemo(
     () => getFortune(profile?.nickname || "이용자", profile?.birthYear || 1955, today),
     [profile?.nickname, profile?.birthYear, today]
   );
+  const dateLabel = longKoreanDate(today);
 
   useEffect(() => {
     if (!profile) return;
@@ -34,162 +63,288 @@ export function HomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
     };
   }, [profile]);
 
+  const tiles = [
+    {
+      key: "quiz",
+      label: "오늘의 퀴즈",
+      sub: todayDaily?.done ? "완료했어요" : "3문제 · 1분",
+      icon: <IconQuiz size={26} />,
+      bg: "bg-sun-light",
+      fg: "text-sun-dark",
+      go: () => onNavigate("quiz"),
+    },
+    {
+      key: "welfare",
+      label: "정부 지원금",
+      sub: "내게 맞는 혜택",
+      icon: <IconBank size={26} />,
+      bg: "bg-leaf-light",
+      fg: "text-leaf-dark",
+      go: () => onNavigate("welfare"),
+    },
+    {
+      key: "tools",
+      label: "돋보기",
+      sub: "크게 보기",
+      icon: <IconTools size={26} />,
+      bg: "bg-plum-light",
+      fg: "text-plum-dark",
+      go: () => onNavigate("tools"),
+    },
+    {
+      key: "med",
+      label: "복약 체크",
+      sub: "아침 · 저녁 약",
+      icon: <IconPill size={26} />,
+      bg: "bg-coral-light",
+      fg: "text-coral-dark",
+      go: () => onNavigate("family"),
+    },
+    {
+      key: "anbu",
+      label: "안부 전송",
+      sub: "카톡으로 인사",
+      icon: <IconMail size={26} />,
+      bg: "bg-sky",
+      fg: "text-[#2F79AE]",
+      go: () => onNavigate("family"),
+    },
+    {
+      key: "guide",
+      label: "생활 가이드",
+      sub: "1분 카드뉴스",
+      icon: <IconBook size={26} />,
+      bg: "bg-gold-light",
+      fg: "text-[#B08208]",
+      go: () => onNavigate("tools"),
+    },
+  ];
+
   return (
-    <div className="space-y-5">
-      {/* 인사 */}
-      <section className="fade-up">
-        <div className="mb-1 flex items-center gap-2">
-          <Badge tone="gold">{koreanDate(today)}</Badge>
-          {streak > 0 ? <Badge tone="warm">🔥 {streak}일 연속</Badge> : null}
+    <div className="space-y-4 pb-2">
+      {/* 인사 + 날짜 */}
+      <section className="fade-up flex items-start justify-between gap-3 pt-1">
+        <div className="min-w-0">
+          <p className="text-[0.86rem] font-extrabold tracking-tight text-brand-dark/80">안녕하세요,</p>
+          <h1 className="mt-0.5 flex items-center gap-1.5 text-[1.52rem] font-black leading-tight text-ink">
+            <span className="truncate">{profile?.nickname}</span>
+            <span className="text-[1.3rem]">😊</span>
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {streak > 0 ? <Badge tone="coral">🔥 {streak}일 연속</Badge> : null}
+            <span className="text-[0.82rem] font-semibold text-ink/50">
+              {shortSido(profile?.sido || "")} {profile?.sigungu}
+            </span>
+          </div>
         </div>
-        <h1 className="text-[1.6rem] font-black leading-snug">
-          {profile?.nickname} 님,
-          <br />
-          오늘도 반갑습니다 🌻
-        </h1>
-        <p className="mt-1 text-[0.98rem] font-semibold text-ink/60">
-          {shortSido(profile?.sido || "")} {profile?.sigungu} · {fortune.zodiacEmoji} {fortune.zodiac}띠
-        </p>
+        <div className="flex shrink-0 items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-soft">
+          <IconCalendar size={20} className="text-brand" />
+          <div className="leading-tight">
+            <p className="tabular text-[0.86rem] font-black text-ink">{dateLabel.date}</p>
+            <p className="text-[0.72rem] font-bold text-ink/50">{dateLabel.day}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 감성 인사카드 히어로 */}
+      <section className="fade-up overflow-hidden rounded-[1.75rem] bg-white shadow-card">
+        <div className="relative h-[228px] overflow-hidden">
+          <HeroScene variant="chrysanthemum" className="absolute inset-0 h-full w-full" />
+          <div className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/35 to-transparent" />
+          <div className="relative flex h-full flex-col justify-center gap-1 px-4">
+            <button
+              type="button"
+              onClick={() => setStudio({ open: true, autoShare: false })}
+              className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-ink/80 px-3 py-1.5 text-[0.76rem] font-extrabold text-white backdrop-blur"
+            >
+              오늘의 안부 인사 <IconChevron size={13} />
+            </button>
+            <p className="hand text-[2.05rem] leading-[1.22] text-ink">
+              {fortune.score >= 85 ? "오늘도 건강하고" : "천천히, 편안하게"}
+              <br />
+              행복하세요! <span className="text-coral">♡</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2 px-4 py-3">
+          <p className="flex items-center justify-center gap-1.5 pb-0.5 text-[0.8rem] font-bold text-ink/55">
+            <IconSparkle size={14} className="text-sun-dark" /> {shortFortuneLine(fortune)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setStudio({ open: true, autoShare: false })}
+            className="touch-btn min-h-[54px] w-full bg-sun text-ink shadow-sun active:bg-sun-dark"
+          >
+            <IconSend size={21} /> 인사카드 만들기
+          </button>
+          <button
+            type="button"
+            onClick={() => setStudio({ open: true, autoShare: true })}
+            className="touch-btn min-h-[52px] w-full bg-white text-ink shadow-soft"
+          >
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.6rem] font-black text-[#3C1E1E]">
+              TALK
+            </span>
+            카카오톡으로 보내기
+          </button>
+        </div>
       </section>
 
       {/* 오늘의 운세 */}
-      <Card className="fade-up bg-gradient-to-br from-white to-[#FFF7E4]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="section-title">🔮 오늘의 운세</h2>
-            <p className="mt-0.5 text-[0.92rem] font-semibold text-ink/60">
-              {profile?.birthYear}년생 · {fortune.zodiac}띠
-            </p>
-          </div>
-          <ScoreRing score={fortune.score} />
-        </div>
-
-        <div className="mt-3 rounded-2xl bg-white/80 p-3.5 text-center">
-          <p className="text-[1.12rem] font-black text-brand-dark">{fortune.headline}</p>
-          <Stars n={fortune.stars} />
-        </div>
-
-        <div className="mt-3 space-y-2.5">
-          <FortuneRow emoji="🍀" label="총운" text={fortune.general} />
-          <FortuneRow emoji="💰" label="금전" text={fortune.money} />
-          <FortuneRow emoji="💚" label="건강" text={fortune.health} />
-          <FortuneRow emoji="🤝" label="인연" text={fortune.social} />
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-          <LuckyBox label="행운의 색" value={fortune.luckyColor.name} swatch={fortune.luckyColor.hex} />
-          <LuckyBox label="행운의 숫자" value={`${fortune.luckyNumber}`} />
-          <LuckyBox label="행운의 방향" value={fortune.luckyDirection} />
-          <LuckyBox label="좋은 시간" value={fortune.luckyTime} />
-        </div>
-
-        <p className="mt-3 rounded-xl bg-gold-light/70 px-3 py-2.5 text-center text-[0.98rem] font-bold text-[#7A5209]">
-          “{fortune.advice}”
-        </p>
-      </Card>
-
-      {/* 날씨 생활 팁 */}
-      <Card className="fade-up">
-        <h2 className="section-title">🌤️ 오늘 날씨 생활 팁</h2>
-        {weather ? (
-          <>
-            <div className="mt-2 flex items-center gap-3">
-              <div className="text-[2.6rem] leading-none">{weather.emoji}</div>
-              <div>
-                <p className="text-[1.5rem] font-black leading-none">
-                  {weather.temp}
-                  <span className="text-[1rem] font-bold">°C</span>
-                </p>
-                <p className="text-[0.95rem] font-bold text-ink/65">
-                  {weather.label} · 최저 {weather.min}° / 최고 {weather.max}°
-                </p>
-              </div>
-            </div>
-            <ul className="mt-3 space-y-2">
-              {weather.tips.map((t) => (
-                <li key={t} className="flex gap-2 text-[1rem] font-semibold leading-snug text-ink/85">
-                  <span aria-hidden className="mt-0.5 text-gold">
-                    ●
-                  </span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[0.78rem] font-medium text-ink/40">
-              {weather.source === "live"
-                ? "실시간 날씨(Open-Meteo) 기준 · 옷차림과 외출 전 확인에 활용하세요"
-                : "날씨를 불러오지 못해 기본 안내를 보여 드려요"}
-            </p>
-          </>
-        ) : (
-          <p className="mt-2 text-[1rem] font-semibold text-ink/55">날씨를 불러오는 중이에요…</p>
-        )}
-      </Card>
-
-      {/* 오늘의 안부 인사카드 */}
-      <GreetingStudio show={show} />
-
-      {/* 바로가기 */}
-      <section className="fade-up">
-        <SectionTitle emoji="⚡">바로가기</SectionTitle>
-        <div className="grid grid-cols-2 gap-3">
-          <BigButton variant={todayDaily?.done ? "white" : "leaf"} size="lg" onClick={() => onNavigate("quiz")}>
-            🧠 {todayDaily?.done ? "오늘 퀴즈 완료" : "1분 퀴즈 풀기"}
-          </BigButton>
-          <BigButton variant="white" size="lg" onClick={() => onNavigate("welfare")}>
-            💰 내 지원금 찾기
-          </BigButton>
-        </div>
-        <button
-          onClick={() => onNavigate("ranking")}
-          className="mt-3 flex w-full items-center justify-between rounded-2xl border-2 border-gold/40 bg-gold-light/60 px-4 py-3 text-left"
-        >
-          <span className="text-[0.98rem] font-black text-[#7A5209]">
-            🏆 이번 주 퀴즈 점수 <span className="tabular text-[1.12rem]">{weekPoints}</span>점 · 랭킹 보기
+      <button
+        type="button"
+        onClick={() => setFortuneOpen(true)}
+        className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
+      >
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[1.1rem] bg-gradient-to-br from-[#FFE6D6] to-[#FFD3C4] text-[1.75rem]">
+          {fortune.zodiacEmoji}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 운세</span>
+          <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
+            {fortune.headline} · {fortune.zodiac}띠
           </span>
-          <span className="text-[1.1rem] font-black text-[#7A5209]">›</span>
-        </button>
+        </span>
+        <IconChevron size={22} className="shrink-0 text-ink/30" />
+      </button>
+
+      {/* 오늘의 날씨와 생활팁 */}
+      <button
+        type="button"
+        onClick={() => setWeatherOpen(true)}
+        className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
+      >
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[1.1rem] bg-gradient-to-br from-sky to-[#EAF4FB]">
+          <WeatherArt label={weather?.label || "맑음"} size={38} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 날씨와 생활팁</span>
+          <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
+            {weather ? `${weather.temp}° ${weather.label} · ${weather.tips[0]}` : "날씨를 확인하고 있어요…"}
+          </span>
+        </span>
+        <IconChevron size={22} className="shrink-0 text-ink/30" />
+      </button>
+
+      {/* 2×3 바로가기 */}
+      <section className="fade-up">
+        <SectionTitle right={<span className="text-[0.78rem] font-bold text-ink/40">자주 찾는 메뉴</span>}>
+          바로가기
+        </SectionTitle>
+        <div className="grid grid-cols-3 gap-2.5">
+          {tiles.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={t.go}
+              className="card flex flex-col items-start gap-1.5 p-3 text-left active:scale-[0.98]"
+            >
+              <span className={`grid h-11 w-11 place-items-center rounded-[0.95rem] ${t.bg} ${t.fg}`}>
+                {t.icon}
+              </span>
+              <span className="block text-[0.9rem] font-black leading-tight text-ink">{t.label}</span>
+              <span className="block text-[0.7rem] font-bold leading-tight text-ink/45">{t.sub}</span>
+            </button>
+          ))}
+        </div>
       </section>
-    </div>
-  );
-}
 
-function ScoreRing({ score }: { score: number }) {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  const filled = (score / 100) * c;
-  return (
-    <div className="relative h-[84px] w-[84px] shrink-0">
-      <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90">
-        <circle cx="38" cy="38" r={r} fill="none" stroke="rgba(20,33,58,0.10)" strokeWidth="9" />
-        <circle
-          cx="38"
-          cy="38"
-          r={r}
-          fill="none"
-          stroke="#B07A16"
-          strokeWidth="9"
-          strokeLinecap="round"
-          strokeDasharray={`${filled} ${c}`}
+      {/* 명예의 전당 배너 */}
+      <button
+        type="button"
+        onClick={() => onNavigate("ranking")}
+        className="fade-up flex w-full items-center gap-3 rounded-[1.5rem] bg-gradient-to-r from-gold-light via-[#FFF1C4] to-[#FFE7A6] px-4 py-3.5 text-left shadow-soft"
+      >
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/80 text-gold-dark">
+          <IconTrophy size={24} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[1rem] font-black leading-tight text-[#7A5600]">
+            이번 주 {weekPoints}점 · 명예의 전당
+          </span>
+          <span className="block text-[0.82rem] font-bold text-[#8A6A16]/80">
+            우리 동네 순위 보기
+          </span>
+        </span>
+        <IconChevron size={22} className="shrink-0 text-[#8A6A16]" />
+      </button>
+
+      <p className="flex items-center justify-center gap-1.5 pb-1 text-[0.76rem] font-semibold text-ink/35">
+        <NeulbomMark size={16} /> 늘봄과 함께, 더 편안한 하루
+      </p>
+
+      <Sheet open={fortuneOpen} onClose={() => setFortuneOpen(false)} title="오늘의 운세" subtitle={`${koreanDate(today)} · ${fortune.zodiac}띠`}>
+        <FortuneDetail fortune={fortune} />
+      </Sheet>
+
+      <Sheet
+        open={weatherOpen}
+        onClose={() => setWeatherOpen(false)}
+        title="오늘의 날씨와 생활팁"
+        subtitle={`${shortSido(profile?.sido || "")} ${profile?.sigungu}`}
+      >
+        <WeatherDetail weather={weather} />
+      </Sheet>
+
+      {studio.open ? (
+        <GreetingSheet
+          autoShare={studio.autoShare}
+          onClose={() => setStudio({ open: false, autoShare: false })}
+          show={show}
         />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="tabular text-[1.35rem] font-black leading-none text-[#8A5A0B]">{score}</span>
-        <span className="text-[0.68rem] font-bold text-ink/50">점</span>
-      </div>
+      ) : null}
     </div>
   );
 }
 
-function FortuneRow({ emoji, label, text }: { emoji: string; label: string; text: string }) {
+/* ---------------------------------------------------------------- */
+
+function FortuneDetail({ fortune }: { fortune: Fortune }) {
+  const rows: [string, string, string][] = [
+    ["🍀", "총운", fortune.general],
+    ["💰", "금전", fortune.money],
+    ["💚", "건강", fortune.health],
+    ["🤝", "인연", fortune.social],
+  ];
   return (
-    <div className="flex gap-2.5">
-      <span aria-hidden className="text-[1.2rem] leading-6">
-        {emoji}
-      </span>
-      <p className="text-[1rem] font-semibold leading-snug text-ink/85">
-        <span className="mr-1 font-black text-ink">{label}</span>
-        {text}
+    <div className="space-y-3">
+      <div className="rounded-[1.5rem] bg-white p-5 text-center shadow-soft">
+        <div className="mx-auto mb-2 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[#FFE6D6] to-[#FFD3C4] text-[2rem]">
+          {fortune.zodiacEmoji}
+        </div>
+        <p className="text-[1.3rem] font-black leading-snug text-brand-deep">{fortune.headline}</p>
+        <div className="mt-1 flex items-center justify-center gap-2">
+          <Stars n={fortune.stars} />
+          <span className="tabular text-[0.95rem] font-extrabold text-ink/55">{fortune.score}점</span>
+        </div>
+      </div>
+
+      <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
+        <div className="space-y-3">
+          {rows.map(([emoji, label, text]) => (
+            <div key={label} className="flex gap-2.5">
+              <span aria-hidden className="text-[1.2rem] leading-6">
+                {emoji}
+              </span>
+              <p className="text-[0.98rem] font-semibold leading-snug text-ink/80">
+                <span className="mr-1 font-black text-ink">{label}</span>
+                {text}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <LuckyBox label="행운의 색" value={fortune.luckyColor.name} swatch={fortune.luckyColor.hex} />
+        <LuckyBox label="행운의 숫자" value={`${fortune.luckyNumber}`} />
+        <LuckyBox label="행운의 방향" value={fortune.luckyDirection} />
+        <LuckyBox label="좋은 시간" value={fortune.luckyTime} />
+      </div>
+
+      <p className="rounded-2xl bg-gold-light px-4 py-3 text-center text-[0.98rem] font-bold leading-relaxed text-[#7A5600]">
+        “{fortune.advice}”
       </p>
     </div>
   );
@@ -197,11 +352,14 @@ function FortuneRow({ emoji, label, text }: { emoji: string; label: string; text
 
 function LuckyBox({ label, value, swatch }: { label: string; value: string; swatch?: string }) {
   return (
-    <div className="rounded-xl bg-white/90 px-2 py-2.5">
-      <p className="text-[0.76rem] font-bold text-ink/50">{label}</p>
-      <p className="mt-0.5 flex items-center justify-center gap-1.5 text-[0.98rem] font-black text-ink">
+    <div className="rounded-2xl bg-white px-3 py-2.5 shadow-soft">
+      <p className="text-[0.74rem] font-bold text-ink/45">{label}</p>
+      <p className="mt-0.5 flex items-center justify-center gap-1.5 text-[0.95rem] font-black text-ink">
         {swatch ? (
-          <span className="inline-block h-3.5 w-3.5 rounded-full border border-ink/20" style={{ background: swatch }} />
+          <span
+            className="inline-block h-3.5 w-3.5 rounded-full border border-ink/15"
+            style={{ background: swatch }}
+          />
         ) : null}
         {value}
       </p>
@@ -209,38 +367,82 @@ function LuckyBox({ label, value, swatch }: { label: string; value: string; swat
   );
 }
 
-function GreetingStudio({ show }: { show: (m: string) => void }) {
+function WeatherDetail({ weather }: { weather: WeatherInfo | null }) {
+  if (!weather) {
+    return <p className="py-8 text-center text-[1rem] font-semibold text-ink/55">날씨를 불러오는 중이에요…</p>;
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-4 rounded-[1.5rem] bg-white p-5 shadow-soft">
+        <WeatherArt label={weather.label} size={62} />
+        <div>
+          <p className="tabular text-[2rem] font-black leading-none text-ink">
+            {weather.temp}
+            <span className="text-[1.1rem] font-bold">°C</span>
+          </p>
+          <p className="mt-1 text-[0.95rem] font-bold text-ink/60">
+            {weather.label} · 최저 {weather.min}° / 최고 {weather.max}°
+          </p>
+          <p className="text-[0.82rem] font-semibold text-ink/45">
+            체감 {weather.feels}° · 습도 {weather.humidity}% · 바람 {weather.wind}m/s
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
+        <p className="mb-2 flex items-center gap-1.5 text-[0.95rem] font-black text-ink">
+          <IconSparkle size={18} className="text-sun" /> 오늘의 생활팁
+        </p>
+        <ul className="space-y-2.5">
+          {weather.tips.map((t) => (
+            <li key={t} className="flex gap-2 text-[0.98rem] font-semibold leading-snug text-ink/80">
+              <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sun" />
+              <span>{t}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="text-center text-[0.76rem] font-medium text-ink/40">
+        {weather.source === "live"
+          ? "실시간 날씨(Open-Meteo) 기준 · 외출 전 한 번 더 확인하세요"
+          : "날씨를 불러오지 못해 기본 안내를 보여 드려요"}
+      </p>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* 인사카드 만들기 시트                                               */
+/* ---------------------------------------------------------------- */
+
+function GreetingSheet({
+  autoShare,
+  onClose,
+  show,
+}: {
+  autoShare: boolean;
+  onClose: () => void;
+  show: (m: string) => void;
+}) {
   const { profile, today } = useApp();
   const [theme, setTheme] = useState<GreetingTheme>("spring");
   const [message, setMessage] = useState(PRESETS[0]);
-  const [rendering, setRendering] = useState(false);
+  const [rendering, setRendering] = useState(true);
+  const [drawn, setDrawn] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const shared = useRef(false);
 
   const fortune = useMemo(
     () => getFortune(profile?.nickname || "이용자", profile?.birthYear || 1955, today),
     [profile?.nickname, profile?.birthYear, today]
   );
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !profile) return;
-    let alive = true;
-    setRendering(true);
-    renderGreetingCard(canvas, {
-      theme,
-      name: profile.nickname,
-      message,
-      dateLabel: koreanDate(today),
-      fortuneLine: shortFortuneLine(fortune),
-    })
-      .catch(() => {})
-      .finally(() => {
-        if (alive) setRendering(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [theme, message, profile, today, fortune]);
+  // 카드 캔버스는 시트 포털이 그려진 뒤에 마운트되므로, 그릴 준비 상태를 자식이 알려 준다.
+  const handleCardState = useCallback((busy: boolean, done: boolean) => {
+    setRendering(busy);
+    setDrawn(done);
+  }, []);
 
   const save = useCallback(() => {
     if (!canvasRef.current || !profile) return;
@@ -255,46 +457,54 @@ function GreetingStudio({ show }: { show: (m: string) => void }) {
       filename: `인사카드_${profile.nickname}_${today}.png`,
       title: `${profile.nickname} 님의 오늘 안부`,
       description: message,
-      text: `${message} - ${profile.nickname} 드림 (시니어생활 도우미)`,
+      text: `${message} - ${profile.nickname} 드림 (늘봄)`,
     });
     show(shareMessageText(result));
   }, [profile, today, message, show]);
 
-  return (
-    <Card className="fade-up">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h2 className="section-title">💌 오늘의 안부 인사카드</h2>
-          <p className="mt-0.5 text-[0.92rem] font-semibold text-ink/60">
-            내 이름이 들어간 카드를 만들어 카카오톡으로 보내요
-          </p>
-        </div>
-        <IconStar className="shrink-0 text-gold" size={26} />
-      </div>
+  // 홈의 '카카오톡으로 보내기' → 카드가 그려진 뒤 한 번만 공유한다
+  useEffect(() => {
+    if (!autoShare || shared.current || !drawn) return;
+    if (!canvasRef.current || !canvasRef.current.width) return;
+    shared.current = true;
+    void send();
+  }, [autoShare, drawn, send]);
 
-      <div className="mt-3 grid grid-cols-5 gap-1.5">
+  return (
+    <Sheet open onClose={onClose} title="오늘의 안부 인사카드" subtitle="내 이름이 들어간 카드를 만들어 보내요">
+      <div className="grid grid-cols-5 gap-1.5">
         {THEMES.map((t) => (
           <button
             key={t.key}
             onClick={() => setTheme(t.key)}
             aria-pressed={theme === t.key}
-            className={`flex flex-col items-center gap-1 rounded-xl border-2 px-1 py-1.5 transition ${
-              theme === t.key ? "border-brand bg-brand-light" : "border-ink/10 bg-white"
+            className={`flex flex-col items-center gap-1 rounded-2xl border-2 px-1 py-1.5 transition ${
+              theme === t.key ? "border-brand bg-brand-light" : "border-ink/8 bg-white"
             }`}
           >
             <span
-              className="h-9 w-full rounded-md"
+              className="h-9 w-full rounded-xl"
               style={{ background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
             />
-            <span className="whitespace-nowrap text-[0.64rem] font-extrabold tracking-tight">{t.label}</span>
+            <span className="whitespace-nowrap text-[0.62rem] font-extrabold tracking-tight">{t.label}</span>
           </button>
         ))}
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-2xl border-2 border-ink/10 bg-[#F4EEE1]">
-        <canvas ref={canvasRef} className="block w-full" style={{ aspectRatio: "1080 / 1350" }} />
+      <div className="mt-3 overflow-hidden rounded-[1.4rem] bg-[#F4EEE1] shadow-soft">
+        <GreetingPreview
+          canvasRef={canvasRef}
+          theme={theme}
+          name={profile?.nickname || ""}
+          message={message}
+          dateLabel={koreanDate(today)}
+          fortuneLine={shortFortuneLine(fortune)}
+          onState={handleCardState}
+        />
       </div>
-      {rendering ? <p className="mt-1 text-center text-[0.8rem] font-semibold text-ink/50">카드를 그리는 중…</p> : null}
+      {rendering ? (
+        <p className="mt-1 text-center text-[0.78rem] font-semibold text-ink/45">카드를 그리는 중…</p>
+      ) : null}
 
       <div className="mt-3">
         <label htmlFor="msg" className="mb-1.5 block text-[0.95rem] font-extrabold">
@@ -312,8 +522,10 @@ function GreetingStudio({ show }: { show: (m: string) => void }) {
             <button
               key={p}
               onClick={() => setMessage(p)}
-              className={`rounded-full border-2 px-3 py-1.5 text-[0.85rem] font-bold ${
-                message === p ? "border-brand bg-brand-light text-brand-dark" : "border-ink/12 bg-white text-ink/70"
+              className={`rounded-full border-2 px-3 py-1.5 text-[0.82rem] font-bold ${
+                message === p
+                  ? "border-brand bg-brand-light text-brand-dark"
+                  : "border-ink/10 bg-white text-ink/65"
               }`}
             >
               {p}
@@ -322,19 +534,55 @@ function GreetingStudio({ show }: { show: (m: string) => void }) {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-2">
         <BigButton variant="white" onClick={save}>
           <IconDownload size={22} /> 저장
         </BigButton>
-        <BigButton variant="warm" onClick={send}>
+        <BigButton variant="sun" onClick={send}>
           <IconShare size={22} /> 카톡으로 보내기
         </BigButton>
       </div>
-      <p className="mt-2 text-center text-[0.78rem] font-medium text-ink/45">
+      <p className="mt-2 text-center text-[0.78rem] font-medium leading-relaxed text-ink/45">
         {kakaoConfig().configured
           ? "카카오톡 공유 카드로 바로 보낼 수 있어요. 친구를 고르면 끝나요."
           : "휴대폰 공유창으로 보낼 수 있어요. 카카오 앱 키를 넣으면 카카오톡 공유 카드로 바뀌어요."}
       </p>
-    </Card>
+    </Sheet>
   );
+}
+
+/** 시트가 열린 뒤(=포털 마운트 뒤) 캔버스를 그리고 알려 주는 미리보기 */
+function GreetingPreview({
+  canvasRef,
+  theme,
+  name,
+  message,
+  dateLabel,
+  fortuneLine,
+  onState,
+}: {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  theme: GreetingTheme;
+  name: string;
+  message: string;
+  dateLabel: string;
+  fortuneLine: string;
+  onState: (busy: boolean, done: boolean) => void;
+}) {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !name) return;
+    let alive = true;
+    onState(true, false);
+    renderGreetingCard(canvas, { theme, name, message, dateLabel, fortuneLine })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) onState(false, true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [canvasRef, theme, name, message, dateLabel, fortuneLine, onState]);
+
+  return <canvas ref={canvasRef} className="block w-full" style={{ aspectRatio: "1080 / 1350" }} />;
 }

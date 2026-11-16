@@ -18,7 +18,7 @@ export const QUIZ_TYPE_LABEL: Record<QuizType, string> = {
 };
 
 export const QUIZ_TYPE_EMOJI: Record<QuizType, string> = {
-  choseong: "🔤",
+  choseong: "🧩",
   lyrics: "🎵",
   spot: "🔍",
 };

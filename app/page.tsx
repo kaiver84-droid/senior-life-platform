@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { AppProvider, useApp } from "@/lib/storage";
-import { ToastProvider, Sheet, BigButton, Divider } from "@/components/ui";
+import { ToastProvider, Sheet, BigButton, Divider, Badge } from "@/components/ui";
 import { Onboarding } from "@/components/onboarding";
 import { HomeTab } from "@/components/home";
 import { QuizTab } from "@/components/quiz";
@@ -10,23 +10,34 @@ import { WelfareTab } from "@/components/welfare";
 import { ToolsTab } from "@/components/tools";
 import { FamilyTab } from "@/components/family";
 import { RankingTab } from "@/components/ranking";
-import { IconFamily, IconGift, IconHome, IconQuiz, IconStar, IconTools } from "@/components/icons";
+import { NeulbomMark } from "@/components/art";
+import {
+  IconFamily,
+  IconGear,
+  IconGift,
+  IconHome,
+  IconQuiz,
+  IconTools,
+  IconTrophy,
+} from "@/components/icons";
 
 type TabKey = "home" | "quiz" | "ranking" | "welfare" | "tools" | "family";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "home", label: "홈", icon: <IconHome size={24} /> },
-  { key: "quiz", label: "퀴즈", icon: <IconQuiz size={23} /> },
-  { key: "ranking", label: "랭킹", icon: <IconStar size={23} /> },
+  { key: "quiz", label: "퀴즈", icon: <IconQuiz size={24} /> },
+  { key: "ranking", label: "랭킹", icon: <IconTrophy size={24} /> },
   { key: "welfare", label: "혜택", icon: <IconGift size={23} /> },
   { key: "tools", label: "도구", icon: <IconTools size={24} /> },
   { key: "family", label: "가족", icon: <IconFamily size={24} /> },
 ];
 
+const FONT_LABEL: Record<number, string> = { 18: "보통", 21: "크게", 24: "아주 크게" };
+
 function Shell() {
   const { ready, profile, fontSize, setFontSize, logout, code } = useApp();
   const [tab, setTab] = useState<TabKey>("home");
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const fromHash = (window.location.hash || "").replace("#", "") as TabKey;
@@ -44,8 +55,8 @@ function Shell() {
     return (
       <div className="grid min-h-dvh place-items-center bg-paper">
         <div className="text-center">
-          <div className="floaty text-[2.6rem]">🌻</div>
-          <p className="mt-2 text-[1.05rem] font-extrabold text-ink/60">잠시만 기다려 주세요…</p>
+          <NeulbomMark size={64} className="floaty mx-auto" />
+          <p className="mt-3 text-[1.02rem] font-extrabold text-ink/55">늘봄을 준비하고 있어요…</p>
         </div>
       </div>
     );
@@ -53,7 +64,7 @@ function Shell() {
 
   if (!profile) {
     return (
-      <div className="min-h-dvh bg-[#F3ECDD]">
+      <div className="min-h-dvh bg-paper">
         <Onboarding />
       </div>
     );
@@ -64,46 +75,47 @@ function Shell() {
   };
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-[460px] bg-paper shadow-[0_0_60px_-20px_rgba(20,33,58,0.35)]">
-      <header className="sticky top-0 z-40 border-b-2 border-ink/8 bg-paper/95 pt-safe backdrop-blur">
-        <div className="flex h-[58px] items-center justify-between px-4">
-          <button onClick={() => navigate("home")} className="flex items-center gap-1.5">
-            <span className="text-[1.3rem]">🌻</span>
-            <span className="text-[1.02rem] font-black tracking-tight">시니어생활 도우미</span>
+    <div className="mx-auto min-h-dvh w-full max-w-[460px] bg-paper shadow-[0_0_70px_-24px_rgba(23,59,94,0.4)]">
+      <header className="sticky top-0 z-40 bg-paper/95 pt-safe backdrop-blur-md">
+        <div className="flex h-[62px] items-center justify-between px-4">
+          <button onClick={() => navigate("home")} className="flex items-center gap-2" aria-label="늘봄 홈">
+            <NeulbomMark size={32} />
+            <span className="text-[1.32rem] font-black leading-none tracking-[-0.05em] text-ink">늘봄</span>
           </button>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={cycleFont}
-              aria-label="글씨 크기 바꾸기"
-              className="grid h-10 w-10 place-items-center rounded-xl border-2 border-ink/12 bg-white text-[0.95rem] font-black"
+              aria-label={`글씨 크기 바꾸기 (지금 ${FONT_LABEL[fontSize]})`}
+              className="flex h-10 items-center gap-1 rounded-full border border-ink/10 bg-white px-3 text-[0.92rem] font-black text-ink shadow-soft"
             >
-              {fontSize === 18 ? "가" : fontSize === 21 ? "가+" : "가++"}
+              <span className="text-[1.05rem]">가</span>
+              <span className="text-[0.66rem] font-bold text-ink/45">{FONT_LABEL[fontSize]}</span>
             </button>
             <button
-              onClick={() => setProfileOpen(true)}
-              aria-label="내 정보"
-              className="grid h-10 w-10 place-items-center rounded-xl border-2 border-ink/12 bg-white text-[1.05rem] font-black text-brand"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="설정"
+              className="grid h-10 w-10 place-items-center rounded-full border border-ink/10 bg-white text-ink/65 shadow-soft"
             >
-              {profile.nickname.slice(0, 1)}
+              <IconGear size={21} />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="px-4 pb-safe pt-4">
+      <main className="px-4 pb-safe pt-2">
         {tab === "home" ? <HomeTab onNavigate={navigate} /> : null}
         {tab === "quiz" ? <QuizTab onNavigate={navigate} /> : null}
         {tab === "ranking" ? <RankingTab onNavigate={navigate} /> : null}
-        {tab === "welfare" ? <WelfareTab /> : null}
+        {tab === "welfare" ? <WelfareTab onNavigate={navigate} /> : null}
         {tab === "tools" ? <ToolsTab /> : null}
-        {tab === "family" ? <FamilyTab /> : null}
+        {tab === "family" ? <FamilyTab onNavigate={navigate} /> : null}
       </main>
 
       <nav
-        className="fixed bottom-0 left-1/2 z-50 w-full max-w-[460px] -translate-x-1/2 border-t-2 border-ink/10 bg-white/97 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur"
+        className="fixed bottom-0 left-1/2 z-50 w-full max-w-[460px] -translate-x-1/2 rounded-t-[1.6rem] border-t border-ink/5 bg-white shadow-[0_-8px_28px_-18px_rgba(23,59,94,0.45)] backdrop-blur"
         aria-label="주요 메뉴"
       >
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-6 pb-[env(safe-area-inset-bottom,0px)]">
           {TABS.map((t) => {
             const active = tab === t.key;
             return (
@@ -111,38 +123,69 @@ function Shell() {
                 key={t.key}
                 onClick={() => navigate(t.key)}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-[62px] flex-col items-center justify-center gap-0.5 transition ${
-                  active ? "text-brand" : "text-ink/45"
+                className={`relative flex min-h-[64px] flex-col items-center justify-center gap-1 transition ${
+                  active ? "text-brand-dark" : "text-ink/50"
                 }`}
               >
-                <span className={active ? "scale-110" : ""}>{t.icon}</span>
-                <span className={`text-[0.72rem] tracking-tight ${active ? "font-black" : "font-bold"}`}>{t.label}</span>
-                <span className={`h-1 w-6 rounded-full ${active ? "bg-brand" : "bg-transparent"}`} />
+                <span className={`transition ${active ? "-translate-y-0.5 scale-105" : ""}`}>{t.icon}</span>
+                <span className={`text-[0.72rem] leading-none tracking-tight ${active ? "font-black" : "font-bold"}`}>
+                  {t.label}
+                </span>
+                {active ? <span className="absolute bottom-1.5 h-1 w-1.5 rounded-full bg-brand" /> : null}
               </button>
             );
           })}
         </div>
       </nav>
 
-      <Sheet open={profileOpen} onClose={() => setProfileOpen(false)} title="내 정보">
-        <div className="rounded-2xl bg-white p-4">
-          <p className="text-[1.2rem] font-black">{profile.nickname} 님</p>
-          <p className="mt-1 text-[0.95rem] font-semibold text-ink/60">
-            {profile.birthYear}년생 ({2026 - profile.birthYear}세) · {profile.sido} {profile.sigungu}
-          </p>
+      <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="내 정보 · 설정">
+        <div className="rounded-3xl bg-white p-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-light text-[1.2rem] font-black text-brand-dark">
+              {profile.nickname.slice(0, 1)}
+            </span>
+            <div>
+              <p className="text-[1.15rem] font-black">{profile.nickname} 님</p>
+              <p className="text-[0.9rem] font-semibold text-ink/55">
+                {profile.birthYear}년생 ({2026 - profile.birthYear}세) · {profile.sido} {profile.sigungu}
+              </p>
+            </div>
+          </div>
           <Divider />
-          <p className="text-[0.88rem] font-semibold text-ink/55">
-            가족 코드 <span className="tabular font-black text-brand-dark">{code}</span>
-          </p>
-          <p className="mt-1 text-[0.8rem] font-medium leading-relaxed text-ink/45">
+          <div className="flex items-center justify-between">
+            <p className="text-[0.9rem] font-semibold text-ink/55">가족 코드</p>
+            <p className="tabular text-[1.1rem] font-black tracking-[0.16em] text-brand-dark">{code}</p>
+          </div>
+          <p className="mt-1 text-[0.78rem] font-medium leading-relaxed text-ink/45">
             이 기기의 브라우저에만 저장돼요. 앱을 지우면 기록도 함께 지워집니다.
           </p>
         </div>
+
+        <div className="mt-3 rounded-3xl bg-white p-4 shadow-soft">
+          <p className="mb-2 text-[0.95rem] font-black">글씨 크기</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([18, 21, 24] as const).map((size, i) => (
+              <button
+                key={size}
+                onClick={() => setFontSize(size)}
+                aria-pressed={fontSize === size}
+                className={`min-h-[52px] rounded-2xl border-2 text-[0.9rem] font-extrabold ${
+                  fontSize === size
+                    ? "border-brand bg-brand text-white"
+                    : "border-ink/10 bg-paper text-ink/70"
+                }`}
+              >
+                {["보통", "크게", "아주 크게"][i]}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-3 grid grid-cols-1 gap-2">
           <BigButton
             variant="white"
             onClick={() => {
-              setProfileOpen(false);
+              setSettingsOpen(false);
               navigate("family");
             }}
           >
@@ -151,12 +194,17 @@ function Shell() {
           <BigButton
             variant="ghost"
             onClick={() => {
-              setProfileOpen(false);
+              setSettingsOpen(false);
               logout();
             }}
           >
             처음부터 다시 시작
           </BigButton>
+        </div>
+
+        <div className="mt-4 flex items-center justify-center gap-2 pb-1">
+          <Badge tone="brand">늘봄</Badge>
+          <p className="text-[0.76rem] font-medium text-ink/40">언제나, 늘 곁에 있는 시니어 생활 플랫폼</p>
         </div>
       </Sheet>
     </div>

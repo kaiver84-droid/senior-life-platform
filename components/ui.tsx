@@ -7,10 +7,12 @@ import { createPortal } from "react-dom";
 /* 버튼                                                              */
 /* ---------------------------------------------------------------- */
 
+type BtnVariant = "ink" | "teal" | "sun" | "coral" | "leaf" | "gold" | "white" | "ghost" | "brand";
+
 type BtnProps = {
   children: React.ReactNode;
   onClick?: () => void;
-  variant?: "brand" | "warm" | "leaf" | "ghost" | "white" | "gold";
+  variant?: BtnVariant;
   size?: "md" | "lg";
   full?: boolean;
   disabled?: boolean;
@@ -19,19 +21,22 @@ type BtnProps = {
   ariaLabel?: string;
 };
 
-const VARIANTS: Record<string, string> = {
-  brand: "bg-brand text-white border-2 border-brand-dark/30 shadow-[0_4px_0_#0E3B78]",
-  warm: "bg-warm text-white border-2 border-[#A83509] shadow-[0_4px_0_#A83509]",
-  leaf: "bg-leaf text-white border-2 border-[#145033] shadow-[0_4px_0_#145033]",
-  gold: "bg-gold text-white border-2 border-[#8A5A0B] shadow-[0_4px_0_#8A5A0B]",
-  white: "bg-white text-ink border-2 border-ink/15 shadow-[0_4px_0_rgba(20,33,58,0.12)]",
-  ghost: "bg-transparent text-ink border-2 border-ink/20",
+const VARIANTS: Record<BtnVariant, string> = {
+  ink: "bg-ink text-white shadow-cta active:bg-[#0F2C48]",
+  brand: "bg-ink text-white shadow-cta active:bg-[#0F2C48]",
+  teal: "bg-brand text-white shadow-soft active:bg-brand-dark",
+  sun: "bg-sun text-ink shadow-sun active:bg-sun-dark",
+  gold: "bg-gold text-ink shadow-sun active:bg-gold-dark",
+  coral: "bg-coral text-white shadow-soft active:bg-coral-dark",
+  leaf: "bg-leaf text-white shadow-soft active:bg-leaf-dark",
+  white: "bg-white text-ink border-2 border-ink/10 shadow-soft active:bg-paper",
+  ghost: "bg-transparent text-ink/70 border-2 border-ink/12",
 };
 
 export function BigButton({
   children,
   onClick,
-  variant = "brand",
+  variant = "ink",
   size = "md",
   full,
   disabled,
@@ -45,9 +50,9 @@ export function BigButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      className={`touch-btn ${VARIANTS[variant]} ${size === "lg" ? "text-[1.15rem] min-h-[64px]" : ""} ${
-        full ? "w-full" : ""
-      } ${disabled ? "opacity-45 grayscale" : ""} ${className}`}
+      className={`touch-btn ${VARIANTS[variant]} ${
+        size === "lg" ? "min-h-[64px] text-[1.12rem]" : ""
+      } ${full ? "w-full" : ""} ${disabled ? "opacity-40 grayscale" : ""} ${className}`}
     >
       {children}
     </button>
@@ -72,8 +77,8 @@ export function SectionTitle({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="mb-2 mt-1 flex items-end justify-between gap-2">
-      <h2 className="section-title flex items-center gap-1.5">
+    <div className="mb-2.5 mt-1 flex items-end justify-between gap-2">
+      <h2 className="section-title flex items-center gap-1.5 text-ink">
         {emoji ? <span aria-hidden>{emoji}</span> : null}
         <span>{children}</span>
       </h2>
@@ -82,29 +87,85 @@ export function SectionTitle({
   );
 }
 
-export function Badge({
-  children,
-  tone = "brand",
-}: {
-  children: React.ReactNode;
-  tone?: "brand" | "warm" | "leaf" | "gold" | "gray";
-}) {
-  const tones: Record<string, string> = {
+type Tone = "brand" | "sun" | "coral" | "leaf" | "gold" | "gray" | "plum" | "ink";
+
+export function Badge({ children, tone = "brand" }: { children: React.ReactNode; tone?: Tone }) {
+  const tones: Record<Tone, string> = {
     brand: "bg-brand-light text-brand-dark",
-    warm: "bg-warm-light text-[#A83509]",
-    leaf: "bg-leaf-light text-leaf",
-    gold: "bg-gold-light text-[#8A5A0B]",
-    gray: "bg-ink/8 text-ink/70",
+    sun: "bg-sun-light text-[#9A6A05]",
+    coral: "bg-coral-light text-coral-dark",
+    leaf: "bg-leaf-light text-leaf-dark",
+    gold: "bg-gold-light text-[#8A6100]",
+    gray: "bg-ink/6 text-ink/60",
+    plum: "bg-plum-light text-plum-dark",
+    ink: "bg-ink text-white",
   };
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.78rem] font-bold ${tones[tone]}`}>
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.75rem] font-extrabold ${tones[tone]}`}
+    >
       {children}
     </span>
   );
 }
 
 export function Divider({ className = "" }: { className?: string }) {
-  return <div className={`my-3 h-[2px] w-full rounded bg-ink/8 ${className}`} />;
+  return <div className={`my-3.5 h-[1px] w-full bg-ink/8 ${className}`} />;
+}
+
+/** 화면 위에 겹쳐 띄우는 알약형 탭 */
+export function PillTabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+  className = "",
+}: {
+  tabs: { key: T; label: string; emoji?: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`flex gap-2 rounded-full bg-white p-1.5 shadow-soft ${className}`} role="tablist">
+      {tabs.map((t) => {
+        const active = t.key === value;
+        return (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(t.key)}
+            className={`min-h-[46px] flex-1 whitespace-nowrap rounded-full text-[0.86rem] font-extrabold transition ${
+              active ? "bg-ink text-white shadow-soft" : "text-ink/55 active:bg-ink/5"
+            }`}
+          >
+            {t.emoji ? <span aria-hidden className="mr-1">{t.emoji}</span> : null}
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 큰 아이콘 타일 (바로가기 · 목록) */
+export function IconTile({
+  children,
+  bg = "bg-brand-light",
+  className = "",
+}: {
+  children: React.ReactNode;
+  bg?: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`grid h-12 w-12 shrink-0 place-items-center rounded-[1rem] ${bg} ${className}`}
+      aria-hidden
+    >
+      {children}
+    </span>
+  );
 }
 
 /* ---------------------------------------------------------------- */
@@ -132,24 +193,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const show = useCallback((m: string) => {
     setMsg(m);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setMsg(null), 3200);
+    timer.current = setTimeout(() => setMsg(null), 3400);
   }, []);
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
 
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
       <div
         aria-live="polite"
-        className={`pointer-events-none fixed inset-x-0 bottom-[112px] z-[70] flex justify-center px-4 transition-opacity duration-200 ${
+        className={`pointer-events-none fixed inset-x-0 bottom-[124px] z-[70] flex justify-center px-4 transition-opacity duration-200 ${
           msg ? "opacity-100" : "opacity-0"
         }`}
       >
         {msg ? (
-          <div className="max-w-[420px] rounded-2xl bg-ink px-5 py-3 text-center text-[1rem] font-bold text-white shadow-lg">
+          <div className="max-w-[420px] rounded-2xl bg-ink px-5 py-3 text-center text-[0.98rem] font-bold leading-snug text-white shadow-lift">
             {msg}
           </div>
         ) : null}
@@ -170,12 +234,14 @@ export function Sheet({
   open,
   onClose,
   title,
+  subtitle,
   children,
   footer,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
+  subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
@@ -196,19 +262,20 @@ export function Sheet({
   if (!open) return null;
   return (
     <Portal>
-    <div className="fixed inset-0 z-[80] flex items-end justify-center">
-      <button
-        aria-label="닫기"
-        onClick={onClose}
-        className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]"
-      />
-      <div className="fade-up relative w-full max-w-[460px] rounded-t-[1.6rem] border-t-2 border-ink/10 bg-paper p-5 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] shadow-2xl">
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-ink/15" />
-        {title ? <h3 className="mb-3 text-center text-[1.2rem] font-black">{title}</h3> : null}
-        <div className="max-h-[70vh] overflow-y-auto no-scrollbar">{children}</div>
-        {footer ? <div className="mt-4">{footer}</div> : null}
+      <div className="fixed inset-0 z-[80] flex items-end justify-center">
+        <button aria-label="닫기" onClick={onClose} className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]" />
+        <div className="fade-up relative w-full max-w-[460px] rounded-t-[2rem] bg-paper px-5 pb-[calc(env(safe-area-inset-bottom,0px)+22px)] pt-3 shadow-2xl">
+          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-ink/15" />
+          {title ? (
+            <div className="mb-3 text-center">
+              <h3 className="text-[1.2rem] font-black leading-snug">{title}</h3>
+              {subtitle ? <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">{subtitle}</p> : null}
+            </div>
+          ) : null}
+          <div className="max-h-[74vh] overflow-y-auto no-scrollbar">{children}</div>
+          {footer ? <div className="mt-4">{footer}</div> : null}
+        </div>
       </div>
-    </div>
     </Portal>
   );
 }
@@ -223,8 +290,8 @@ export function ProgressDots({ total, current }: { total: number; current: numbe
       {Array.from({ length: total }).map((_, i) => (
         <span
           key={i}
-          className={`h-3 rounded-full transition-all ${
-            i < current ? "w-8 bg-leaf" : i === current ? "w-8 bg-brand/40" : "w-3 bg-ink/15"
+          className={`h-2.5 rounded-full transition-all ${
+            i < current ? "w-7 bg-brand" : i === current ? "w-7 bg-brand/40" : "w-2.5 bg-ink/15"
           }`}
         />
       ))}
@@ -235,7 +302,7 @@ export function ProgressDots({ total, current }: { total: number; current: numbe
 export function Stars({ n }: { n: number }) {
   return (
     <span className="text-[1.05rem] tracking-tight" aria-label={`${n}점`}>
-      {"★".repeat(n)}
+      <span className="text-sun">{"★".repeat(n)}</span>
       <span className="text-ink/20">{"★".repeat(5 - n)}</span>
     </span>
   );

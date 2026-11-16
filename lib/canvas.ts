@@ -609,7 +609,7 @@ export async function renderGreetingCard(
   ctx.stroke();
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#B07A16";
+  ctx.fillStyle = "#0F6F76";
   ctx.font = `700 34px ${FONT}`;
   ctx.fillText("오늘의 안부", W / 2, cardY + 92);
 
@@ -625,13 +625,13 @@ export async function renderGreetingCard(
     ctx.fillText(line, W / 2, cardY + 278 + i * 60);
   });
 
-  ctx.fillStyle = "#1B6B45";
+  ctx.fillStyle = "#0F6F76";
   ctx.font = `700 36px ${FONT}`;
   ctx.fillText(opts.fortuneLine, W / 2, cardY + cardH - 120);
 
   ctx.fillStyle = "#7A8399";
   ctx.font = `500 30px ${FONT}`;
-  ctx.fillText(`${opts.dateLabel} · 시니어생활 도우미`, W / 2, cardY + cardH - 66);
+  ctx.fillText(`${opts.dateLabel} · 늘봄`, W / 2, cardY + cardH - 66);
 }
 
 export async function renderCertificate(
@@ -708,15 +708,15 @@ export async function renderCertificate(
   ctx.stroke();
   ctx.fillStyle = "#C0392B";
   ctx.font = `800 30px ${FONT}`;
-  ctx.fillText("시니어생활", W - 210, H - 198);
+  ctx.fillText("늘", W - 210, H - 198);
   ctx.font = `700 24px ${FONT}`;
-  ctx.fillText("도우미", W - 210, H - 162);
+  ctx.fillText("봄", W - 210, H - 162);
   ctx.restore();
 
   ctx.textAlign = "left";
   ctx.fillStyle = "#8A93A6";
   ctx.font = `500 26px ${FONT}`;
-  ctx.fillText("시니어생활 도우미", 92, H - 108);
+  ctx.fillText("늘봄 neulbom", 92, H - 108);
 }
 
 export async function renderAnbuCard(
@@ -746,7 +746,7 @@ export async function renderAnbuCard(
   ctx.fill();
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#B07A16";
+  ctx.fillStyle = "#0F6F76";
   ctx.font = `700 34px ${FONT}`;
   ctx.fillText("오늘의 안부", W / 2, 110);
 
@@ -785,14 +785,14 @@ export async function renderAnbuCard(
   });
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#B07A16";
+  ctx.fillStyle = "#0F6F76";
   ctx.font = `700 38px ${FONT}`;
   ctx.fillText(`🔥 ${opts.streak}일 연속 출석 중`, W / 2, 920);
 
   ctx.fillStyle = "#7A8399";
   ctx.font = `500 30px ${FONT}`;
   ctx.fillText(`${opts.dateLabel} ${opts.timeLabel}`, W / 2, 1060);
-  ctx.fillText("시니어생활 도우미", W / 2, 1108);
+  ctx.fillText("늘봄 neulbom", W / 2, 1108);
 }
 
 export function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {

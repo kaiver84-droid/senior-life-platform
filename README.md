@@ -1,19 +1,24 @@
-# 시니어생활 도우미 (senior-life-platform)
+# 늘봄 (senior-life-platform)
 
-**라이브: https://senior-life-platform.pages.dev** (Cloudflare Pages, 2026-11-16 배포)
+**라이브: https://senior-life-platform.pages.dev** (Cloudflare Pages)
+
+**늘봄 — 언제나, 늘 곁에 있는 시니어를 위한 스마트한 생활 플랫폼**
 
 카카오톡 웹뷰(모바일 390×844)에 맞춘 **어르신 종합 생활 플랫폼**입니다.
+청록(`#18939B`) + 따뜻한 노랑(`#F5B82E`)의 하트·새싹 로고, 크림 배경(`#F9F7F1`),
+딥네이비(`#173B5E`) 버튼과 골드 CTA 로 구성한 시니어 친화 디자인입니다.
 Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Pages**(정적 빌드 + Pages Functions)에 배포합니다.
 
 - 글씨 기본 18px(최대 24px까지 키우기), 고대비 색, 48~64px 터치 버튼
 - 카카오 앱 키나 Supabase 키가 **없어도 모든 기능이 그대로 동작**합니다(체험 로그인 · 로컬 저장 · 예시 순위)
 
-## 5대 기능
+## 6대 화면
 
 | # | 기능 | 화면 |
 |---|---|---|
 | ① | 오늘의 운세(띠·생년월일) + 날씨 생활 팁 + 이름이 들어간 안부 인사카드(Canvas 1080×1350) 생성·저장·카카오 공유 | 홈 |
-| ② | 1분 두뇌 퀴즈(초성 / 옛날 노래 가사 / 틀린 그림 찾기, 하루 3문제) + 금빛 상장 PNG + 명예의 전당(우리 동네 · 띠·나이 · 개근상, 주간 리셋) | 퀴즈 |
+| ② | 1분 두뇌 퀴즈(초성 / 옛날 노래 가사 / 틀린 그림 찾기, 하루 3문제, 정답 확인 단계) + 금빛 상장 PNG | 퀴즈 |
+| ②′ | 명예의 전당 — 알약형 3탭(우리 동네 · 출생연도 · 개근왕), 1·2·3위 시상대, 4~10위, 내 순위·상위 % | 랭킹 |
 | ③ | 출생연도·거주지 기반 맞춤 지원금 14종 + 3단계 행동 지침 + 문의처 전화 연결 | 혜택 |
 | ④ | 카메라 돋보기 1~4배(손전등·화면 밝게), 카드뉴스(보이스피싱·KTX·카톡 글씨·병원) | 도구 |
 | ⑤ | 아침/저녁 복약 체크 + 원터치 안부 카드 + 자녀 확인 대시보드(`/family`) | 가족 |
@@ -132,10 +137,10 @@ JS SDK 간편로그인을 쓰려면 **플랫폼 > Web > 사이트 도메인**에
 
 ```
 app/
-  page.tsx          탭 셸(홈/퀴즈/혜택/도구/가족)
+  page.tsx          탭 셸(홈/퀴즈/랭킹/혜택/도구/가족) · 늘봄 로고 헤더 · 설정 시트
   family/page.tsx   자녀 확인 대시보드
   layout.tsx        메타데이터 · OG 이미지
-components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, ui, icons)
+components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, onboarding, ui, icons, art)
 lib/
   fortune.ts        띠·운세 결정론(날짜+생년월일 시드)
   weather.ts        Open-Meteo 실시간 날씨 + 생활 팁(실패 시 폴백)
@@ -152,8 +157,11 @@ supabase/schema.sql DB 스키마
 ## 검증
 
 - `npm run typecheck`, `npm run build` 통과
-- Playwright 모바일 390×844 E2E: 체험 로그인 → 인사카드 생성 → 퀴즈 3문제·상장 → 랭킹 탭 → 지원금 필터 → 돋보기/카드뉴스 → 복약·가족 대시보드
-- 스크린샷: `downloads/senior_home_fortune.png`, `senior_quiz_ranking.png`, `senior_welfare_tools.png`, `senior_family_dashboard.png`
+- Playwright 모바일 390×844 E2E: `BASE=https://senior-life-platform.pages.dev python3 e2e/test_live.py`
+  (체험 로그인 → 인사카드 캔버스 → 퀴즈 3문제·금빛 상장 → 시상대 → 지원금 3단계 → 돋보기·가이드 → 복약·가족 대시보드)
+- 카카오 로그인 검증: `BASE=https://senior-life-platform.pages.dev python3 e2e/test_kakao_talk.py`
+- 스크린샷: `python3 e2e/capture_neulbom.py` →
+  `downloads/neulbom_home.png`, `neulbom_quiz.png`, `neulbom_ranking_welfare.png`, `neulbom_tools_family.png`
 
 ## 안내
 
