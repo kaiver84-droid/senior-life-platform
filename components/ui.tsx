@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /* ---------------------------------------------------------------- */
 /* 버튼                                                              */
@@ -96,7 +97,7 @@ export function Badge({
     gray: "bg-ink/8 text-ink/70",
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.78rem] font-bold ${tones[tone]}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.78rem] font-bold ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -104,6 +105,17 @@ export function Badge({
 
 export function Divider({ className = "" }: { className?: string }) {
   return <div className={`my-3 h-[2px] w-full rounded bg-ink/8 ${className}`} />;
+}
+
+/* ---------------------------------------------------------------- */
+/* 포털 (화면 전체 덮개용)                                            */
+/* ---------------------------------------------------------------- */
+
+export function Portal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted || typeof document === "undefined") return null;
+  return createPortal(children, document.body);
 }
 
 /* ---------------------------------------------------------------- */
@@ -171,13 +183,19 @@ export function Sheet({
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, onClose]);
 
   if (!open) return null;
   return (
+    <Portal>
     <div className="fixed inset-0 z-[80] flex items-end justify-center">
       <button
         aria-label="닫기"
@@ -191,6 +209,7 @@ export function Sheet({
         {footer ? <div className="mt-4">{footer}</div> : null}
       </div>
     </div>
+    </Portal>
   );
 }
 

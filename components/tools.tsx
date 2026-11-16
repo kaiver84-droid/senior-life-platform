@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { GUIDES, type Guide } from "@/lib/guides";
 import { useApp } from "@/lib/storage";
-import { Badge, BigButton, Card, ProgressDots, SectionTitle, Sheet } from "./ui";
+import { Badge, BigButton, Card, ProgressDots, Portal, SectionTitle, Sheet } from "./ui";
 import { IconBulb, IconCamera, IconChevron } from "./icons";
 
 export function ToolsTab() {
@@ -150,6 +150,7 @@ function MagnifierOverlay({ onClose, onFontSize }: { onClose: () => void; onFont
   }, [torch]);
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[90] flex flex-col bg-black">
       <div className="relative flex-1 overflow-hidden">
         <video
@@ -231,6 +232,7 @@ function MagnifierOverlay({ onClose, onFontSize }: { onClose: () => void; onFont
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -245,6 +247,7 @@ function FlashOverlay({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
+    <Portal>
     <button
       onClick={onClose}
       className="fixed inset-0 z-[95] flex flex-col items-center justify-center gap-4 bg-white px-6 text-center"
@@ -259,6 +262,7 @@ function FlashOverlay({ onClose }: { onClose: () => void }) {
       </p>
       <div className="mt-6 h-24 w-24 rounded-full border-4 border-ink/15" />
     </button>
+    </Portal>
   );
 }
 

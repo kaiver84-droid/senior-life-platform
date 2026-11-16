@@ -181,9 +181,16 @@ function paintScene(ctx: CanvasRenderingContext2D, theme: GreetingTheme, w: numb
     case "spring": {
       sky(ctx, w, h, "#FFD6E3", "#FFF7EF");
       sun(ctx, w * 0.78, h * 0.2, 92, "#FFE9B0");
-      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      // 먼 산
+      ctx.fillStyle = "rgba(190,214,235,0.55)";
       ctx.beginPath();
-      ctx.ellipse(w * 0.22, h * 0.16, 210, 90, 0, 0, Math.PI * 2);
+      ctx.moveTo(0, h * 0.5);
+      ctx.quadraticCurveTo(w * 0.18, h * 0.36, w * 0.38, h * 0.5);
+      ctx.quadraticCurveTo(w * 0.55, h * 0.4, w * 0.72, h * 0.5);
+      ctx.lineTo(w, h * 0.48);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
       ctx.fill();
       // 언덕
       ctx.fillStyle = "#C9E4B7";
@@ -215,15 +222,23 @@ function paintScene(ctx: CanvasRenderingContext2D, theme: GreetingTheme, w: numb
       ctx.moveTo(w * 0.1, h * 0.11);
       ctx.quadraticCurveTo(w * 0.14, h * 0.2, w * 0.09, h * 0.26);
       ctx.stroke();
-      for (let i = 0; i < 26; i++) {
-        const t = i / 26;
+      for (let i = 0; i < 40; i++) {
+        const t = i / 40;
         const x = w * (0.02 + t * 0.34) + (R() - 0.5) * 60;
         const y = h * (0.07 + Math.sin(t * 2.4) * 0.05) + (R() - 0.5) * 70;
         blossom(ctx, x, y, 13 + R() * 10, R() > 0.5 ? "#FFB8CE" : "#FFD3E0", "#FFE9A8");
       }
-      for (let i = 0; i < 40; i++) {
-        petal(ctx, R() * w, R() * h * 0.62, 6 + R() * 8, R() * Math.PI, R() > 0.5 ? "rgba(255,190,210,0.85)" : "rgba(255,220,232,0.9)");
+      for (let i = 0; i < 60; i++) {
+        petal(ctx, R() * w, R() * h * 0.7, 6 + R() * 9, R() * Math.PI, R() > 0.5 ? "rgba(255,185,207,0.9)" : "rgba(255,222,234,0.95)");
       }
+      ctx.fillStyle = "rgba(150,196,124,0.55)";
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.66);
+      ctx.quadraticCurveTo(w * 0.5, h * 0.6, w, h * 0.68);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      ctx.fill();
       break;
     }
     case "summer": {

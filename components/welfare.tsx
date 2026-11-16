@@ -41,7 +41,7 @@ export function WelfareTab() {
         </div>
       </section>
 
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div className="flex flex-wrap gap-2 pb-1">
         {WELFARE_CATEGORIES.map((c) => (
           <button
             key={c}

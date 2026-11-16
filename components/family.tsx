@@ -61,7 +61,7 @@ export function FamilyTab() {
       </section>
 
       <Card className="fade-up">
-        <SectionTitle emoji="💊" right={<Badge tone="leaf">{med.morning && med.evening ? "오늘 다 챙겼어요" : "오늘 남았어요"}</Badge>}>
+        <SectionTitle emoji="💊" right={<Badge tone="leaf">{med.morning && med.evening ? "완료 ✓" : `${(med.morning?0:1)+(med.evening?0:1)}개 남음`}</Badge>}>
           오늘의 복약 체크
         </SectionTitle>
         <div className="mt-2 grid grid-cols-1 gap-3">
@@ -86,7 +86,7 @@ export function FamilyTab() {
         <canvas ref={canvasRef} className="hidden" />
         <div className="mt-3 grid grid-cols-1 gap-2">
           <BigButton variant="warm" size="lg" onClick={sendAnbu}>
-            <IconChat size={22} /> 자녀에게 오늘 안부 보내기
+            <IconChat size={22} /> 안부 카드 보내기
           </BigButton>
           <BigButton variant="white" onClick={sendLink}>
             <IconShare size={20} /> 자녀 확인 화면 링크 보내기

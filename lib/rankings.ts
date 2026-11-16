@@ -66,7 +66,7 @@ export function buildRanking(input: RankingInput): RankingResult {
     const points =
       scope === "streak"
         ? 20 + Math.floor(rnd() * 60)
-        : Math.floor(30 + rnd() * 150) + Math.floor(rnd() * 6) * 4;
+        : Math.floor(15 + rnd() * 95) + Math.floor(rnd() * 5) * 3;
     rows.push({ name, points, streak, isMe: false });
   }
 

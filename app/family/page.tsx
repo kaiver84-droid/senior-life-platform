@@ -133,7 +133,7 @@ function Dashboard() {
             {koreanDate(today)} · {data.region || "지역 미설정"} · {2026 - data.birthYear}세
           </p>
         </div>
-        <Link href="/" className="rounded-xl border-2 border-ink/12 bg-white px-3 py-2 text-[0.85rem] font-extrabold">
+        <Link href="/" className="whitespace-nowrap rounded-xl border-2 border-ink/12 bg-white px-3 py-2 text-[0.82rem] font-extrabold">
           부모님 화면
         </Link>
       </div>

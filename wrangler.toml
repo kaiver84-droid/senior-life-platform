@@ -1,0 +1,8 @@
+# Cloudflare Pages 프로젝트 설정
+# 배포: npm run build && npx wrangler pages deploy out --project-name senior-life-platform
+name = "senior-life-platform"
+compatibility_date = "2026-11-01"
+pages_build_output_dir = "out"
+
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://senior-life-platform.pages.dev"

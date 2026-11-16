@@ -266,21 +266,21 @@ function GreetingStudio({ show }: { show: (m: string) => void }) {
         <IconStar className="shrink-0 text-gold" size={26} />
       </div>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div className="mt-3 grid grid-cols-5 gap-1.5">
         {THEMES.map((t) => (
           <button
             key={t.key}
             onClick={() => setTheme(t.key)}
             aria-pressed={theme === t.key}
-            className={`flex min-w-[76px] flex-col items-center gap-1 rounded-2xl border-2 px-2 py-2 transition ${
+            className={`flex flex-col items-center gap-1 rounded-xl border-2 px-1 py-1.5 transition ${
               theme === t.key ? "border-brand bg-brand-light" : "border-ink/10 bg-white"
             }`}
           >
             <span
-              className="h-11 w-14 rounded-lg"
+              className="h-9 w-full rounded-md"
               style={{ background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
             />
-            <span className="text-[0.82rem] font-extrabold">{t.emoji} {t.label}</span>
+            <span className="whitespace-nowrap text-[0.72rem] font-extrabold">{t.label}</span>
           </button>
         ))}
       </div>

@@ -75,7 +75,7 @@ export function RankingPanel() {
     <section className="fade-up">
       <SectionTitle
         emoji="🏆"
-        right={<span className="text-[0.8rem] font-bold text-ink/50">{periodLabel(weekId)}</span>}
+        right={<span className="text-[0.8rem] font-bold text-ink/50">{periodLabel()}</span>}
       >
         명예의 전당
       </SectionTitle>

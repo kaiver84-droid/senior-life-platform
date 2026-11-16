@@ -101,13 +101,19 @@ export async function shareCard(opts: {
   }
 
   // 3) 이미지 저장 + 글 복사
+  let saved = false;
   try {
     downloadCanvas(canvas, filename);
-    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-    return "downloaded";
+    saved = true;
   } catch {
-    return "failed";
+    saved = false;
   }
+  try {
+    await navigator.clipboard?.writeText(text);
+  } catch {
+    /* 클립보드 권한이 없어도 이미지 저장은 성공 */
+  }
+  return saved ? "downloaded" : "failed";
 }
 
 export async function shareText(opts: { title: string; text: string }): Promise<ShareResult> {
