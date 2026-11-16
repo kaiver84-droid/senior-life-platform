@@ -111,6 +111,7 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
   const dayNews = newsOnDate(news, selected);
 
   const rows = useMemo(() => {
+    const seen = new Set<string>();
     const up = upcomingEvents(events, today, 400, 40).map((u) => ({
       type: "family" as const,
       date: u.date,
@@ -118,13 +119,23 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
       event: u.event,
       key: `f-${u.event.id}-${u.date}`,
     }));
-    const newsRows = news.map((n) => ({
-      type: "news" as const,
-      date: n.startDate < today ? today : n.startDate,
-      days: daysBetween(today, n.startDate),
-      news: n,
-      key: `n-${n.id}`,
-    }));
+    const newsRows = news
+      .filter((n) => {
+        // 매달 되풀이되는 소식은 가장 가까운 한 번만 목록에 보여 준다(달력 점은 그 달마다 찍힌다)
+        if (n.category === "welfare" || n.category === "class") {
+          const key = `${n.category}|${n.title}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+        }
+        return true;
+      })
+      .map((n) => ({
+        type: "news" as const,
+        date: n.startDate < today ? today : n.startDate,
+        days: daysBetween(today, n.startDate),
+        news: n,
+        key: `n-${n.id}`,
+      }));
     const all = [...up, ...newsRows].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return all.filter((r) => {
       if (filter === "all") return true;

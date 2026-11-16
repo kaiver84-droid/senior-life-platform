@@ -22,9 +22,9 @@ Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Page
 | ③ | 출생연도·거주지 기반 맞춤 지원금 14종 + 3단계 행동 지침 + 문의처 전화 연결 | 혜택 |
 | ④ | 카메라 돋보기 1~4배(손전등·화면 밝게), 카드뉴스(보이스피싱·KTX·카톡 글씨·병원) | 도구 |
 | ⑤ | 아침/저녁 복약 체크 + 원터치 안부 카드 + 자녀 확인 대시보드(`/family`) | 가족 |
+| ⑤′ | **가족안부달력** — 자녀 생일·기념일·가족 일정·병원약속(매년 반복·D-Day) 과 **우리동네 소식**(지역 행사·축제·무료 강좌·복지) 을 한 달 달력에 점으로 구분해 보여 주고, 날짜별 상세·일정 추가/수정/삭제·카톡 알리기까지 한 화면에서 | 홈 배너 · 가족 · `/family` |
 
 ## 실행
-
 ```bash
 npm install
 npm run dev          # http://localhost:3000
@@ -140,15 +140,17 @@ app/
   page.tsx          탭 셸(홈/퀴즈/랭킹/혜택/도구/가족) · 늘봄 로고 헤더 · 설정 시트
   family/page.tsx   자녀 확인 대시보드
   layout.tsx        메타데이터 · OG 이미지
-components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, onboarding, ui, icons, art)
+components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, calendar, onboarding, ui, icons, art)
 lib/
   fortune.ts        띠·운세 결정론(날짜+생년월일 시드)
   weather.ts        Open-Meteo 실시간 날씨 + 생활 팁(실패 시 폴백)
   quiz.ts           문제 은행과 하루 3문제 선택
   welfare.ts        2026년 지원 제도 데이터 · 자격 매칭
   rankings.ts       주간 순위 생성(지역·띠·개근) · 상위 10명/상위 %
+  calendar.ts       가족안부달력 일정 모델 · 매년 반복·D-Day·월간 달력 계산
+  local-news.ts     우리동네 소식(지역 행사·축제·무료 강좌·복지) 데이터 · 지역별 생성
   canvas.ts         인사카드·상장·안부카드 Canvas 렌더러
-  storage.tsx       localStorage 상태 + 가족 코드
+  storage.tsx       localStorage 상태 + 가족 코드 (+ 가족 일정 추가/수정/삭제)
   db.ts             Supabase(PostgREST) 연결 + 메모리 폴백
 functions/api/      Pages Functions (auth/kakao, state, rankings, health)
 supabase/schema.sql DB 스키마
@@ -158,7 +160,8 @@ supabase/schema.sql DB 스키마
 
 - `npm run typecheck`, `npm run build` 통과
 - Playwright 모바일 390×844 E2E: `BASE=https://senior-life-platform.pages.dev python3 e2e/test_live.py`
-  (체험 로그인 → 인사카드 캔버스 → 퀴즈 3문제·금빛 상장 → 시상대 → 지원금 3단계 → 돋보기·가이드 → 복약·가족 대시보드)
+  (체험 로그인 → 인사카드 캔버스 → 퀴즈 3문제·금빛 상장 → 시상대 → 지원금 3단계 → 돋보기·가이드 → 복약·가족 대시보드
+  → 가족안부달력 일정 추가·삭제·4갈래 소식 필터·자녀 화면 공유 일정)
 - 카카오 로그인 검증: `BASE=https://senior-life-platform.pages.dev python3 e2e/test_kakao_talk.py`
 - 스크린샷: `python3 e2e/capture_neulbom.py` →
   `downloads/neulbom_home.png`, `neulbom_quiz.png`, `neulbom_ranking_welfare.png`, `neulbom_tools_family.png`
@@ -168,3 +171,7 @@ supabase/schema.sql DB 스키마
 지원금 금액·기준은 2026년 정부24/보건복지부 자료를 기준으로 정리했고, 지자체 사업은 달라질 수 있어 화면에
 "주민센터(129) 확인" 안내를 함께 표시합니다. 명예의 전당은 실제 참여자가 쌓이기 전까지 예시 순위로 보이며
 화면에 그 사실을 표시합니다.
+
+우리동네 소식은 지역 축제 이름·장소와, 어느 시·군·구에서나 운영하는 행사·무료 강좌·복지 사업을 사용자의
+설정 지역에 맞춰 정리한 안내입니다. 축제·행사 날짜와 접수 기간은 해마다 달라지므로 화면 하단에
+"방문·신청 전에 전화로 확인" 안내를 함께 보여 줍니다.

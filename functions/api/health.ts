@@ -10,7 +10,18 @@ export const onRequestGet = async ({ env }: Ctx) =>
       service: "senior-life-platform",
       time: new Date().toISOString(),
       ...dbStatus(env),
-      features: ["fortune", "greeting-card", "quiz", "certificate", "ranking", "welfare", "magnifier", "family"],
+      features: [
+        "fortune",
+        "greeting-card",
+        "quiz",
+        "certificate",
+        "ranking",
+        "welfare",
+        "magnifier",
+        "family",
+        "family-calendar",
+        "local-news",
+      ],
     }),
     { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
   );
