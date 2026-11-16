@@ -262,7 +262,7 @@ def main():
         # ---------- 태어난 시간이 운세에 반영되는지 ----------
         page2.get_by_role("button", name="오늘의 운세").first.click()
         page2.wait_for_selector("text=진시 팁", timeout=8000)
-        check(page2.get_by_text("진시에 태어나").count() >= 1, "운세에 시진 성향이 보인다")
+        check(page2.get_by_text("아침에 태어나").count() >= 1, "운세에 시진 성향이 보인다")
         shot_fortune = crisp(page2, f"{TMP}/06_fortune.png", 500)
         page2.keyboard.press("Escape")
         ctx2.close()

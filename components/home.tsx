@@ -334,9 +334,7 @@ function FortuneDetail({ fortune }: { fortune: Fortune }) {
           <span className="tabular text-[0.95rem] font-extrabold text-ink/55">{fortune.score}점</span>
         </div>
         {fortune.timeTrait ? (
-          <p className="mt-2 text-[0.86rem] font-semibold leading-relaxed text-ink/45">
-            {fortune.birthTime}에 태어나 {fortune.timeTrait}
-          </p>
+          <p className="mt-2 text-[0.86rem] font-semibold leading-relaxed text-ink/45">{fortune.timeTrait}</p>
         ) : null}
       </div>
 
