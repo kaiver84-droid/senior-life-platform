@@ -41,12 +41,48 @@ python3 -c "import shutil; shutil.make_archive('senior-platform-site','zip','out
 # Cloudflare 대시보드 → Workers & Pages → senior-life-platform → Create deployment
 # → zip 업로드 → Save and deploy
 
-# 방법 B) wrangler
-npx wrangler pages deploy out --project-name=senior-life-platform
+# 방법 B) wrangler (검증된 경로 — 이 계정에서 정상 동작)
+npx wrangler pages deploy out --project-name=senior-life-platform --branch=main
 ```
 
 > `deploy_cloudflare.py` 는 Pages REST API 직접 업로드용 스크립트다. 프로젝트 생성·배포 기록은 성공했지만
 > 이 계정에서는 업로드된 배포가 500 을 반환해(대시보드 업로드본은 정상) 현재는 방법 A 를 사용한다.
+
+### ⚠️ 환경변수와 wrangler 의 관계 (2026-11-16 실측)
+
+- `wrangler pages deploy` 는 `wrangler.toml` 의 `[vars]` 기준으로 **프로젝트의 `plain_text` 환경변수를 덮어쓴다**
+  (`[vars]` 가 비면 대시보드에서 넣은 plain_text 변수가 지워진다).
+- 반면 타입이 `secret_text` 인 변수는 wrangler 배포에도 살아남고 새 배포에 그대로 바인딩된다.
+- 그래서 런타임 변수는 전부 `secret_text` 로 넣는다(값은 Cloudflare에 암호화 저장, 공개 저장소에 노출 없음).
+- 배포 없이 대시보드에서 변수만 바꾸면 이미 만들어진 배포에는 반영되지 않는다(= 바인딩은 배포 생성 시점).
+  변수를 바꾼 뒤에는 반드시 다시 배포한다.
+
+```bash
+# 런타임 변수 넣기/바꾸기 (production) — 없애려면 값을 null 로 보낸다
+python3 - <<'PY'
+import json, os, urllib.request
+account, project = "bbddf7735b353b9656460deab2744f9b", "senior-life-platform"
+token = open(".cloudflare_token").read().strip()
+body = {"deployment_configs": {"production": {"env_vars": {
+    "SUPABASE_SERVICE_ROLE_KEY": {"type": "secret_text", "value": "..."},
+    "KAKAO_CLIENT_SECRET": {"type": "secret_text", "value": "..."},
+}}}}
+req = urllib.request.Request(f"https://api.cloudflare.com/client/v4/accounts/{account}/pages/projects/{project}",
+    data=json.dumps(body).encode(), method="PATCH",
+    headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
+print(json.loads(urllib.request.urlopen(req).read())["success"])
+PY
+```
+
+### 카카오 로그인 흐름
+
+1. 온보딩 화면의 **카카오톡으로 시작하기** → `GET /api/auth/kakao?start=1` 이 카카오 인가 화면으로 302
+   (REST 키는 서버에만 있음).
+2. 카카오가 `KAKAO_REDIRECT_URI`(기본 `https://senior-life-platform.pages.dev/`)로 `?code=` 를 돌려준다.
+3. 앱이 그 code 를 `POST /api/auth/kakao` 로 보내면 서버가 토큰 교환 → 프로필 저장.
+
+카카오 콘솔에는 Redirect URI 를 `https://senior-life-platform.pages.dev/` 로 등록하면 되고,
+`https://senior-life-platform.pages.dev/api/auth/kakao` 도 함께 등록해 두면 code 를 직접 확인할 때 편하다.
 
 ### 환경변수 (전부 선택 — 없으면 데모 모드)
 
