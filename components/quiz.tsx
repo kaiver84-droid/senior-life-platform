@@ -18,6 +18,7 @@ import { siteOrigin } from "@/lib/groups";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { IconChevron, IconClock, IconDownload, IconShare, IconTrophy } from "./icons";
+import { AssetImage } from "./art";
 import { RankingPanel } from "./ranking";
 import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
 import type { QuizType } from "@/lib/types";
@@ -401,6 +402,9 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
               </div>
             )}
           </Card>
+
+          {/* 하단 응원 배너 — 답을 고르는 영역을 가리지 않도록 문제 카드 아래에 둔다 */}
+          <QuizCheerBanner />
         </div>
       ) : null}
 
@@ -429,6 +433,23 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 }
 
 /** 연습 모드 결과 — 점수·순위에 들어가지 않는다는 점을 분명히 안내 */
+function QuizCheerBanner() {
+  return (
+    <div className="relative flex items-end justify-between gap-1 overflow-hidden rounded-[1.6rem] bg-gradient-to-r from-[#FFF6E2] via-[#FFFBEF] to-[#EAF7F2] pl-4 pr-0.5 shadow-soft">
+      <div className="pb-4 pt-4">
+        <p className="hand text-[1.42rem] leading-[1.18] text-ink">하루 3문제로</p>
+        <p className="hand text-[1.42rem] leading-[1.18] text-ink">
+          가볍게! <span className="text-coral">♡</span>
+        </p>
+      </div>
+      <AssetImage
+        name="quiz-couple"
+        alt="활짝 웃으며 엄지를 치켜든 어르신 부부"
+        className="h-[108px] w-auto max-w-[46%] shrink-0 self-end object-contain mix-blend-multiply"
+      />
+    </div>
+  );
+}
 function PracticeResult({
   correct,
   total,

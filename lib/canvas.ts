@@ -1,8 +1,9 @@
 /** Canvas 로 그리는 이미지들 (인사카드 · 상장 · 안부카드) */
 
-export type GreetingTheme = "spring" | "summer" | "autumn" | "winter" | "sunset";
+export type GreetingTheme = "chrysanthemum" | "spring" | "summer" | "autumn" | "winter" | "sunset";
 
 export const THEMES: { key: GreetingTheme; label: string; emoji: string; colors: [string, string] }[] = [
+  { key: "chrysanthemum", label: "국화", emoji: "🌼", colors: ["#CFE8F8", "#FFE9A8"] },
   { key: "spring", label: "봄꽃", emoji: "🌸", colors: ["#FFD9E4", "#FFF6EE"] },
   { key: "summer", label: "여름바다", emoji: "🌊", colors: ["#9BD7F5", "#EAF9FF"] },
   { key: "autumn", label: "가을단풍", emoji: "🍁", colors: ["#FFCE8A", "#FFF3E0"] },
@@ -566,6 +567,37 @@ function paintScene(ctx: CanvasRenderingContext2D, theme: GreetingTheme, w: numb
   }
 }
 
+/* 사진을 그대로 배경으로 쓰는 테마 (고화질 국화 사진) */
+const PHOTO_SCENES: Partial<Record<GreetingTheme, string>> = {
+  chrysanthemum: "/images/greeting-chrysanthemum-large.jpg",
+};
+
+function loadPhoto(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (typeof Image === "undefined") return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/** 사진을 카드 비율에 꽉 채워 그리고, 남는 쪽은 가운데를 기준으로 잘라 낸다 */
+async function paintPhotoScene(
+  ctx: CanvasRenderingContext2D,
+  src: string,
+  w: number,
+  h: number
+): Promise<boolean> {
+  const img = await loadPhoto(src);
+  if (!img || !img.width || !img.height) return false;
+  const scale = Math.max(w / img.width, h / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  return true;
+}
+
 export async function renderGreetingCard(
   canvas: HTMLCanvasElement,
   opts: { theme: GreetingTheme; name: string; message: string; dateLabel: string; fortuneLine: string }
@@ -579,7 +611,9 @@ export async function renderGreetingCard(
   await document.fonts.ready;
   ctx.clearRect(0, 0, W, H);
 
-  paintScene(ctx, opts.theme, W, H);
+  const photo = PHOTO_SCENES[opts.theme];
+  const drewPhoto = photo ? await paintPhotoScene(ctx, photo, W, H) : false;
+  if (!drewPhoto) paintScene(ctx, opts.theme === "chrysanthemum" ? "autumn" : opts.theme, W, H);
 
   // 하단 가독성용 그라데이션
   const shade = ctx.createLinearGradient(0, H * 0.38, 0, H);

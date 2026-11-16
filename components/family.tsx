@@ -8,7 +8,7 @@ import { shareCard, shareMessageText, shareText } from "@/lib/share";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, useToast } from "./ui";
 import { FamilyCalendarCard } from "./calendar";
-import { FamilyScene } from "./art";
+import { AssetImage } from "./art";
 import {
   IconCheck,
   IconChat,
@@ -89,9 +89,16 @@ export function FamilyTab({
       {/* 가족안부달력 */}
       <FamilyCalendarCard onOpen={() => onOpenCalendar?.()} />
 
-      {/* 따뜻한 가족 배너 */}
+      {/* 따뜻한 가족 사진 배너 */}
       <div className="fade-up overflow-hidden rounded-[1.7rem] bg-white shadow-card">
-        <FamilyScene className="h-[152px] w-full" />
+        <div className="relative h-[160px] w-full overflow-hidden bg-[#F3EEE2]">
+          <AssetImage
+            name="family-greeting-couple"
+            alt="거실에서 함께 휴대폰을 보며 웃는 어르신 부부"
+            className="h-full w-full object-cover object-[center_30%]"
+          />
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white via-white/40 to-transparent" />
+        </div>
         <div className="px-4 pb-4 pt-3">
           <p className="text-[1.05rem] font-black leading-snug text-ink">부모님의 안부를 자녀에게 전송해요</p>
           <p className="mt-0.5 text-[0.84rem] font-semibold text-ink/55">

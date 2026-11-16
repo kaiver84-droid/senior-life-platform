@@ -3,6 +3,45 @@
 import React from "react";
 
 /* ================================================================ */
+/* 고화질 사진 · 일러스트 에셋 (public/images)                        */
+/* ---------------------------------------------------------------- */
+/* - WebP 를 먼저 주고, 못 읽는 브라우저에는 JPEG 로 내려 준다.        */
+/* - `picture` 를 display:contents 로 두어 <img> 가 곧바로 놓이게 한다.*/
+/* ================================================================ */
+
+export type AssetName =
+  | "greeting-chrysanthemum"
+  | "quiz-couple"
+  | "welfare-pension-bg"
+  | "family-greeting-couple";
+
+export function AssetImage({
+  name,
+  alt,
+  className = "",
+  priority = false,
+}: {
+  name: AssetName;
+  alt: string;
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <picture className="contents">
+      <source srcSet={`/images/${name}.webp`} type="image/webp" />
+      <img
+        src={`/images/${name}.jpg`}
+        alt={alt}
+        className={className}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        fetchPriority={priority ? "high" : "auto"}
+      />
+    </picture>
+  );
+}
+
+/* ================================================================ */
 /* 늘봄 로고 — 청록 하트 · 따뜻한 노랑 해 · 새싹                        */
 /* ================================================================ */
 
@@ -373,6 +412,37 @@ export function FamilyScene({ className = "" }: { className?: string }) {
       </g>
       <path d="M0 196c70-14 140-10 200-2 66 10 134 6 200-6v32H0Z" fill="#A9CBA0" opacity="0.7" />
     </svg>
+  );
+}
+
+/* ================================================================ */
+/* 입체 타일 — 운세 띠 · 날씨 아이콘을 한 겹 더 도드라지게           */
+/* ================================================================ */
+
+export function RaisedTile({
+  children,
+  tone = "warm",
+  size = 56,
+}: {
+  children: React.ReactNode;
+  tone?: "warm" | "sky";
+  size?: number;
+}) {
+  const skin =
+    tone === "warm"
+      ? "bg-gradient-to-br from-[#FFEDE0] via-[#FFD9C6] to-[#FFC0AB] shadow-[0_9px_18px_-9px_rgba(214,110,86,0.75),inset_0_-4px_8px_rgba(198,96,72,0.18),inset_0_2px_0_rgba(255,255,255,0.95)]"
+      : "bg-gradient-to-br from-[#EDF7FE] via-[#D6EAFB] to-[#B7D9F4] shadow-[0_9px_18px_-9px_rgba(70,140,190,0.65),inset_0_-4px_8px_rgba(58,118,168,0.16),inset_0_2px_0_rgba(255,255,255,0.95)]";
+  const glow = tone === "warm" ? "bg-white/60" : "bg-white/70";
+  return (
+    <span
+      className={`relative grid shrink-0 place-items-center overflow-hidden rounded-[1.1rem] ${skin}`}
+      style={{ width: size, height: size }}
+    >
+      {/* 윗면 하이라이트 */}
+      <span aria-hidden className={`pointer-events-none absolute inset-x-1.5 top-1 h-3 rounded-full blur-[2px] ${glow}`} />
+      <span aria-hidden className="pointer-events-none absolute inset-0 rounded-[1.1rem] ring-1 ring-inset ring-white/40" />
+      <span className="relative drop-shadow-[0_2px_2px_rgba(90,70,60,0.28)]">{children}</span>
+    </span>
   );
 }
 

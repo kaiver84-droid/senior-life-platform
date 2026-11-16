@@ -1,8 +1,8 @@
 import type { WelfareProgram } from "./types";
 
 /**
- * 2026년 기준 어르신 지원 제도 모음.
- * 금액·기준은 정부24 / 보건복지부 고시(2026) 기준으로 확인한 값이며,
+ * 2026년 기준 어르신·중장년 지원 제도 모음.
+ * 금액·기준은 정부24 / 보건복지부 고시(2026), 고용노동부·국민건강보험공단 안내 기준으로 확인한 값이며,
  * 지자체 사업은 지역마다 다르므로 '주민센터 확인' 안내를 함께 제공합니다.
  */
 export const WELFARE: WelfareProgram[] = [
@@ -279,6 +279,69 @@ export const WELFARE: WelfareProgram[] = [
     deadline: "연중",
     tags: ["한 번에 찾기", "자녀와 함께", "온라인"],
   },
+  {
+    id: "training-card",
+    title: "국민내일배움카드",
+    category: "일자리",
+    org: "고용노동부 · 고용센터",
+    amount: "5년간 300만원 (최대 500만원)",
+    summary:
+      "새 일을 준비하거나 하던 일의 기술을 늘릴 때 훈련비를 지원받아요. 훈련비의 45~100%를 지원하고 카드 유효기간은 5년이에요. 공무원, 만 75세 이상 등은 받을 수 없어요.",
+    minAge: 18,
+    steps: [
+      "고용24(work24.go.kr)에 가입하고, 일자리를 찾는 중이면 구직 신청을 먼저 해요.",
+      "‘국민내일배움카드 발급 신청’을 누르거나 가까운 고용센터에 가서 신청해요.",
+      "고용24에서 배우고 싶은 훈련과정을 골라 카드로 수강료를 내면 돼요.",
+    ],
+    documents: ["신분증", "본인 명의 휴대폰(본인확인)"],
+    contact: "고용노동부 고객상담센터",
+    phone: "1350",
+    url: "https://www.work24.go.kr/hr/h/a/1100/selectIssuGudn.do",
+    deadline: "연중 상시 신청",
+    tags: ["직업훈련", "40·50대도 가능", "온라인 신청"],
+  },
+  {
+    id: "midlife-center",
+    title: "중장년내일센터",
+    category: "일자리",
+    org: "고용노동부 · 중장년내일센터",
+    amount: "상담 · 교육 무료",
+    summary:
+      "만 40세 이상이면 전직·재취업 상담과 교육을 무료로 받을 수 있어요. 전국 35개 센터에서 1:1 컨설팅, 이력서·면접 코칭, 구인 알선까지 도와줘요.",
+    minAge: 40,
+    steps: [
+      "고용24에서 회원가입을 하고 구직 신청을 해요.",
+      "‘전직지원 서비스’를 신청하면 담당 컨설턴트가 배정돼요.",
+      "1:1 상담과 교육 프로그램에 참여해 새 일자리를 찾아요.",
+    ],
+    documents: ["신분증", "이력서(있으면)"],
+    contact: "고용노동부 고객상담센터",
+    phone: "1350",
+    url: "https://www.work24.go.kr/wk/u/a/1000/seniorCenterInfo.do",
+    deadline: "연중",
+    tags: ["40세 이상", "재취업 상담", "전국 35개 센터"],
+  },
+  {
+    id: "national-health-check",
+    title: "국가 건강검진",
+    category: "의료",
+    org: "국민건강보험공단",
+    amount: "본인 부담 0원",
+    summary:
+      "만 40세 이상이면 2년마다 일반 건강검진을 무료로 받을 수 있어요. 짝수 해에는 짝수 해에 태어난 사람이, 홀수 해에는 홀수 해에 태어난 사람이 받아요.",
+    minAge: 40,
+    steps: [
+      "국민건강보험공단 홈페이지나 The건강보험 앱에서 올해 검진 대상자인지 확인해요.",
+      "가까운 검진 병·의원에 전화해 날짜를 정하고, 신분증을 챙겨 가요.",
+      "검진 결과는 보통 2~4주 뒤 우편이나 앱으로 받아요.",
+    ],
+    documents: ["신분증"],
+    contact: "국민건강보험공단",
+    phone: "1577-1000",
+    url: "https://www.nhis.or.kr",
+    deadline: "12월 31일까지 (해마다)",
+    tags: ["무료", "2년마다", "40세 이상"],
+  },
 ];
 
 export function matchPrograms(
@@ -303,4 +366,4 @@ export function matchPrograms(
   });
 }
 
-export const WELFARE_CATEGORIES = ["전체", "연금", "생활비", "의료", "교통", "돌봄", "주거"] as const;
+export const WELFARE_CATEGORIES = ["전체", "연금", "생활비", "의료", "교통", "돌봄", "주거", "일자리"] as const;

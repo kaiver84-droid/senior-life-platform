@@ -14,7 +14,7 @@ import { HomeCalendarBanner } from "./calendar";
 import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
 import { HealthChallengeCard } from "./health";
 import { SharePreviewSheet } from "./share-sheet";
-import { HeroScene, NeulbomMark, WeatherArt } from "./art";
+import { AssetImage, NeulbomMark, RaisedTile, WeatherArt } from "./art";
 import {
   IconBank,
   IconBook,
@@ -160,20 +160,27 @@ export function HomeTab({
       <GroupSelectorBanner />
       <TodayGroupCard />
 
-      {/* 감성 인사카드 히어로 */}
+      {/* 감성 인사카드 히어로 — 고화질 국화 사진 */}
       <section className="fade-up overflow-hidden rounded-[1.75rem] bg-white shadow-card">
-        <div className="relative h-[228px] overflow-hidden">
-          <HeroScene variant="chrysanthemum" className="absolute inset-0 h-full w-full" />
-          <div className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/35 to-transparent" />
+        <div className="relative h-[228px] overflow-hidden bg-[#CFE7F7]">
+          <AssetImage
+            name="greeting-chrysanthemum"
+            alt="파란 하늘 아래 활짝 핀 노란 국화꽃"
+            priority
+            className="absolute inset-0 h-full w-full object-cover object-[64%_center]"
+          />
+          {/* 왼쪽 손글씨가 그림자 없이도 선명하게 읽히도록 하는 부드러운 흰 그라디언트 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/75 to-white/0" />
+          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white/55 via-white/15 to-transparent" />
           <div className="relative flex h-full flex-col justify-center gap-1 px-4">
             <button
               type="button"
               onClick={() => setStudio({ open: true, autoShare: false })}
-              className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-ink/80 px-3 py-1.5 text-[0.76rem] font-extrabold text-white backdrop-blur"
+              className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-ink/85 px-3 py-1.5 text-[0.76rem] font-extrabold text-white shadow-soft backdrop-blur"
             >
               오늘의 안부 인사 <IconChevron size={13} />
             </button>
-            <p className="hand text-[2.05rem] leading-[1.22] text-ink">
+            <p className="hand text-[2rem] leading-[1.2] text-[#122A44]">
               {fortune.score >= 85 ? "오늘도 건강하고" : "천천히, 편안하게"}
               <br />
               행복하세요! <span className="text-coral">♡</span>
@@ -217,9 +224,9 @@ export function HomeTab({
         onClick={() => setFortuneOpen(true)}
         className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
       >
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[1.1rem] bg-gradient-to-br from-[#FFE6D6] to-[#FFD3C4] text-[1.75rem]">
-          {fortune.zodiacEmoji}
-        </span>
+        <RaisedTile tone="warm" size={56}>
+          <span className="text-[1.7rem] leading-none">{fortune.zodiacEmoji}</span>
+        </RaisedTile>
         <span className="min-w-0 flex-1">
           <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 운세</span>
           <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
@@ -235,9 +242,9 @@ export function HomeTab({
         onClick={() => setWeatherOpen(true)}
         className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
       >
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[1.1rem] bg-gradient-to-br from-sky to-[#EAF4FB]">
-          <WeatherArt label={weather?.label || "맑음"} size={38} />
-        </span>
+        <RaisedTile tone="sky" size={56}>
+          <WeatherArt label={weather?.label || "맑음"} size={36} />
+        </RaisedTile>
         <span className="min-w-0 flex-1">
           <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 날씨와 생활팁</span>
           <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
@@ -468,7 +475,7 @@ function GreetingSheet({
   show: (m: string) => void;
 }) {
   const { profile, today } = useApp();
-  const [theme, setTheme] = useState<GreetingTheme>("spring");
+  const [theme, setTheme] = useState<GreetingTheme>("chrysanthemum");
   const [message, setMessage] = useState(PRESETS[0]);
   const [rendering, setRendering] = useState(true);
   const [drawn, setDrawn] = useState(false);
@@ -503,7 +510,7 @@ function GreetingSheet({
 
   return (
     <Sheet open onClose={onClose} title="오늘의 안부 인사카드" subtitle="내 이름이 들어간 카드를 만들어 보내요">
-      <div className="grid grid-cols-5 gap-1.5">
+      <div className="grid grid-cols-3 gap-2">
         {THEMES.map((t) => (
           <button
             key={t.key}
@@ -513,11 +520,19 @@ function GreetingSheet({
               theme === t.key ? "border-brand bg-brand-light" : "border-ink/8 bg-white"
             }`}
           >
-            <span
-              className="h-9 w-full rounded-xl"
-              style={{ background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
-            />
-            <span className="whitespace-nowrap text-[0.62rem] font-extrabold tracking-tight">{t.label}</span>
+            {t.key === "chrysanthemum" ? (
+              <span className="h-9 w-full overflow-hidden rounded-xl bg-[#CFE8F8]">
+                <AssetImage name="greeting-chrysanthemum" alt="" className="h-full w-full object-cover" />
+              </span>
+            ) : (
+              <span
+                className="h-9 w-full rounded-xl"
+                style={{ background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
+              />
+            )}
+            <span className="whitespace-nowrap text-[0.66rem] font-extrabold tracking-tight">
+              {t.emoji} {t.label}
+            </span>
           </button>
         ))}
       </div>

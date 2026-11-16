@@ -165,7 +165,7 @@ export type GroupsPayload = {
 export type WelfareProgram = {
   id: string;
   title: string;
-  category: "연금" | "교통" | "의료" | "생활비" | "돌봄" | "주거";
+  category: "연금" | "교통" | "의료" | "생활비" | "돌봄" | "주거" | "일자리";
   org: string;
   amount: string;
   summary: string;

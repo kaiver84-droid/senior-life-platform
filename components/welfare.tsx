@@ -7,7 +7,9 @@ import { useApp } from "@/lib/storage";
 import { REGIONS, sigunguList, shortSido } from "@/lib/regions";
 import { shareText } from "@/lib/share";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
-import { IconBank, IconBell, IconChevron, IconPhone, IconPin } from "./icons";
+import { IconBank, IconBell, IconChevron, IconPhone, IconPin, IconSend } from "./icons";
+import { AssetImage } from "./art";
+import { BIRTH_YEARS } from "./profile-fields";
 
 const CATEGORY_EMOJI: Record<string, string> = {
   연금: "💰",
@@ -16,62 +18,10 @@ const CATEGORY_EMOJI: Record<string, string> = {
   생활비: "🍚",
   돌봄: "🤝",
   주거: "🏠",
+  일자리: "💼",
 };
 
-/* 도시 · 관공서 느낌의 하이라이트 배경 */
-function CityScene({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
-      <defs>
-        <linearGradient id="ct-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop stopColor="#CFE7F3" />
-          <stop offset="0.65" stopColor="#EAF4FA" />
-          <stop offset="1" stopColor="#FDFBF4" />
-        </linearGradient>
-        <linearGradient id="ct-glass" x1="0" y1="0" x2="1" y2="1">
-          <stop stopColor="#BFDCEA" />
-          <stop offset="1" stopColor="#8FB9CE" />
-        </linearGradient>
-      </defs>
-      <rect width="400" height="240" fill="url(#ct-sky)" />
-      <circle cx="330" cy="46" r="30" fill="#FFE6A8" opacity="0.85" />
-      <g opacity="0.9">
-        <rect x="18" y="96" width="58" height="120" rx="6" fill="#DCE6EA" />
-        <rect x="86" y="70" width="66" height="146" rx="6" fill="#CBD9DF" />
-        <rect x="160" y="112" width="48" height="104" rx="6" fill="#E3EBEE" />
-        <rect x="216" y="52" width="74" height="164" rx="8" fill="url(#ct-glass)" />
-        <rect x="298" y="96" width="66" height="120" rx="6" fill="#D7E3E7" />
-      </g>
-      {[0, 1, 2, 3, 4].map((r) =>
-        [0, 1, 2, 3].map((c) => (
-          <rect
-            key={`w-${r}-${c}`}
-            x={228 + c * 15}
-            y={68 + r * 26}
-            width="9"
-            height="14"
-            rx="2"
-            fill="#FFFFFF"
-            opacity={0.55}
-          />
-        ))
-      )}
-      {[0, 1, 2, 3].map((r) => (
-        <rect key={`b-${r}`} x="100" y={84 + r * 28} width="38" height="12" rx="3" fill="#FFFFFF" opacity="0.5" />
-      ))}
-      <rect y="196" width="400" height="44" fill="#E7EEDF" />
-      <g fill="#9CC08C">
-        <circle cx="46" cy="192" r="16" />
-        <circle cx="68" cy="196" r="12" />
-        <circle cx="352" cy="190" r="18" />
-        <circle cx="376" cy="196" r="12" />
-      </g>
-      <rect x="0" y="212" width="400" height="28" fill="#C9DCC0" />
-    </svg>
-  );
-}
-
-/** 긴 안내문에서 첫 문장만 (카드 요약용) */
+/* 긴 안내문에서 첫 문장만 (카드 요약용) */
 function firstSentence(text: string): string {
   const i = text.indexOf(". ");
   return i > 10 ? text.slice(0, i + 1) : text;
@@ -91,7 +41,9 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
 
   const age = profile ? new Date().getFullYear() - profile.birthYear : 0;
   const filtered = category === "전체" ? matched : matched.filter((p) => p.category === category);
-  const hero = filtered.find((p) => p.id === "basic-pension") ?? filtered[0];
+  // 65세 이상은 기초연금을, 40·50대는 지금 챙길 수 있는 직업훈련·일자리 혜택을 맨 앞에 보여 준다.
+  const heroId = age >= 65 ? "basic-pension" : "training-card";
+  const hero = filtered.find((p) => p.id === heroId) ?? filtered[0];
   const others = filtered.filter((p) => p.id !== hero?.id);
   const openProgram = matched.find((p) => p.id === openId) ?? null;
 
@@ -157,12 +109,24 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
         ))}
       </div>
 
+      {age > 0 && age < 60 ? (
+        <p className="fade-up rounded-2xl bg-leaf-light px-3.5 py-2.5 text-[0.84rem] font-semibold leading-snug text-leaf-dark">
+          40·50대는 직업훈련·건강검진처럼 지금부터 챙길 수 있는 혜택을 먼저 보여 드려요. 예순이 되면 연금·돌봄 혜택도 함께 열려요.
+        </p>
+      ) : null}
+
       {hero ? (
         <div className="fade-up overflow-hidden rounded-[1.7rem] bg-white shadow-card">
-          <div className="relative">
-            <CityScene className="absolute inset-0 h-full w-full" />
-            <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-white/55 to-white" />
-            <div className="relative px-4 pb-3 pt-6">
+          <div className="relative h-[212px] overflow-hidden bg-[#D7E9F5]">
+            <AssetImage
+              name="welfare-pension-bg"
+              alt="맑은 하늘 아래 숲과 어우러진 밝은 공공기관 건물"
+              priority
+              className="absolute inset-0 h-full w-full object-cover object-[58%_center]"
+            />
+            {/* 아래로 갈수록 흰색 — 글씨가 사진 위에서도 깔끔하게 읽힌다 */}
+            <div className="absolute inset-0 bg-gradient-to-b from-white/0 via-white/45 to-white" />
+            <div className="relative flex h-full flex-col justify-end px-4 pb-3">
               <div className="flex items-center gap-1.5">
                 <Badge tone="brand">{hero.category}</Badge>
                 {hero.tags.includes("가장 먼저 챙기세요") ? <Badge tone="coral">먼저 챙기세요</Badge> : null}
@@ -237,22 +201,30 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
         </div>
       </section>
 
-      {/* 카톡 안부 전송 */}
-      <div className="fade-up overflow-hidden rounded-[1.6rem] bg-gradient-to-br from-[#EAF7EC] via-[#F3FBF4] to-[#FFF7E6] p-4 shadow-soft">
+      {/* 가족에게 안부 전송 */}
+      <div className="fade-up overflow-hidden rounded-[1.6rem] bg-white p-3 shadow-card">
         <div className="flex items-center gap-3">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FEE500] text-[0.62rem] font-black text-[#3C1E1E]">
-            TALK
-          </span>
+          <div className="relative h-[98px] w-[116px] shrink-0 overflow-hidden rounded-[1.15rem] bg-[#F3EEE2] shadow-soft">
+            <AssetImage
+              name="family-greeting-couple"
+              alt="거실에서 휴대폰으로 가족에게 안부를 전하는 어르신 부부"
+              className="h-full w-full object-cover object-[center_32%]"
+            />
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[1rem] font-black leading-snug text-ink">가족에게 안부 보내기</p>
-            <p className="text-[0.84rem] font-semibold text-ink/55">오늘도 잘 지내고 있다고 전해 보세요.</p>
+            <p className="text-[1.04rem] font-black leading-snug text-ink">가족에게 안부 보내기</p>
+            <p className="mt-0.5 text-[0.85rem] font-semibold leading-snug text-ink/55">
+              사랑하는 가족에게 오늘도 안부를 전하세요.
+            </p>
           </div>
         </div>
-        <div className="mt-3">
-          <BigButton variant="sun" full onClick={shareAnbu}>
-            카카오톡으로 안부 전송
-          </BigButton>
-        </div>
+        <button
+          type="button"
+          onClick={shareAnbu}
+          className="touch-btn mt-3 min-h-[56px] w-full bg-[#0FBF7F] text-white shadow-[0_8px_18px_-9px_rgba(15,191,127,0.9)] active:bg-[#0CA96F]"
+        >
+          <IconSend size={20} /> 카카오톡으로 안부 전송
+        </button>
       </div>
 
       <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
@@ -399,7 +371,7 @@ function ProfileEditor({
   const [sigungu, setSigungu] = useState(initial.sigungu || sigunguList(initial.sido || REGIONS[0].name)[0]);
 
   const options = sigunguList(sido);
-  const years = Array.from({ length: 44 }, (_, i) => 1930 + i);
+  const years = BIRTH_YEARS;
 
   return (
     <div className="space-y-3">
