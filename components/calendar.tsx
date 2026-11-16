@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/storage";
 import { shareMessageText, shareText } from "@/lib/share";
-import { shortSido } from "@/lib/regions";
+import { REGIONS, shortSido, sigunguList } from "@/lib/regions";
+import { regionLinks } from "@/lib/region-links";
 import { kstDate } from "@/lib/week";
 import {
   EVENT_KINDS,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/calendar";
 import {
   localNewsFor,
+  newsAreaName,
   newsCategoryInfo,
   newsOnDate,
   newsPeriod,
@@ -35,7 +37,7 @@ import {
   type NewsCategory,
 } from "@/lib/local-news";
 import { Badge, BigButton, Divider, Portal, Sheet, useToast } from "./ui";
-import { IconBack, IconCalendar, IconChat, IconClock, IconPin, IconPlus } from "./icons";
+import { IconBack, IconCalendar, IconChat, IconChevron, IconClock, IconPin, IconPlus } from "./icons";
 
 type Filter = "all" | "family" | NewsCategory;
 
@@ -69,6 +71,9 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
   const [ym, setYm] = useState<YearMonth>(() => monthOf(today));
   const [selected, setSelected] = useState<string>(today);
   const [filter, setFilter] = useState<Filter>("all");
+  /** 달력 안에서 잠깐 다른 지역을 볼 때 (프로필 지역은 그대로 둔다) */
+  const [region, setRegion] = useState<{ sido: string; sigungu: string } | null>(null);
+  const [regionOpen, setRegionOpen] = useState(false);
   const [form, setForm] = useState<{ open: boolean; editing: FamilyEvent | null; date: string }>({
     open: false,
     editing: null,
@@ -82,12 +87,22 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
     setSelected(today);
     setFilter("all");
     setConfirmId(null);
+    setRegion(null);
+    setRegionOpen(false);
   }, [open, today]);
 
+  const mySido = profile?.sido || "";
+  const mySigungu = profile?.sigungu || "";
+  const viewSido = region?.sido ?? mySido;
+  const viewSigungu = region?.sigungu ?? mySigungu;
+  const area = newsAreaName(viewSido, viewSigungu);
+  const isMyRegion = viewSido === mySido && viewSigungu === mySigungu;
+
   const news = useMemo(
-    () => localNewsFor(profile?.sido || "", profile?.sigungu || "", today, 4),
-    [profile?.sido, profile?.sigungu, today]
+    () => localNewsFor(viewSido, viewSigungu, today, 4),
+    [viewSido, viewSigungu, today]
   );
+  const links = useMemo(() => regionLinks(viewSido, viewSigungu), [viewSido, viewSigungu]);
 
   const grid = useMemo(() => monthMatrix(ym), [ym]);
   const monthEvents = useMemo(() => eventsInMonth(events, ym), [events, ym]);
@@ -201,15 +216,36 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
               </button>
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-[1.24rem] font-black leading-tight text-ink">📅 가족안부달력</h1>
-                <p className="truncate text-[0.78rem] font-bold text-ink/50">
-                  {shortSido(profile?.sido || "")} {profile?.sigungu || ""} · 가족 일정과 동네 소식
-                </p>
+                <p className="truncate text-[0.78rem] font-bold text-ink/50">가족 일정과 우리 동네 소식</p>
               </div>
               <button
                 onClick={() => setForm({ open: true, editing: null, date: selected })}
                 className="flex min-h-[46px] shrink-0 items-center gap-1 rounded-full bg-coral px-3.5 text-[0.88rem] font-extrabold text-white shadow-soft active:bg-coral-dark"
               >
                 <IconPlus size={18} /> 일정
+              </button>
+            </div>
+
+            {/* 우리동네 소식 지역 — 누르면 다른 시·군·구로 바꿔 볼 수 있다 */}
+            <div className="px-4 pb-2.5">
+              <button
+                onClick={() => setRegionOpen(true)}
+                aria-label="우리동네 소식 지역 바꾸기"
+                className="flex min-h-[48px] w-full items-center gap-2 rounded-2xl bg-white px-3 text-left shadow-soft active:bg-paper"
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-light">
+                  <IconPin size={17} className="text-brand-dark" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[0.72rem] font-extrabold leading-none text-ink/45">
+                    우리동네 소식 지역
+                  </span>
+                  <span className="mt-0.5 block truncate text-[0.98rem] font-black leading-tight text-ink">
+                    {area}
+                    {!isMyRegion ? <span className="ml-1 text-[0.78rem] font-bold text-brand-dark">(내 지역 아님)</span> : null}
+                  </span>
+                </span>
+                <IconChevron size={18} className="shrink-0 rotate-90 text-ink/35" />
               </button>
             </div>
           </header>
@@ -464,9 +500,11 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
 
             {/* 다가오는 일정 · 소식 */}
             <section>
-              <div className="mb-2 flex items-end justify-between">
+              <div className="mb-2 flex items-end justify-between gap-2">
                 <h2 className="text-[1.12rem] font-black text-ink">다가오는 일정과 소식</h2>
-                <span className="text-[0.74rem] font-bold text-ink/40">{rows.length}건</span>
+                <span className="truncate text-[0.74rem] font-bold text-ink/40">
+                  {area} · {rows.length}건
+                </span>
               </div>
 
               <div className="mb-2 flex gap-2 overflow-x-auto pb-1 no-scrollbar" role="tablist" aria-label="소식 갈래">
@@ -492,7 +530,17 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
               <div className="space-y-2">
                 {rows.length === 0 ? (
                   <p className="rounded-2xl bg-white p-4 text-center text-[0.9rem] font-semibold text-ink/45">
-                    아직 일정이 없어요. <b className="text-ink/70">+ 일정 추가</b>로 생일을 넣어 두세요.
+                    {filter === "all" ? (
+                      <>
+                        아직 일정이 없어요. <b className="text-ink/70">+ 일정 추가</b>로 생일을 넣어 두세요.
+                      </>
+                    ) : filter === "family" ? (
+                      <>
+                        넣어 둔 가족 일정이 없어요. <b className="text-ink/70">+ 일정 추가</b>로 생일을 넣어 보세요.
+                      </>
+                    ) : (
+                      <>{area}에서 앞으로 넉 달 안에 잡힌 {FILTERS.find((f) => f.key === filter)?.label} 소식은 아직 없어요. 다른 갈래를 눌러 보세요.</>
+                    )}
                   </p>
                 ) : null}
 
@@ -540,8 +588,9 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[0.98rem] font-black text-ink">{r.news.title}</span>
                         <span className="block truncate text-[0.78rem] font-bold text-ink/50">
-                          {newsPeriod(r.news)} · {info.label} · {r.news.place}
+                          {newsPeriod(r.news)} · {info.label}
                         </span>
+                        <span className="block truncate text-[0.74rem] font-semibold text-ink/45">{r.news.place}</span>
                       </span>
                     </button>
                   );
@@ -549,9 +598,39 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
               </div>
 
               <p className="mt-3 rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.78rem] font-semibold leading-relaxed text-ink/45">
-                우리동네 소식은 지역 공고를 요약해 정리한 안내예요. 축제·행사 날짜와 접수 기간은 해마다 달라질 수
+                {area} 소식은 지역 공고를 요약해 정리한 안내예요. 축제·행사 날짜와 접수 기간은 해마다 달라질 수
                 있으니 방문·신청 전에 꼭 전화로 확인해 주세요.
               </p>
+            </section>
+
+            {/* 우리 지역 바로가기 — 전국 어느 지역이든 늘 열리는 주소만 모았다 */}
+            <section className="rounded-[1.6rem] bg-white p-4 shadow-card">
+              <div className="mb-1 flex items-center gap-1.5">
+                <IconPin size={17} className="text-brand" />
+                <h2 className="text-[1.06rem] font-black text-ink">{area} 바로가기</h2>
+              </div>
+              <p className="mb-2.5 text-[0.8rem] font-semibold leading-snug text-ink/50">
+                공고·축제 일정은 지역마다 달라요. 아래에서 최신 소식을 바로 확인하실 수 있어요.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {links.map((l) => (
+                  <a
+                    key={l.key}
+                    href={l.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-h-[58px] items-center gap-2 rounded-2xl bg-paper px-3 py-2 active:bg-ink/10"
+                  >
+                    <span aria-hidden className="text-[1.15rem]">
+                      {l.emoji}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[0.88rem] font-black text-ink">{l.label}</span>
+                      <span className="block truncate text-[0.72rem] font-semibold text-ink/50">{l.note}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
             </section>
           </div>
         </div>
@@ -568,7 +647,119 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
           show(msg);
         }}
       />
+
+      <RegionSheet
+        open={regionOpen}
+        onClose={() => setRegionOpen(false)}
+        mySido={mySido}
+        mySigungu={mySigungu}
+        current={{ sido: viewSido, sigungu: viewSigungu }}
+        onPick={(next) => {
+          setRegion(next);
+          setRegionOpen(false);
+          show(next ? `${newsAreaName(next.sido, next.sigungu)} 소식을 볼게요.` : "내 지역 소식으로 돌아왔어요.");
+        }}
+      />
     </Portal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 우리동네 소식 — 지역 고르기                                          */
+/* ------------------------------------------------------------------ */
+
+function RegionSheet({
+  open,
+  onClose,
+  mySido,
+  mySigungu,
+  current,
+  onPick,
+}: {
+  open: boolean;
+  onClose: () => void;
+  mySido: string;
+  mySigungu: string;
+  current: { sido: string; sigungu: string };
+  onPick: (next: { sido: string; sigungu: string } | null) => void;
+}) {
+  const { today } = useApp();
+  const [sido, setSido] = useState(current.sido || REGIONS[0].name);
+  const [sigungu, setSigungu] = useState(
+    current.sigungu || sigunguList(current.sido || REGIONS[0].name)[0] || ""
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setSido(current.sido || REGIONS[0].name);
+    setSigungu(current.sigungu || sigunguList(current.sido || REGIONS[0].name)[0] || "");
+  }, [open, current.sido, current.sigungu]);
+
+  const options = sigunguList(sido);
+  const pickedArea = newsAreaName(sido, sigungu);
+  const count = localNewsFor(sido, sigungu, today, 4).length;
+  const isMine = sido === mySido && sigungu === mySigungu;
+
+  return (
+    <Sheet open={open} onClose={onClose} title="우리동네 소식 지역" subtitle="보고 싶은 시·도와 시·군·구를 골라 주세요">
+      <div className="space-y-3">
+        <div>
+          <label htmlFor="news-sido" className="mb-1 block text-[0.95rem] font-extrabold">
+            시·도
+          </label>
+          <select
+            id="news-sido"
+            className="field"
+            value={sido}
+            onChange={(e) => {
+              setSido(e.target.value);
+              setSigungu(sigunguList(e.target.value)[0] || "");
+            }}
+          >
+            {REGIONS.map((r) => (
+              <option key={r.name} value={r.name}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="news-sigungu" className="mb-1 block text-[0.95rem] font-extrabold">
+            시·군·구
+          </label>
+          <select
+            id="news-sigungu"
+            className="field"
+            value={sigungu}
+            onChange={(e) => setSigungu(e.target.value)}
+          >
+            {options.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <p className="rounded-2xl bg-brand-light/60 px-3.5 py-2.5 text-[0.84rem] font-semibold leading-snug text-brand-dark">
+          {pickedArea}에서 앞으로 넉 달 동안 {count}건의 소식을 보여 드릴게요.
+        </p>
+
+        <BigButton variant="ink" full onClick={() => onPick({ sido, sigungu })}>
+          {pickedArea} 소식 보기
+        </BigButton>
+
+        {isMine ? null : (
+          <BigButton variant="white" full onClick={() => onPick(null)}>
+            내 지역({newsAreaName(mySido, mySigungu)})으로 돌아가기
+          </BigButton>
+        )}
+
+        <p className="text-center text-[0.76rem] font-semibold leading-relaxed text-ink/45">
+          다른 지역을 봐도 내 설정 지역은 바뀌지 않아요. 내 지역을 바꾸려면 혜택 화면의 지역 버튼을 눌러 주세요.
+        </p>
+      </div>
+    </Sheet>
   );
 }
 

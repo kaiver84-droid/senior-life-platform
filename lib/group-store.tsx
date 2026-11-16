@@ -9,6 +9,7 @@ import {
   fetchGroups,
   inviteLinkFor,
   peekPendingInvite,
+  pingGroup,
   rememberActiveGroup,
   rememberedActiveGroup,
   sendGroupAction,
@@ -104,6 +105,24 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     rememberActiveGroup(id);
   }, []);
 
+  /** ping 이 알려 준 "지금 접속 중" 정보만 골라 화면 상태에 반영한다 */
+  const applyPresence = useCallback((groupId: string, onlineCodes: string[], onlineCount: number) => {
+    setPayload((prev) => {
+      if (!prev) return prev;
+      const set = new Set(onlineCodes);
+      const groups = prev.groups.map((g) => (g.id === groupId ? { ...g, onlineCount } : g));
+      const detail =
+        prev.detail && prev.detail.id === groupId
+          ? {
+              ...prev.detail,
+              onlineCount,
+              members: prev.detail.members.map((m) => ({ ...m, online: set.has(m.code) || m.isMe })),
+            }
+          : prev.detail;
+      return { ...prev, groups, detail };
+    });
+  }, []);
+
   const refresh = useCallback(
     async (gid?: string | null) => {
       if (!code) return;
@@ -137,6 +156,35 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     }, 250);
     return () => clearTimeout(t);
   }, [appReady, code, me.name, me.points, me.days, me.today, me.health?.join(","), refresh]);
+
+  /* 접속 표시 — 앱을 열어 둔 동안 50초마다 "지금 보고 있어요"를 알리고 접속 인원을 새로 받는다 */
+  useEffect(() => {
+    if (!appReady || !code) return;
+    let stopped = false;
+
+    const tick = async () => {
+      const gid = activeRef.current;
+      if (!gid || stopped) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      const ping = await pingGroup(code, gid);
+      if (stopped || !ping) return;
+      applyPresence(ping.groupId, ping.onlineCodes, ping.onlineCount);
+    };
+
+    const first = setTimeout(() => void tick(), 1500);
+    const timer = setInterval(() => void tick(), 50_000);
+    const onVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      stopped = true;
+      clearTimeout(first);
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [appReady, code, applyPresence]);
 
   const runAction = useCallback(
     async (body: Omit<GroupActionBody, "code" | "me">): Promise<ActionResult & { groupId?: string }> => {

@@ -7,6 +7,7 @@ import { onRequestGet as healthGet } from "./functions/api/health";
 import { onRequestGet as rankingsGet } from "./functions/api/rankings";
 import { onRequestGet as groupsGet, onRequestPost as groupsPost } from "./functions/api/groups";
 import { onRequestGet as stateGet, onRequestPost as statePost } from "./functions/api/state";
+import { onRequestGet as localNewsGet } from "./functions/api/local-news";
 import { onRequestGet as kakaoGet, onRequestPost as kakaoPost } from "./functions/api/auth/kakao";
 
 type Env = Record<string, unknown> & { ASSETS?: { fetch: (r: Request) => Promise<Response> } };
@@ -20,6 +21,7 @@ export default {
 
     try {
       if (path === "/api/health") return await healthGet(ctx);
+      if (path === "/api/local-news") return await localNewsGet(ctx);
       if (path === "/api/rankings") return await rankingsGet(ctx);
       if (path === "/api/groups") {
         return request.method === "POST" ? await groupsPost(ctx) : await groupsGet(ctx);

@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Cloudflare Pages 에 out/ 를 직접 업로드한다 (wrangler 없이 REST API).
 
+⚠️ 2026-11-17 사고 기록 — 이 스크립트로 올린 배포는 "success" 로 끝나도 라이브가 전부 500 이 됐다
+   (정적 파일·Functions 모두). 같은 out/ 를 `npx wrangler@3 pages deploy out` 으로 올리면 정상이다.
+   해시 이름 방식(hash-name) 업로드가 Pages 의 기대와 맞지 않는 것으로 보인다.
+   → 특별한 이유가 없으면 아래처럼 wrangler 로 배포할 것.
+
+       export CLOUDFLARE_API_TOKEN=$(cat .cloudflare_token)
+       export CLOUDFLARE_ACCOUNT_ID=bbddf7735b353b9656460deab2744f9b
+       npx --yes wrangler@3 pages deploy out --project-name=senior-life-platform --branch=main --commit-dirty=true
+
 사전 준비:
   npm run build                # out/ 생성
   bun build functions-entry.ts --target browser --format esm --outfile out/_worker.js

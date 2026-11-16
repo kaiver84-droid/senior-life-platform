@@ -94,6 +94,8 @@ export type GroupSummary = {
   description: string;
   isDemo: boolean;
   memberCount: number;
+  /** 지금(최근 5분 안에) 접속해 있는 모임원 수 — 나 포함 */
+  onlineCount?: number;
   goalScore: number;
   weeklyGoal: number;
   myRole: GroupRole;
@@ -105,6 +107,8 @@ export type GroupMemberInfo = {
   isMe: boolean;
   isLeader: boolean;
   isDemo: boolean;
+  /** 지금 접속 중(최근 5분 안에 앱을 열었거나 내가 본인) */
+  online?: boolean;
   /** 오늘 출석(접속·퀴즈) 했는지 */
   todayAttended: boolean;
   /** 이번 주 참여 일수 */

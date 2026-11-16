@@ -124,6 +124,14 @@ export function GroupSelectorBanner() {
                 ? "모임을 골라 주세요"
                 : "우리 가족 사랑방에서 함께 시작해요"}
           </span>
+          {active ? (
+            <span className="mt-1 flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-leaf-light px-2 py-0.5 text-[0.76rem] font-black text-leaf-dark">
+                <span className="h-1.5 w-1.5 rounded-full bg-leaf" />
+                지금 {active.onlineCount ?? detail?.onlineCount ?? 1}명 접속 중
+              </span>
+            </span>
+          ) : null}
         </span>
         <IconChevron size={20} className="shrink-0 rotate-90 text-ink/30" />
       </button>
@@ -287,6 +295,12 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                 ? `멤버 ${active.memberCount}명 · 이번 주 달성률 ${detail?.weeklyRate ?? 0}%`
                 : "가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요"}
             </p>
+            {active ? (
+              <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-leaf-light px-2.5 py-1 text-[0.8rem] font-black text-leaf-dark">
+                <span className="h-2 w-2 rounded-full bg-leaf" />
+                지금 {active.onlineCount ?? detail?.onlineCount ?? 1}명 접속 중
+              </span>
+            ) : null}
           </div>
           {active ? (
             <button
@@ -506,15 +520,23 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
 function MemberChip({ member }: { member: GroupMemberInfo }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <span
-        className={`grid h-11 w-11 place-items-center rounded-full text-[1rem] font-black ${
-          member.todayAttended
-            ? "bg-leaf text-white shadow-soft"
-            : "border-2 border-dashed border-ink/15 bg-white text-ink/25"
-        } ${member.isMe ? "ring-2 ring-brand ring-offset-2" : ""}`}
-        aria-label={`${member.name}${member.isMe ? "(나)" : ""} ${member.todayAttended ? "출석" : "미출석"}`}
-      >
-        {member.todayAttended ? <IconStamp size={20} /> : member.name.slice(0, 1)}
+      <span className="relative">
+        <span
+          className={`grid h-11 w-11 place-items-center rounded-full text-[1rem] font-black ${
+            member.todayAttended
+              ? "bg-leaf text-white shadow-soft"
+              : "border-2 border-dashed border-ink/15 bg-white text-ink/25"
+          } ${member.isMe ? "ring-2 ring-brand ring-offset-2" : ""}`}
+          aria-label={`${member.name}${member.isMe ? "(나)" : ""}${member.online ? " 접속 중" : ""} ${member.todayAttended ? "출석" : "미출석"}`}
+        >
+          {member.todayAttended ? <IconStamp size={20} /> : member.name.slice(0, 1)}
+        </span>
+        {/* 지금 접속 중 — 초록 점 */}
+        {member.online ? (
+          <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-white">
+            <span className="h-2.5 w-2.5 rounded-full bg-leaf shadow-soft" />
+          </span>
+        ) : null}
       </span>
       <span
         className={`max-w-full truncate text-[0.78rem] leading-tight ${
@@ -523,6 +545,11 @@ function MemberChip({ member }: { member: GroupMemberInfo }) {
       >
         {member.name}
       </span>
+      {member.online ? (
+        <span className="tabular text-[0.66rem] font-extrabold leading-none text-leaf-dark">
+          접속 중
+        </span>
+      ) : null}
       <span className="tabular text-[0.68rem] font-extrabold text-ink/40">{member.points}점</span>
     </div>
   );

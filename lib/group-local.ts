@@ -102,6 +102,16 @@ function write(db: LocalDb) {
   }
 }
 
+/** 체험 모임원 — 서버(체험 모드)와 같은 규칙으로 지금 접속 중인 사람을 고른다 */
+export function localDemoOnline(code: string): boolean {
+  const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCHours();
+  let n = 0;
+  for (const ch of code) n = (n * 31 + ch.charCodeAt(0)) % 997;
+  const busy = (kstHour >= 7 && kstHour <= 10) || (kstHour >= 18 && kstHour <= 22);
+  // 열 명 중 아침·저녁에는 4명, 그 밖에는 2명꼴로 접속 중이 되게 시간마다 돌아간다(서버와 같은 규칙).
+  return (n + kstHour * 7) % 10 < (busy ? 4 : 2);
+}
+
 function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): GroupDetail {
   const today = kstDate();
   const week = weekIdOf(today);
@@ -119,6 +129,7 @@ function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): 
         isMe: false,
         isLeader: false,
         isDemo: true,
+        online: localDemoOnline(m.code),
         todayAttended: demoAttended.has(m.code),
         weekDays: demoWeekDays(m.code, week),
         points: demoPoints(m.code, week),
@@ -133,6 +144,7 @@ function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): 
       isMe,
       isLeader: m.role === "leader",
       isDemo: false,
+      online: isMe,
       todayAttended: (isMe ? Boolean(me?.today) : false) || myHealth.length > 0,
       weekDays: isMe ? Math.max(0, Math.round(me?.days ?? 0)) : 0,
       points: isMe ? Math.max(0, Math.round(me?.points ?? 0)) : 0,
@@ -160,6 +172,7 @@ function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): 
     }));
 
   const memberCount = members.length;
+  const onlineCount = Math.max(1, members.filter((m) => m.online).length);
   const todayAttended = members.filter((m) => m.todayAttended).length;
   const weeklyGoal = Math.max(1, g.weeklyGoal);
   const weekSum = members.reduce((a, m) => a + m.weekDays, 0);
@@ -171,6 +184,7 @@ function detailOf(db: LocalDb, g: LocalGroup, code: string, me?: MeStatsInput): 
     description: g.description,
     isDemo: g.isDemo,
     memberCount,
+    onlineCount,
     goalScore: g.goalScore,
     weeklyGoal,
     myRole: g.members.find((m) => m.code === code)?.role ?? "member",
@@ -207,6 +221,10 @@ export function localPayload(
     description: g.description,
     isDemo: g.isDemo,
     memberCount: g.members.length,
+    onlineCount: Math.max(
+      1,
+      g.members.filter((m) => m.code === code || (m.role === "demo" && localDemoOnline(m.code))).length
+    ),
     goalScore: g.goalScore,
     weeklyGoal: g.weeklyGoal,
     myRole: g.members.find((m) => m.code === code)?.role ?? "member",
@@ -222,7 +240,7 @@ export function localPayload(
 
 export function localAction(
   body: {
-    action: "create" | "join" | "select" | "leave" | "post" | "cheer";
+    action: "create" | "join" | "select" | "leave" | "post" | "cheer" | "ping";
     code: string;
     groupId?: string | null;
     name?: string;

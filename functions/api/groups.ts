@@ -51,7 +51,15 @@ type GroupRow = {
   creator_code: string | null;
   is_demo: boolean;
 };
-type MemberRow = { group_id: string; user_code: string; name: string; role: GroupRole; joined_at?: string };
+type MemberRow = {
+  group_id: string;
+  user_code: string;
+  name: string;
+  role: GroupRole;
+  joined_at?: string;
+  /** 마지막으로 앱을 연 시각 — 지금 접속 중인지 판단한다 */
+  last_seen_at?: string | null;
+};
 type PostRow = {
   id: number | string;
   user_code: string;
@@ -97,6 +105,40 @@ async function sbWrite(
   return text ? JSON.parse(text) : null;
 }
 
+/** 지금 접속 중으로 볼 시간 창 (5분) */
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+function onlineFrom(iso?: string | null): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) && Date.now() - t <= ONLINE_WINDOW_MS && t - Date.now() < 60_000;
+}
+
+/** 체험 모임원 — 시각에 따라 그럴듯하게 접속 중인 사람을 만든다(실제 사람이 아니다) */
+function demoOnline(code: string): boolean {
+  const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCHours();
+  let n = 0;
+  for (const ch of code) n = (n * 31 + ch.charCodeAt(0)) % 997;
+  const busy = (kstHour >= 7 && kstHour <= 10) || (kstHour >= 18 && kstHour <= 22);
+  // 열 명 중 아침·저녁에는 4명, 그 밖에는 2명꼴로 접속 중이 되게 시간마다 돌아간다.
+  return (n + kstHour * 7) % 10 < (busy ? 4 : 2);
+}
+
+/** 내가 지금 앱을 열어 두었다고 표시한다(컬럼이 없거나 잠깐 실패해도 화면은 그대로) */
+async function touchPresence(env: DbEnv, groupId: string, code: string): Promise<void> {
+  try {
+    await sbWrite(
+      env,
+      `group_members?group_id=eq.${enc(groupId)}&user_code=eq.${enc(code)}`,
+      "PATCH",
+      { last_seen_at: new Date().toISOString() },
+      "return=minimal"
+    );
+  } catch {
+    /* 무시 — 접속 표시는 부가 정보 */
+  }
+}
+
 /** 모임 하나의 상세(회원 · 오늘 출석 · 이번 주 달성률 · 게시판) */
 async function buildDetail(
   env: DbEnv,
@@ -115,9 +157,12 @@ async function buildDetail(
   if (!groupRows.length) return null;
   const g = groupRows[0];
 
+  // 화면을 연 사람은 "지금 접속 중" — 상세를 만들 때마다 시각을 새로 찍는다.
+  await touchPresence(env, groupId, code);
+
   const memberRows = await sbGet<MemberRow>(
     env,
-    `group_members?group_id=eq.${enc(groupId)}&select=user_code,name,role,joined_at&order=joined_at.asc`
+    `group_members?group_id=eq.${enc(groupId)}&select=user_code,name,role,joined_at,last_seen_at&order=joined_at.asc`
   );
   const realCodes = Array.from(
     new Set(memberRows.filter((m) => m.role !== "demo").map((m) => m.user_code))
@@ -174,6 +219,7 @@ async function buildDetail(
         isMe: false,
         isLeader: false,
         isDemo: true,
+        online: demoOnline(m.user_code),
         todayAttended: demoAttended.has(m.user_code),
         weekDays: demoWeekDays(m.user_code, week),
         points: demoPoints(m.user_code, week),
@@ -202,6 +248,8 @@ async function buildDetail(
       isMe,
       isLeader: m.role === "leader",
       isDemo: false,
+      // 내 기록은 방금 시각을 찍었으니 항상 접속 중으로 본다.
+      online: isMe || onlineFrom(m.last_seen_at),
       todayAttended,
       weekDays,
       points,
@@ -232,6 +280,7 @@ async function buildDetail(
   });
 
   const memberCount = members.length;
+  const onlineCount = Math.max(1, members.filter((m) => m.online).length);
   const todayAttended = members.filter((m) => m.todayAttended).length;
   const attendanceRate = memberCount ? Math.round((todayAttended / memberCount) * 100) : 0;
   const weeklyGoal = Math.max(1, Number(g.weekly_goal) || 5);
@@ -250,6 +299,7 @@ async function buildDetail(
     description: g.description || "",
     isDemo: Boolean(g.is_demo),
     memberCount,
+    onlineCount,
     goalScore: Number(g.goal_score) || 0,
     weeklyGoal,
     myRole: myMembership?.role ?? "member",
@@ -284,8 +334,11 @@ async function buildPayload(
       ? sbGet<GroupRow>(env, `groups?id=in.(${list})&select=${GROUP_COLUMNS}`)
       : Promise.resolve([] as GroupRow[]),
     list
-      ? sbGet<{ group_id: string }>(env, `group_members?group_id=in.(${list})&select=group_id`)
-      : Promise.resolve([] as { group_id: string }[]),
+      ? sbGet<{ group_id: string; user_code: string; role?: string; last_seen_at?: string | null }>(
+          env,
+          `group_members?group_id=in.(${list})&select=group_id,user_code,role,last_seen_at`
+        )
+      : Promise.resolve([] as { group_id: string; user_code: string; role?: string; last_seen_at?: string | null }[]),
     sbGet<{ active_group_id?: string | null }>(
       env,
       `users?code=eq.${enc(code)}&select=active_group_id&limit=1`
@@ -294,7 +347,12 @@ async function buildPayload(
 
   const byId = new Map(rows.map((r) => [r.id, r]));
   const countMap = new Map<string, number>();
-  countRows.forEach((c) => countMap.set(c.group_id, (countMap.get(c.group_id) || 0) + 1));
+  const onlineMap = new Map<string, number>();
+  countRows.forEach((c) => {
+    countMap.set(c.group_id, (countMap.get(c.group_id) || 0) + 1);
+    const on = c.user_code === code || (c.role === "demo" ? demoOnline(c.user_code) : onlineFrom(c.last_seen_at));
+    if (on) onlineMap.set(c.group_id, (onlineMap.get(c.group_id) || 0) + 1);
+  });
 
   const groups: GroupSummary[] = memberships
     .filter((m) => byId.has(m.group_id))
@@ -306,6 +364,7 @@ async function buildPayload(
         description: r.description || "",
         isDemo: Boolean(r.is_demo),
         memberCount: countMap.get(r.id) || 0,
+        onlineCount: Math.max(1, onlineMap.get(r.id) || 0),
         goalScore: Number(r.goal_score) || 0,
         weeklyGoal: Number(r.weekly_goal) || 5,
         myRole: m.role,
@@ -483,6 +542,30 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
       }
       const payload = await buildPayload(env, code, { me });
       return json({ ok: true, ...payload });
+    }
+
+    if (action === "ping") {
+      // 화면을 켜 두었다는 신호 — 무거운 응답 없이 접속 인원만 돌려준다.
+      const groupId = (body.groupId || "").trim().toUpperCase();
+      if (!groupId) return json({ ok: false, error: "group_required" }, 400);
+      await touchPresence(env, groupId, code);
+      const rows = await sbGet<{ user_code: string; role?: string; last_seen_at?: string | null }>(
+        env,
+        `group_members?group_id=eq.${enc(groupId)}&select=user_code,role,last_seen_at`
+      );
+      const onlineCodes = rows
+        .filter(
+          (r) => r.user_code === code || (r.role === "demo" ? demoOnline(r.user_code) : onlineFrom(r.last_seen_at))
+        )
+        .map((r) => r.user_code);
+      return json({
+        ok: true,
+        groupId,
+        onlineCount: Math.max(1, onlineCodes.length),
+        memberCount: rows.length,
+        onlineCodes,
+        serverTime: new Date().toISOString(),
+      });
     }
 
     if (action === "post") {

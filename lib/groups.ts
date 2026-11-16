@@ -17,7 +17,7 @@ export type MeStatsInput = {
 };
 
 export type GroupActionBody = {
-  action: "create" | "join" | "select" | "leave" | "post" | "cheer";
+  action: "create" | "join" | "select" | "leave" | "post" | "cheer" | "ping";
   code: string;
   groupId?: string | null;
   name?: string;
@@ -25,6 +25,14 @@ export type GroupActionBody = {
   content?: string;
   postId?: string;
   me?: MeStatsInput;
+};
+
+/** 접속 알림(ping) 응답 — 지금 몇 명이 함께 보고 있는지 */
+export type PresencePing = {
+  groupId: string;
+  onlineCount: number;
+  memberCount: number;
+  onlineCodes: string[];
 };
 
 export function siteOrigin(): string {
@@ -148,8 +156,33 @@ export async function sendGroupAction(
   }
 }
 
-/** 몇 분 전에 쓴 글인지 (게시판 표시용) */
-export function timeAgo(iso: string): string {
+/**
+ * "나 지금 보고 있어요" 신호 — 마지막 접속 시각을 서버에 남기고,
+ * 지금 함께 접속해 있는 모임원 수를 받아 온다. 실패하면 null(화면은 그대로).
+ */
+export async function pingGroup(code: string, groupId: string): Promise<PresencePing | null> {
+  if (!code || !groupId) return null;
+  try {
+    const res = await fetch("/api/groups", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "ping", code, groupId }),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    if (!j?.ok) return null;
+    return {
+      groupId: j.groupId || groupId,
+      onlineCount: Math.max(1, Number(j.onlineCount) || 1),
+      memberCount: Math.max(0, Number(j.memberCount) || 0),
+      onlineCodes: Array.isArray(j.onlineCodes) ? j.onlineCodes.filter((x: unknown) => typeof x === "string") : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 몇 분 전에 쓴 글인지 (게시판 표시용) */export function timeAgo(iso: string): string {
   const t = new Date(iso).getTime();
   if (!Number.isFinite(t)) return "";
   const diff = Date.now() - t;

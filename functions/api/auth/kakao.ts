@@ -9,6 +9,13 @@ const json = (data: unknown, status = 200) =>
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
 
+/** 카카오 콘솔에 등록한 리다이렉트 주소와 글자 하나까지 같아야 한다 — 끝 '/' 는 붙이지 않는다 */
+const trimSlash = (u: string) => u.replace(/\/+$/, "");
+
+function redirectFor(env: DbEnv, url: URL): string {
+  return trimSlash(env.KAKAO_REDIRECT_URI || url.origin);
+}
+
 function newCodeId(): string {
   return `u_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -32,7 +39,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
   // 카카오 로그인 시작: 카카오 인가 화면으로 302 (REST 키는 서버에만 둔다)
   if (url.searchParams.get("start")) {
     if (!env.KAKAO_CLIENT_ID) return json({ ok: false, error: "kakao_not_configured" }, 503);
-    const redirectUri = env.KAKAO_REDIRECT_URI || `${url.origin}/`;
+    const redirectUri = redirectFor(env, url);
     const authorize = new URL("https://kauth.kakao.com/oauth/authorize");
     authorize.searchParams.set("client_id", env.KAKAO_CLIENT_ID);
     authorize.searchParams.set("redirect_uri", redirectUri);
@@ -47,7 +54,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
       kakaoLoginConfigured: Boolean(env.KAKAO_CLIENT_ID),
       // JS 키가 있으면 클라이언트가 Kakao.Auth.authorize(throughTalk) 간편로그인을 쓸 수 있다
       kakaoJsConfigured: Boolean(env.NEXT_PUBLIC_KAKAO_JS_KEY),
-      redirectUri: env.KAKAO_REDIRECT_URI || `${url.origin}/`,
+      redirectUri: redirectFor(env, url),
     });
   }
 
@@ -56,7 +63,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
   }
 
   try {
-    const redirectUri = env.KAKAO_REDIRECT_URI || `${url.origin}/`;
+    const redirectUri = redirectFor(env, url);
     const tokenRes = await fetch("https://kauth.kakao.com/oauth/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded;charset=utf-8" },
@@ -120,8 +127,8 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     // 인가 코드를 교환할 때 쓰는 redirect_uri 는 인가 코드를 받을 때와 100% 같아야 한다.
     // 클라이언트(Kakao.Auth.authorize)가 넘긴 값과 서버가 쓸 값이 다르면 교환하지 않고 알린다.
     const url = new URL(request.url);
-    const serverRedirectUri = env.KAKAO_REDIRECT_URI || `${url.origin}/`;
-    const clientRedirectUri = (body.redirectUri || "").trim();
+    const serverRedirectUri = redirectFor(env, url);
+    const clientRedirectUri = trimSlash((body.redirectUri || "").trim());
     if (clientRedirectUri && clientRedirectUri !== serverRedirectUri) {
       return json(
         {

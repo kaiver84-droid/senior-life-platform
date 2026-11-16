@@ -158,11 +158,11 @@ export function Onboarding() {
         setKakao({
           configured: Boolean(j?.kakaoLoginConfigured),
           jsConfigured: Boolean(j?.kakaoJsConfigured),
-          redirectUri: String(j?.redirectUri || `${window.location.origin}/`),
+          redirectUri: String(j?.redirectUri || window.location.origin).replace(/\/+$/, ""),
           ready: true,
         });
       })
-      .catch(() => setKakao((k) => ({ ...k, redirectUri: `${window.location.origin}/`, ready: true })));
+      .catch(() => setKakao((k) => ({ ...k, redirectUri: window.location.origin, ready: true })));
 
     // 카카오 로그인 콜백(?code=... / ?error=...) — 주소창에서 코드를 지우고 보관만 한다
     const params = new URLSearchParams(window.location.search);
@@ -216,7 +216,7 @@ export function Onboarding() {
   const startKakao = async () => {
     if (busy || kakaoStarting || checking) return;
     setLoginError("");
-    const redirectUri = kakao.redirectUri || `${window.location.origin}/`;
+    const redirectUri = (kakao.redirectUri || window.location.origin).replace(/\/+$/, "");
     const fallback = () => {
       setKakaoStarting(false);
       window.location.href = "/api/auth/kakao?start=1";
