@@ -1,0 +1,130 @@
+import React from "react";
+
+type P = { className?: string; size?: number };
+
+const base = (size = 26) => ({
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2.1,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+});
+
+export const IconHome = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M3 10.5 12 3l9 7.5" />
+    <path d="M5.5 9.5V21h13V9.5" />
+    <path d="M9.5 21v-6h5v6" />
+  </svg>
+);
+
+export const IconQuiz = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1 1 1.7V17h5v-1.4c0-.7.4-1.3 1-1.7A6 6 0 0 0 12 3Z" />
+    <path d="M9.5 20.5h5" />
+  </svg>
+);
+
+export const IconGift = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M4 10.5h16V21H4z" />
+    <path d="M2.5 7.5h19v3h-19z" />
+    <path d="M12 7.5V21" />
+    <path d="M12 7.5S10.8 3 8.3 3a2.4 2.4 0 0 0 0 4.5H12Zm0 0S13.2 3 15.7 3a2.4 2.4 0 0 1 0 4.5H12Z" />
+  </svg>
+);
+
+export const IconTools = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="m15.5 15.5 5 5" />
+  </svg>
+);
+
+export const IconFamily = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <circle cx="9" cy="8" r="3.2" />
+    <circle cx="17" cy="10" r="2.4" />
+    <path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5" />
+    <path d="M15.5 20c0-2.2 1-4 3-4s3 1.6 3 4" />
+  </svg>
+);
+
+export const IconDownload = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M12 3v12" />
+    <path d="m7 11 5 5 5-5" />
+    <path d="M4 20h16" />
+  </svg>
+);
+
+export const IconShare = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <circle cx="6" cy="12" r="2.6" />
+    <circle cx="17.5" cy="6.5" r="2.6" />
+    <circle cx="17.5" cy="17.5" r="2.6" />
+    <path d="m8.4 10.8 6.8-3.4M8.4 13.2l6.8 3.4" />
+  </svg>
+);
+
+export const IconChat = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M20.5 12c0 4.1-3.8 7.4-8.5 7.4-1 0-2-.15-2.9-.42L4 20.5l1.6-3.6C4.3 15.6 3.5 13.9 3.5 12 3.5 7.9 7.3 4.6 12 4.6s8.5 3.3 8.5 7.4Z" />
+  </svg>
+);
+
+export const IconCheck = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="m4.5 12.5 5 5 10-11" />
+  </svg>
+);
+
+export const IconChevron = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="m9 5 7 7-7 7" />
+  </svg>
+);
+
+export const IconCamera = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M3.5 8.5h3l1.6-2.2h7.8l1.6 2.2h3v11h-17z" />
+    <circle cx="12" cy="13.7" r="3.4" />
+  </svg>
+);
+
+export const IconBulb = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M9 17.5h6" />
+    <path d="M10 21h4" />
+    <path d="M12 2.8a6.2 6.2 0 0 0-3.4 11.4V17h6.8v-2.8A6.2 6.2 0 0 0 12 2.8Z" />
+  </svg>
+);
+
+export const IconPhone = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M6.2 3.5h3.2l1.4 3.6-2 1.4a10.5 10.5 0 0 0 5.2 5.2l1.4-2 3.6 1.4v3.2c0 1.2-1 2.2-2.2 2.2C10.3 18.5 5.5 13.7 4 6.2c-.15-1.2.9-2.7 2.2-2.7Z" />
+  </svg>
+);
+
+export const IconPill = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-45 12 12)" />
+    <path d="M9 9 15 15" />
+  </svg>
+);
+
+export const IconSun = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <circle cx="12" cy="12" r="4.2" />
+    <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6" />
+  </svg>
+);
+
+export const IconStar = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9 7.3 14.4 2.6 9.8l6.5-.9z" />
+  </svg>
+);

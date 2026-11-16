@@ -1,0 +1,175 @@
+-- 시니어 종합 플랫폼 (senior-life-platform) Supabase 스키마
+-- Supabase SQL Editor 에 통째로 붙여 넣고 실행하세요.
+-- 앱은 NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY(또는 anon key)로 PostgREST 를 사용합니다.
+
+create extension if not exists "pgcrypto";
+
+/* ------------------------------------------------------------------ */
+/* 1. 사용자                                                          */
+/* ------------------------------------------------------------------ */
+create table if not exists public.users (
+  id             uuid primary key default gen_random_uuid(),
+  code           text unique not null,              -- 기기 코드(가족 코드로도 사용, 6자리)
+  external_id    text,                              -- 앱 내부 id (u_xxx / kakao_xxx)
+  nickname       text not null,
+  birth_year     int  not null check (birth_year between 1900 and 2020),
+  sido           text not null default '',
+  sigungu        text not null default '',
+  source         text not null default 'demo' check (source in ('demo','kakao')),
+  created_at     timestamptz not null default now(),
+  last_seen_at   timestamptz not null default now()
+);
+
+create index if not exists users_region_idx on public.users (sido, sigungu);
+create index if not exists users_birth_idx  on public.users (birth_year);
+
+/* ------------------------------------------------------------------ */
+/* 2. 퀴즈 기록                                                        */
+/* ------------------------------------------------------------------ */
+create table if not exists public.quiz_logs (
+  id          bigserial primary key,
+  user_code   text not null references public.users(code) on delete cascade,
+  quiz_date   date not null default (now() at time zone 'Asia/Seoul')::date,
+  week_id     text not null,                        -- 2026-W47
+  correct     int  not null check (correct between 0 and 3),
+  total       int  not null check (total between 1 and 3),
+  points      int  not null default 0,
+  seconds     int  not null default 0,
+  types       text[] not null default '{}',
+  created_at  timestamptz not null default now(),
+  unique (user_code, quiz_date)
+);
+
+create index if not exists quiz_week_idx on public.quiz_logs (week_id);
+create index if not exists quiz_user_idx on public.quiz_logs (user_code, quiz_date desc);
+
+/* ------------------------------------------------------------------ */
+/* 3. 주간 랭킹 집계 (매주 월요일 0시 KST 리셋 = week_id 변경)          */
+/* ------------------------------------------------------------------ */
+create table if not exists public.rankings_weekly (
+  id          bigserial primary key,
+  week_id     text not null,
+  scope       text not null check (scope in ('region','zodiac','streak')),
+  region      text not null default '',             -- '충청북도/옥천군' 또는 띠 이름
+  user_code   text not null references public.users(code) on delete cascade,
+  nickname    text not null,
+  points      int  not null default 0,
+  streak      int  not null default 0,
+  rank        int,
+  updated_at  timestamptz not null default now(),
+  unique (week_id, scope, region, user_code)
+);
+
+create index if not exists ranking_lookup_idx on public.rankings_weekly (week_id, scope, region, points desc);
+
+/* ------------------------------------------------------------------ */
+/* 4. 복약 체크 (아침/저녁)                                            */
+/* ------------------------------------------------------------------ */
+create table if not exists public.med_checks (
+  id          bigserial primary key,
+  user_code   text not null references public.users(code) on delete cascade,
+  check_date  date not null default (now() at time zone 'Asia/Seoul')::date,
+  morning     boolean not null default false,
+  evening     boolean not null default false,
+  updated_at  timestamptz not null default now(),
+  unique (user_code, check_date)
+);
+
+/* ------------------------------------------------------------------ */
+/* 5. 접속(출석) 기록 — 개근상 계산                                    */
+/* ------------------------------------------------------------------ */
+create table if not exists public.daily_visits (
+  id          bigserial primary key,
+  user_code   text not null references public.users(code) on delete cascade,
+  visit_date  date not null default (now() at time zone 'Asia/Seoul')::date,
+  created_at  timestamptz not null default now(),
+  unique (user_code, visit_date)
+);
+
+/* ------------------------------------------------------------------ */
+/* 6. 가족 연결 (자녀가 부모님 코드로 안부 확인)                        */
+/* ------------------------------------------------------------------ */
+create table if not exists public.family_links (
+  id            bigserial primary key,
+  parent_code   text not null references public.users(code) on delete cascade,
+  child_label   text,                               -- '딸', '아들' 등 자유 입력
+  child_contact text,
+  created_at    timestamptz not null default now(),
+  unique (parent_code, child_label)
+);
+
+/* ------------------------------------------------------------------ */
+/* 7. 안부 메시지 (원터치 안부 전송 기록)                               */
+/* ------------------------------------------------------------------ */
+create table if not exists public.anbu_messages (
+  id          bigserial primary key,
+  user_code   text not null references public.users(code) on delete cascade,
+  sent_date   date not null default (now() at time zone 'Asia/Seoul')::date,
+  channel     text not null default 'kakao' check (channel in ('kakao','share','copy','sms')),
+  note        text,
+  created_at  timestamptz not null default now()
+);
+
+/* ------------------------------------------------------------------ */
+/* 8. 주간 자동 집계 함수 — 매주 월요일 0시(KST) 이전 주 실적을 집계      */
+/* ------------------------------------------------------------------ */
+create or replace function public.refresh_weekly_rankings(p_week text default null)
+returns void
+language sql
+security definer
+as $$
+  insert into public.rankings_weekly as r (week_id, scope, region, user_code, nickname, points, streak)
+  select
+    q.week_id,
+    'region' as scope,
+    u.sido || '/' || u.sigungu as region,
+    q.user_code,
+    u.nickname,
+    sum(q.points)::int as points,
+    max(0, count(distinct q.quiz_date))::int as streak
+  from public.quiz_logs q
+  join public.users u on u.code = q.user_code
+  where (p_week is null or q.week_id = p_week)
+  group by q.week_id, u.sido, u.sigungu, q.user_code, u.nickname
+  on conflict (week_id, scope, region, user_code)
+  do update set points = excluded.points, streak = excluded.streak, nickname = excluded.nickname, updated_at = now();
+
+  with ranked as (
+    select id, rank() over (partition by week_id, scope, region order by points desc, streak desc) as rk
+    from public.rankings_weekly
+    where (p_week is null or week_id = p_week)
+  )
+  update public.rankings_weekly r set rank = ranked.rk from ranked where r.id = ranked.id;
+$$;
+
+/* Supabase 스케줄러(pg_cron)를 쓸 수 있으면 매주 월요일 00:05 KST 에 집계 */
+-- select cron.schedule('weekly-rankings', '5 15 * * 0', $$select public.refresh_weekly_rankings()$$);
+
+/* ------------------------------------------------------------------ */
+/* 9. 조회용 뷰 — 상위 10명 + 내 순위                                    */
+/* ------------------------------------------------------------------ */
+create or replace view public.v_weekly_top as
+select week_id, scope, region, rank, nickname, points, streak
+from public.rankings_weekly
+where rank <= 10
+order by week_id desc, scope, region, rank;
+
+/* ------------------------------------------------------------------ */
+/* 10. RLS — 데모에서 anon 키로 읽기만 허용, 쓰기는 service_role        */
+/* ------------------------------------------------------------------ */
+alter table public.users            enable row level security;
+alter table public.quiz_logs        enable row level security;
+alter table public.rankings_weekly  enable row level security;
+alter table public.med_checks       enable row level security;
+alter table public.daily_visits     enable row level security;
+alter table public.family_links     enable row level security;
+alter table public.anbu_messages    enable row level security;
+
+-- 랭킹은 누구나 읽을 수 있게
+drop policy if exists "rankings_read_all" on public.rankings_weekly;
+create policy "rankings_read_all" on public.rankings_weekly for select using (true);
+
+-- service_role 은 RLS 를 우회하므로 별도 정책 불필요.
+-- anon 키로 직접 쓰기가 필요하면 아래 정책을 쓰되, 운영에서는 service_role 경유를 권장합니다.
+-- drop policy if exists "users_insert_anon" on public.users;
+-- create policy "users_insert_anon" on public.users for insert with check (true);

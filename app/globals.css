@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --app-font: 18px;
+  --ink: #14213a;
+  --paper: #fffbf1;
+}
+
+html {
+  font-size: var(--app-font);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: #f3ecdd;
+  color: var(--ink);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+    system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* 시니어용 고대비 큰 터치 영역 */
+.touch-btn {
+  min-height: 56px;
+  border-radius: 1rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 1.1rem;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+.touch-btn:active {
+  transform: translateY(2px) scale(0.995);
+}
+
+.card {
+  background: #fff;
+  border: 2px solid rgba(20, 33, 58, 0.1);
+  border-radius: 1.25rem;
+  box-shadow: 0 6px 18px -14px rgba(20, 33, 58, 0.55);
+}
+
+.section-title {
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.field {
+  width: 100%;
+  min-height: 54px;
+  border: 2px solid rgba(20, 33, 58, 0.18);
+  border-radius: 0.9rem;
+  padding: 0 0.9rem;
+  font-size: 1.05rem;
+  background: #fff;
+  color: var(--ink);
+}
+.field:focus {
+  outline: none;
+  border-color: #17509e;
+  box-shadow: 0 0 0 4px rgba(23, 80, 158, 0.16);
+}
+
+select.field {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #14213a 50%),
+    linear-gradient(135deg, #14213a 50%, transparent 50%);
+  background-position: calc(100% - 22px) 24px, calc(100% - 15px) 24px;
+  background-size: 7px 7px, 7px 7px;
+  background-repeat: no-repeat;
+  padding-right: 2.4rem;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 하단 안전 영역(iPhone 홈 인디케이터) */
+.pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fadeUp 0.32s ease both;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.pop {
+  animation: pop 0.4s ease both;
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.floaty {
+  animation: floaty 3.2s ease-in-out infinite;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .no-print {
+    display: none;
+  }
+}
