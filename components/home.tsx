@@ -61,8 +61,8 @@ export function HomeTab({
     [profile?.nickname, profile?.birthYear, profile?.birthTime, today]
   );
   const dateLabel = longKoreanDate(today);
-  /** 맑은 날에는 3D 날씨 아이콘, 비·눈·흐림에는 상태를 살린 그림을 쓴다 */
-  const clearSky = !/비|눈|흐림|안개|구름|소나기|천둥|이슬비/.test(weather?.label || "맑음");
+  /** 맑음·구름은 3D 날씨 아이콘, 비·눈·안개는 상태를 살린 그림을 그대로 쓴다 */
+  const weather3D = !/비|눈|소나기|천둥|이슬비|안개/.test(weather?.label || "맑음");
 
   useEffect(() => {
     if (!profile) return;
@@ -234,7 +234,7 @@ export function HomeTab({
         onClick={() => setWeatherOpen(true)}
         className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
       >
-        {clearSky ? (
+        {weather3D ? (
           <Icon3D name="icon-3d-weather" size={56} className="drop-shadow-[0_10px_16px_rgba(60,120,180,0.32)]" />
         ) : (
           <RaisedTile tone="sky" size={56}>
