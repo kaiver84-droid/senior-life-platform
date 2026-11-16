@@ -28,10 +28,12 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
       id: string;
       nickname: string;
       birthYear: number;
+      birthTime?: string;
       sido: string;
       sigungu: string;
       source: string;
       createdAt: string;
+      profileCompleted?: boolean;
     };
     quizLogs?: {
       date: string;

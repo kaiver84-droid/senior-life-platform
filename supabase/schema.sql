@@ -13,12 +13,22 @@ create table if not exists public.users (
   external_id    text,                              -- 앱 내부 id (u_xxx / kakao_xxx)
   nickname       text not null,
   birth_year     int  not null check (birth_year between 1900 and 2020),
+  birth_time     text not null default '모름',          -- 태어난 시간(십이시진): 자시 … 해시 / 모름
   sido           text not null default '',
   sigungu        text not null default '',
   source         text not null default 'demo' check (source in ('demo','kakao')),
+  -- 최초 1회 초기 설정(이름·태어난해·태어난시간·지역)을 마쳤는지 — true 면 재로그인 시 설정 화면을 건너뛴다
+  profile_completed boolean not null default false,
   created_at     timestamptz not null default now(),
   last_seen_at   timestamptz not null default now()
 );
+
+-- 이미 만들어진 DB에도 두 열을 더한다(있으면 그대로 둔다).
+alter table public.users add column if not exists birth_time text not null default '모름';
+alter table public.users add column if not exists profile_completed boolean not null default false;
+
+-- 로그인한 사람을 카카오 회원번호(external_id)로 찾을 수 있게
+create index if not exists users_external_idx on public.users (external_id);
 
 create index if not exists users_region_idx on public.users (sido, sigungu);
 create index if not exists users_birth_idx  on public.users (birth_year);

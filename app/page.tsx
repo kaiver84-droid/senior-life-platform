@@ -2,8 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { AppProvider, useApp } from "@/lib/storage";
-import { ToastProvider, Sheet, BigButton, Divider, Badge } from "@/components/ui";
+import { ToastProvider, Sheet, BigButton, Divider, Badge, useToast } from "@/components/ui";
 import { Onboarding } from "@/components/onboarding";
+import {
+  DEFAULT_SIDO,
+  DEFAULT_SIGUNGU,
+  ProfileFields,
+  type ProfileDraft,
+} from "@/components/profile-fields";
+import { UNKNOWN_BIRTH_TIME, birthTimeLabel } from "@/lib/birthtime";
 import { HomeTab } from "@/components/home";
 import { QuizTab } from "@/components/quiz";
 import { WelfareTab } from "@/components/welfare";
@@ -36,10 +43,19 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 const FONT_LABEL: Record<number, string> = { 18: "보통", 21: "크게", 24: "아주 크게" };
 
 function Shell() {
-  const { ready, profile, fontSize, setFontSize, logout, code } = useApp();
+  const { ready, profile, fontSize, setFontSize, logout, code, updateProfile } = useApp();
+  const { show } = useToast();
   const [tab, setTab] = useState<TabKey>("home");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<ProfileDraft>({
+    nickname: "",
+    birthYear: 1952,
+    birthTime: UNKNOWN_BIRTH_TIME,
+    sido: DEFAULT_SIDO,
+    sigungu: DEFAULT_SIGUNGU,
+  });
 
   useEffect(() => {
     const fromHash = (window.location.hash || "").replace("#", "") as TabKey;
@@ -74,6 +90,40 @@ function Shell() {
 
   const cycleFont = () => {
     setFontSize(fontSize === 18 ? 21 : fontSize === 21 ? 24 : 18);
+  };
+
+  const startEdit = () => {
+    if (!profile) return;
+    setEditDraft({
+      nickname: profile.nickname,
+      birthYear: profile.birthYear,
+      birthTime: profile.birthTime || UNKNOWN_BIRTH_TIME,
+      sido: profile.sido || DEFAULT_SIDO,
+      sigungu: profile.sigungu || DEFAULT_SIGUNGU,
+    });
+    setEditOpen(true);
+  };
+
+  const saveEdit = () => {
+    const name = editDraft.nickname.trim();
+    if (!name) {
+      show("이름을 먼저 적어 주세요.");
+      return;
+    }
+    if (!editDraft.sido || !editDraft.sigungu) {
+      show("사는 지역을 골라 주세요.");
+      return;
+    }
+    updateProfile({
+      nickname: name,
+      birthYear: editDraft.birthYear,
+      birthTime: editDraft.birthTime || UNKNOWN_BIRTH_TIME,
+      sido: editDraft.sido,
+      sigungu: editDraft.sigungu,
+      profileCompleted: true,
+    });
+    setEditOpen(false);
+    show("내 정보를 저장했어요.");
   };
 
   return (
@@ -146,25 +196,54 @@ function Shell() {
 
       <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="내 정보 · 설정">
         <div className="rounded-3xl bg-white p-4 shadow-soft">
-          <div className="flex items-center gap-3">
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-light text-[1.2rem] font-black text-brand-dark">
-              {profile.nickname.slice(0, 1)}
-            </span>
+          {editOpen ? (
             <div>
-              <p className="text-[1.15rem] font-black">{profile.nickname} 님</p>
-              <p className="text-[0.9rem] font-semibold text-ink/55">
-                {profile.birthYear}년생 ({2026 - profile.birthYear}세) · {profile.sido} {profile.sigungu}
+              <p className="mb-3 text-[1rem] font-black">내 정보 고치기</p>
+              <ProfileFields
+                value={editDraft}
+                onChange={(patch) => setEditDraft((d) => ({ ...d, ...patch }))}
+                idPrefix="edit"
+              />
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <BigButton variant="white" onClick={() => setEditOpen(false)}>
+                  그만두기
+                </BigButton>
+                <BigButton variant="ink" onClick={saveEdit}>
+                  저장
+                </BigButton>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-light text-[1.2rem] font-black text-brand-dark">
+                  {profile.nickname.slice(0, 1)}
+                </span>
+                <div>
+                  <p className="text-[1.15rem] font-black">{profile.nickname} 님</p>
+                  <p className="text-[0.9rem] font-semibold text-ink/55">
+                    {profile.birthYear}년생 ({2026 - profile.birthYear}세) · {profile.sido} {profile.sigungu}
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-ink/45">
+                    태어난 시간 · {birthTimeLabel(profile.birthTime)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <BigButton variant="white" full onClick={startEdit}>
+                  내 정보 고치기
+                </BigButton>
+              </div>
+              <Divider />
+              <div className="flex items-center justify-between">
+                <p className="text-[0.9rem] font-semibold text-ink/55">가족 코드</p>
+                <p className="tabular text-[1.1rem] font-black tracking-[0.16em] text-brand-dark">{code}</p>
+              </div>
+              <p className="mt-1 text-[0.78rem] font-medium leading-relaxed text-ink/45">
+                내 정보는 이 기기에 저장되고, 다시 카카오톡으로 로그인하면 그대로 이어져요.
               </p>
             </div>
-          </div>
-          <Divider />
-          <div className="flex items-center justify-between">
-            <p className="text-[0.9rem] font-semibold text-ink/55">가족 코드</p>
-            <p className="tabular text-[1.1rem] font-black tracking-[0.16em] text-brand-dark">{code}</p>
-          </div>
-          <p className="mt-1 text-[0.78rem] font-medium leading-relaxed text-ink/45">
-            이 기기의 브라우저에만 저장돼요. 앱을 지우면 기록도 함께 지워집니다.
-          </p>
+          )}
         </div>
 
         <div className="mt-3 rounded-3xl bg-white p-4 shadow-soft">

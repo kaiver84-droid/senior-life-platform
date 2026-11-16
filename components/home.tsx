@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getFortune, shortFortuneLine, type Fortune } from "@/lib/fortune";
+import { JISIN_LINES } from "@/lib/birthtime";
 import { fetchWeather, type WeatherInfo } from "@/lib/weather";
 import { renderGreetingCard, downloadCanvas, THEMES, type GreetingTheme } from "@/lib/canvas";
 import { kakaoConfig, shareCard, shareMessageText } from "@/lib/share";
@@ -53,8 +54,8 @@ export function HomeTab({
   const [studio, setStudio] = useState<{ open: boolean; autoShare: boolean }>({ open: false, autoShare: false });
 
   const fortune = useMemo(
-    () => getFortune(profile?.nickname || "이용자", profile?.birthYear || 1955, today),
-    [profile?.nickname, profile?.birthYear, today]
+    () => getFortune(profile?.nickname || "이용자", profile?.birthYear || 1955, today, profile?.birthTime),
+    [profile?.nickname, profile?.birthYear, profile?.birthTime, today]
   );
   const dateLabel = longKoreanDate(today);
 
@@ -282,7 +283,12 @@ export function HomeTab({
         <NeulbomMark size={16} /> 늘봄과 함께, 더 편안한 하루
       </p>
 
-      <Sheet open={fortuneOpen} onClose={() => setFortuneOpen(false)} title="오늘의 운세" subtitle={`${koreanDate(today)} · ${fortune.zodiac}띠`}>
+      <Sheet
+        open={fortuneOpen}
+        onClose={() => setFortuneOpen(false)}
+        title="오늘의 운세"
+        subtitle={`${koreanDate(today)} · ${fortune.zodiac}띠${fortune.birthTime ? ` · ${fortune.birthTime}생` : ""}`}
+      >
         <FortuneDetail fortune={fortune} />
       </Sheet>
 
@@ -315,17 +321,23 @@ function FortuneDetail({ fortune }: { fortune: Fortune }) {
     ["💚", "건강", fortune.health],
     ["🤝", "인연", fortune.social],
   ];
+  const jisin = fortune.birthTime ? JISIN_LINES[fortune.birthTime] : undefined;
   return (
     <div className="space-y-3">
       <div className="rounded-[1.5rem] bg-white p-5 text-center shadow-soft">
         <div className="mx-auto mb-2 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[#FFE6D6] to-[#FFD3C4] text-[2rem]">
-          {fortune.zodiacEmoji}
+          {jisin?.emoji || fortune.zodiacEmoji}
         </div>
         <p className="text-[1.3rem] font-black leading-snug text-brand-deep">{fortune.headline}</p>
         <div className="mt-1 flex items-center justify-center gap-2">
           <Stars n={fortune.stars} />
           <span className="tabular text-[0.95rem] font-extrabold text-ink/55">{fortune.score}점</span>
         </div>
+        {fortune.timeTrait ? (
+          <p className="mt-2 text-[0.86rem] font-semibold leading-relaxed text-ink/45">
+            {fortune.birthTime}에 태어나 {fortune.timeTrait}
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
@@ -341,6 +353,17 @@ function FortuneDetail({ fortune }: { fortune: Fortune }) {
               </p>
             </div>
           ))}
+          {fortune.timeTip ? (
+            <div className="flex gap-2.5">
+              <span aria-hidden className="text-[1.2rem] leading-6">
+                {jisin?.emoji || "🕰️"}
+              </span>
+              <p className="text-[0.98rem] font-semibold leading-snug text-ink/80">
+                <span className="mr-1 font-black text-ink">{fortune.birthTime} 팁</span>
+                {fortune.timeTip}
+              </p>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -442,8 +465,8 @@ function GreetingSheet({
   const shared = useRef(false);
 
   const fortune = useMemo(
-    () => getFortune(profile?.nickname || "이용자", profile?.birthYear || 1955, today),
-    [profile?.nickname, profile?.birthYear, today]
+    () => getFortune(profile?.nickname || "이용자", profile?.birthYear || 1955, today, profile?.birthTime),
+    [profile?.nickname, profile?.birthYear, profile?.birthTime, today]
   );
 
   // 카드 캔버스는 시트 포털이 그려진 뒤에 마운트되므로, 그릴 준비 상태를 자식이 알려 준다.

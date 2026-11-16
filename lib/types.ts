@@ -1,13 +1,17 @@
 export type Profile = {
-  /** 기기별 식별자 (가족 확인용 코드로도 사용) */
+  /** 사람 식별자 (카카오 로그인이면 kakao_xxx, 가족 확인용 코드로도 사용) */
   id: string;
   nickname: string;
   birthYear: number;
+  /** 태어난 시간 — 십이시진 이름("자시" … "해시") 또는 "모름" */
+  birthTime?: string;
   sido: string;
   sigungu: string;
   createdAt: string;
   source: "demo" | "kakao";
   avatar?: string;
+  /** 로그인 후 최초 1회 초기 설정(이름·태어난해·태어난시간·지역)을 마쳤는지 */
+  profileCompleted?: boolean;
 };
 
 import type { FamilyEvent } from "./calendar";

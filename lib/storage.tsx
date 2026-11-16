@@ -103,7 +103,7 @@ type Ctx = {
   weekId: string;
   weekPoints: number;
   todayDaily: DailyQuiz | null;
-  saveProfile: (p: Omit<Profile, "id" | "createdAt">) => Profile;
+  saveProfile: (p: Omit<Profile, "id" | "createdAt"> & { id?: string }) => Profile;
   updateProfile: (patch: Partial<Profile>) => void;
   logout: () => void;
   toggleMed: (slot: "morning" | "evening") => void;
@@ -159,9 +159,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [ready, state.profile, state.quizLogs, state.med, state.visits, state.familyEvents]);
 
-  const saveProfile = useCallback((p: Omit<Profile, "id" | "createdAt">) => {
+  const saveProfile = useCallback((p: Omit<Profile, "id" | "createdAt"> & { id?: string }) => {
     const now = new Date();
-    const id = `u_${now.getTime().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    // 카카오 로그인이면 kakao_xxx 를 그대로 쓴다 — 다른 기기에서 다시 로그인해도 같은 사람으로 이어진다.
+    const id = p.id || `u_${now.getTime().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const profile: Profile = { ...p, id, createdAt: now.toISOString() };
     setState((s) => ({ ...s, profile }));
     return profile;

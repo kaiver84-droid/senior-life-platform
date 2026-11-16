@@ -11,3 +11,6 @@ out/
 __pycache__/
 *.pyc
 .supabase_token
+
+# 로컬 검증용 번들 결과물
+e2e/.local-api.mjs

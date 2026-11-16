@@ -1,4 +1,5 @@
 import { kstDate } from "./week";
+import { JISIN_LINES, UNKNOWN_BIRTH_TIME, birthTimeShort } from "./birthtime";
 
 export const ZODIAC = ["쥐", "소", "호랑이", "토끼", "용", "뱀", "말", "양", "원숭이", "닭", "개", "돼지"] as const;
 export type Zodiac = (typeof ZODIAC)[number];
@@ -50,6 +51,10 @@ export type Fortune = {
   luckyTime: string;
   zodiac: Zodiac;
   zodiacEmoji: string;
+  /** 태어난 시간(시진)이 저장되어 있을 때만 채워지는 시간대 한마디 */
+  birthTime?: string;
+  timeTrait?: string;
+  timeTip?: string;
 };
 
 const GENERAL = [
@@ -112,12 +117,20 @@ const COLORS = [
 const DIRECTIONS = ["동쪽", "서쪽", "남쪽", "북쪽", "남동쪽", "남서쪽"];
 const TIMES = ["아침 7시~9시", "오전 10시~12시", "오후 1시~3시", "오후 3시~5시", "저녁 6시~8시"];
 
-export function getFortune(nickname: string, birthYear: number, date: string = kstDate()): Fortune {
+export function getFortune(
+  nickname: string,
+  birthYear: number,
+  date: string = kstDate(),
+  birthTime?: string
+): Fortune {
   const zodiac = zodiacOf(birthYear);
-  const key = `${date}|${birthYear}|${nickname}`;
+  const jisin = birthTime && birthTime !== UNKNOWN_BIRTH_TIME ? birthTimeShort(birthTime) : "";
+  // 태어난 시간까지 알면 그 사람만의 시드가 되어, 사주 시간대 팁이 따로 나온다.
+  const key = `${date}|${birthYear}|${nickname}${jisin ? `|${jisin}` : ""}`;
   const h = hash(key);
   const h2 = hash(key + "|b");
   const h3 = hash(key + "|c");
+  const info = jisin ? JISIN_LINES[jisin] : undefined;
 
   const score = 62 + (h % 37); // 62 ~ 98
   const stars = score >= 90 ? 5 : score >= 82 ? 4 : score >= 72 ? 3 : 2;
@@ -145,6 +158,9 @@ export function getFortune(nickname: string, birthYear: number, date: string = k
     luckyTime: pick(TIMES, h3 >> 8),
     zodiac,
     zodiacEmoji: ZODIAC_EMOJI[zodiac],
+    birthTime: jisin || undefined,
+    timeTrait: info?.trait,
+    timeTip: info ? pick(info.tips, h3 >> 11) : undefined,
   };
 }
 

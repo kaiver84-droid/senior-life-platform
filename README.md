@@ -88,7 +88,10 @@ PY
 python3 scripts/apply_integrations.py --deploy
 ```
 
-### 카카오 로그인 흐름
+### 카카오 로그인 흐름(로그인 전용 → 최초 1회 설정)
+
+첫 화면은 **카카오톡 로그인 전용**입니다. 로그인 전에는 이름·태어난 해·지역 입력 폼을 보여 주지 않고
+브랜드 소개와 **[카카오톡으로 시작하기]** 버튼만 둡니다(카카오 키가 없는 개발 빌드에서만 '카카오 없이 둘러보기'가 보입니다).
 
 1. 온보딩 화면의 **카카오톡으로 시작하기**
    - `NEXT_PUBLIC_KAKAO_JS_KEY` 가 있으면 Kakao JS SDK(`t1.kakaocdn.net` 2.7.4)를 미리 불러 두고,
@@ -107,6 +110,18 @@ python3 scripts/apply_integrations.py --deploy
 `https://senior-life-platform.pages.dev/api/auth/kakao` 도 함께 등록해 두면 code 를 직접 확인할 때 편하다.
 JS SDK 간편로그인을 쓰려면 **플랫폼 > Web > 사이트 도메인**에 `https://senior-life-platform.pages.dev`,
 **카카오 로그인 > 일반**에서 카카오 로그인 사용 설정이 켜져 있어야 한다.
+
+#### 로그인 직후 — 최초 1회 초기 설정
+
+4. 토큰 교환이 끝나면 앱은 `makeCode(profile.id)`(카카오 회원번호 기반 `kakao_xxx`)로 `GET /api/state?code=` 를 불러
+   이미 `profile_completed = true` 인 사람인지 확인한다.
+   - **처음**이면 → 초기 설정 화면: `이름(카카오 닉네임 기본값) · 태어난 해(1930~1985, 기본 1952) ·
+     태어난 시간(자시~해시 12시진 + 모름) · 사는 지역(시·도) · 시·군·구` → **[저장하고 늘봄 시작하기]**
+   - **이미 설정을 마친 사람**(다른 기기에서 다시 로그인 포함)이면 → DB 프로필을 그대로 불러와 설정 화면 없이 **바로 홈**
+5. 저장하면 `localStorage`(`seniorLife.v1`)와 Supabase `users` 행에 함께 남는다
+   (`birth_time`, `profile_completed` 열 — `supabase/schema.sql` 참고, 기존 DB에는 `alter table` 로 추가).
+   이후 ⚙ **설정 > 내 정보 고치기** 에서 이름·태어난 해·태어난 시간·지역을 언제든 고칠 수 있다.
+6. 태어난 시간은 `lib/fortune.ts` 의 오늘의 운세 시드와 **시진 성향·시간대 팁**에 반영된다(모르면 표시하지 않음).
 
 ### 환경변수 (전부 선택 — 없으면 데모 모드)
 
@@ -163,6 +178,8 @@ supabase/schema.sql DB 스키마
   (체험 로그인 → 인사카드 캔버스 → 퀴즈 3문제·금빛 상장 → 시상대 → 지원금 3단계 → 돋보기·가이드 → 복약·가족 대시보드
   → 가족안부달력 일정 추가·삭제·4갈래 소식 필터·자녀 화면 공유 일정)
 - 카카오 로그인 검증: `BASE=https://senior-life-platform.pages.dev python3 e2e/test_kakao_talk.py`
+- 로그인 전용 첫 화면 + 최초 1회 설정(이름·태어난해·태어난시간·지역) + 재로그인 스킵 검증:
+  `python3 e2e/test_kakao_onboarding.py` (카카오 인가만 스텁, 저장·조회는 같은 핸들러 + 실제 Supabase)
 - 스크린샷: `python3 e2e/capture_neulbom.py` →
   `downloads/neulbom_home.png`, `neulbom_quiz.png`, `neulbom_ranking_welfare.png`, `neulbom_tools_family.png`
 

@@ -20,10 +20,15 @@ export type StoredProfile = {
   id: string;
   nickname: string;
   birthYear: number;
+  /** 십이시진 이름("자시" … "해시") 또는 "모름" */
+  birthTime?: string;
   sido: string;
   sigungu: string;
   source: string;
   createdAt: string;
+  /** 최초 1회 초기 설정을 마쳤는지 — true 면 다시 로그인해도 설정 화면을 건너뛴다 */
+  profileCompleted?: boolean;
+  avatar?: string;
 };
 
 export type StoredQuizLog = {
@@ -153,10 +158,12 @@ export async function upsertUser(env: DbEnv, code: string, profile: StoredProfil
         code,
         nickname: profile.nickname,
         birth_year: profile.birthYear,
+        birth_time: profile.birthTime || "모름",
         sido: profile.sido,
         sigungu: profile.sigungu,
         source: profile.source,
         external_id: profile.id,
+        profile_completed: Boolean(profile.profileCompleted),
         last_seen_at: new Date().toISOString(),
       },
     ]),
@@ -275,10 +282,13 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
           id: u.external_id || code,
           nickname: u.nickname,
           birthYear: u.birth_year,
+          birthTime: u.birth_time || "모름",
           sido: u.sido,
           sigungu: u.sigungu,
           source: u.source || "demo",
           createdAt: u.created_at,
+          profileCompleted: Boolean(u.profile_completed),
+          avatar: u.avatar || undefined,
         }
       : null,
     quizLogs: (Array.isArray(quiz) ? quiz : []).map(

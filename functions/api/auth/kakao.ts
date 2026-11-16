@@ -93,7 +93,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
       createdAt: new Date().toISOString(),
       avatar: me.kakao_account?.profile?.profile_image_url,
     };
-    return json({ ok: true, profile, needsProfile: !birthYear || true });
+    return json({ ok: true, profile, needsProfile: true });
   } catch (e) {
     return json({ ok: false, error: String(e).slice(0, 300) }, 500);
   }
