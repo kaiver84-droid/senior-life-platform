@@ -1,8 +1,7 @@
 # Cloudflare Pages 프로젝트 설정
 # 배포: npm run build && npx wrangler pages deploy out --project-name senior-life-platform
+# 환경변수는 Cloudflare Pages 프로젝트 설정(Settings → Environment variables)에만 둡니다.
+# (wrangler.toml 의 [vars] 는 배포 시 프로젝트 환경변수를 덮어쓰므로 쓰지 않습니다.)
 name = "senior-life-platform"
 compatibility_date = "2026-11-01"
 pages_build_output_dir = "out"
-
-[vars]
-NEXT_PUBLIC_SITE_URL = "https://senior-life-platform.pages.dev"
