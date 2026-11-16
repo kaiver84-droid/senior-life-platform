@@ -7,6 +7,7 @@ import { ToastProvider, Badge, BigButton, Card, Divider, SectionTitle, useToast 
 import { NeulbomLogo } from "@/components/art";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
+import { dayTitle, ddayLabel, kindInfo, upcomingEvents, type FamilyEvent } from "@/lib/calendar";
 import { IconCalendar, IconPhone } from "@/components/icons";
 import type { AppState } from "@/lib/types";
 
@@ -15,6 +16,7 @@ type RemoteState = {
   quizLogs: { date: string; points: number; correct: number; total: number }[];
   med: Record<string, { morning: boolean; evening: boolean }>;
   visits: string[];
+  familyEvents?: FamilyEvent[];
 };
 
 function Dashboard() {
@@ -41,6 +43,7 @@ function Dashboard() {
             quizLogs: j.state.quizLogs || [],
             med: j.state.med || {},
             visits: j.state.visits || [],
+            familyEvents: Array.isArray(j.state.familyEvents) ? j.state.familyEvents : [],
           });
         }
       })
@@ -56,6 +59,7 @@ function Dashboard() {
     quizLogs: AppState["quizLogs"];
     med: AppState["med"];
     visits: string[];
+    familyEvents: FamilyEvent[];
   } =
     useRemote && remote
       ? {
@@ -65,6 +69,7 @@ function Dashboard() {
           quizLogs: remote.quizLogs as AppState["quizLogs"],
           med: remote.med,
           visits: remote.visits,
+          familyEvents: remote.familyEvents || [],
         }
       : {
           name: profile?.nickname || "부모님",
@@ -73,6 +78,7 @@ function Dashboard() {
           quizLogs: state.quizLogs,
           med: state.med,
           visits: state.visits,
+          familyEvents: state.familyEvents,
         };
 
   const todayMed = data.med[today] ?? { morning: false, evening: false };
@@ -80,6 +86,7 @@ function Dashboard() {
   const todayPoints = todayLogs.reduce((a, b) => a + b.points, 0);
   const visitedToday = data.visits.includes(today);
   const parentStreak = calcStreak({ ...state, quizLogs: data.quizLogs, med: data.med, visits: data.visits }, today);
+  const familyUpcoming = upcomingEvents(data.familyEvents, today, 180, 4);
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today + "T00:00:00Z");
@@ -239,6 +246,31 @@ function Dashboard() {
             <IconPhone size={20} /> 부모님께 전화하기
           </BigButton>
         </div>
+      </Card>
+
+      <Card className="mb-3 rounded-[1.6rem] p-4">
+        <SectionTitle emoji="📅" right={<Badge tone="gold">함께 보는 달력</Badge>}>
+          가족 일정
+        </SectionTitle>
+        {familyUpcoming.length === 0 ? (
+          <p className="text-[0.92rem] font-semibold leading-relaxed text-ink/55">
+            아직 달력에 넣어 둔 일정이 없어요. 부모님 화면의 <b className="text-ink">가족</b> 탭에서 생일·기념일을
+            넣으면 여기에 함께 보여요.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {familyUpcoming.map((u) => (
+              <div key={`${u.event.id}-${u.date}`} className="flex items-center gap-2 rounded-xl bg-paper px-3 py-2">
+                <span aria-hidden>{kindInfo(u.event.kind).emoji}</span>
+                <span className="min-w-0 flex-1 truncate text-[0.95rem] font-black text-ink">{u.event.title}</span>
+                <span className="shrink-0 text-[0.78rem] font-bold text-ink/50">{dayTitle(u.date)}</span>
+                <span className="shrink-0 rounded-full bg-coral-light px-2 py-0.5 text-[0.72rem] font-black text-coral-dark">
+                  {ddayLabel(u.days)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       <p className="mt-2 rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.78rem] font-semibold leading-relaxed text-ink/45">

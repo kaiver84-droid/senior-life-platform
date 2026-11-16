@@ -2,6 +2,8 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, DailyQuiz, Profile, QuizLog, QuizType } from "./types";
+import type { FamilyEvent } from "./calendar";
+import { isValidDateKey, newEventId } from "./calendar";
 import { kstDate, weekIdOf } from "./week";
 
 const KEY = "seniorLife.v1";
@@ -14,6 +16,7 @@ function emptyState(): AppState {
     daily: null,
     med: {},
     visits: [],
+    familyEvents: [],
     fontSize: 18,
     lastVisit: "",
   };
@@ -26,7 +29,10 @@ function read(): AppState {
     if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as AppState;
     if (!parsed || parsed.version !== 1) return emptyState();
-    return { ...emptyState(), ...parsed };
+    const merged = { ...emptyState(), ...parsed };
+    // 예전에 저장된 기록에는 가족 일정이 없으므로 빈 목록으로 채운다.
+    if (!Array.isArray(merged.familyEvents)) merged.familyEvents = [];
+    return merged;
   } catch {
     return emptyState();
   }
@@ -78,6 +84,14 @@ export function calcStreak(state: AppState, today: string = kstDate()): number {
 
 type CompleteInput = { correct: number; total: number; points: number; seconds: number; types: QuizType[] };
 
+export type FamilyEventInput = {
+  title: string;
+  date: string;
+  repeatYearly: boolean;
+  kind: FamilyEvent["kind"];
+  memo?: string;
+};
+
 type Ctx = {
   ready: boolean;
   state: AppState;
@@ -94,6 +108,9 @@ type Ctx = {
   logout: () => void;
   toggleMed: (slot: "morning" | "evening") => void;
   completeQuiz: (input: CompleteInput) => void;
+  addFamilyEvent: (input: FamilyEventInput) => FamilyEvent | null;
+  updateFamilyEvent: (id: string, patch: Partial<FamilyEventInput>) => void;
+  removeFamilyEvent: (id: string) => void;
   setFontSize: (size: 18 | 21 | 24) => void;
   refresh: () => void;
 };
@@ -134,12 +151,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           quizLogs: state.quizLogs.slice(-40),
           med: state.med,
           visits: state.visits.slice(-30),
+          familyEvents: state.familyEvents,
           today: kstDate(),
         }),
       }).catch(() => {});
     }, 1200);
     return () => clearTimeout(t);
-  }, [ready, state.profile, state.quizLogs, state.med, state.visits]);
+  }, [ready, state.profile, state.quizLogs, state.med, state.visits, state.familyEvents]);
 
   const saveProfile = useCallback((p: Omit<Profile, "id" | "createdAt">) => {
     const now = new Date();
@@ -197,6 +215,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addFamilyEvent = useCallback((input: FamilyEventInput): FamilyEvent | null => {
+    const title = input.title.trim();
+    if (!title || !isValidDateKey(input.date)) return null;
+    const ev: FamilyEvent = {
+      id: newEventId(),
+      title: title.slice(0, 30),
+      date: input.date,
+      repeatYearly: Boolean(input.repeatYearly),
+      kind: input.kind,
+      memo: input.memo?.trim().slice(0, 40) || undefined,
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, familyEvents: [...s.familyEvents, ev] }));
+    return ev;
+  }, []);
+
+  const updateFamilyEvent = useCallback((id: string, patch: Partial<FamilyEventInput>) => {
+    setState((s) => ({
+      ...s,
+      familyEvents: s.familyEvents.map((ev) => {
+        if (ev.id !== id) return ev;
+        const next: FamilyEvent = { ...ev, ...patch, memo: patch.memo?.trim() || ev.memo };
+        if (patch.title !== undefined) next.title = patch.title.trim().slice(0, 30) || ev.title;
+        if (patch.date !== undefined && !isValidDateKey(patch.date)) next.date = ev.date;
+        return next;
+      }),
+    }));
+  }, []);
+
+  const removeFamilyEvent = useCallback((id: string) => {
+    setState((s) => ({ ...s, familyEvents: s.familyEvents.filter((ev) => ev.id !== id) }));
+  }, []);
+
   const setFontSize = useCallback((size: 18 | 21 | 24) => {
     setState((s) => ({ ...s, fontSize: size }));
   }, []);
@@ -229,6 +280,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     logout,
     toggleMed,
     completeQuiz,
+    addFamilyEvent,
+    updateFamilyEvent,
+    removeFamilyEvent,
     setFontSize,
     refresh,
   };

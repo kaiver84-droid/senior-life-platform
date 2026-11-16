@@ -9,6 +9,7 @@ import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
 import { Badge, BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
+import { HomeCalendarBanner } from "./calendar";
 import { HeroScene, NeulbomMark, WeatherArt } from "./art";
 import {
   IconBank,
@@ -37,7 +38,13 @@ function longKoreanDate(dateStr: string): { date: string; day: string } {
   };
 }
 
-export function HomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
+export function HomeTab({
+  onNavigate,
+  onOpenCalendar,
+}: {
+  onNavigate: (tab: string) => void;
+  onOpenCalendar?: () => void;
+}) {
   const { profile, streak, today, todayDaily, weekPoints } = useApp();
   const { show } = useToast();
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
@@ -225,6 +232,8 @@ export function HomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
         </span>
         <IconChevron size={22} className="shrink-0 text-ink/30" />
       </button>
+
+      <HomeCalendarBanner onOpen={() => onOpenCalendar?.()} />
 
       {/* 2×3 바로가기 */}
       <section className="fade-up">

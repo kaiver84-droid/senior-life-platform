@@ -10,6 +10,7 @@ import { WelfareTab } from "@/components/welfare";
 import { ToolsTab } from "@/components/tools";
 import { FamilyTab } from "@/components/family";
 import { RankingTab } from "@/components/ranking";
+import { CalendarScreen } from "@/components/calendar";
 import { NeulbomMark } from "@/components/art";
 import {
   IconFamily,
@@ -38,6 +39,7 @@ function Shell() {
   const { ready, profile, fontSize, setFontSize, logout, code } = useApp();
   const [tab, setTab] = useState<TabKey>("home");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     const fromHash = (window.location.hash || "").replace("#", "") as TabKey;
@@ -103,12 +105,14 @@ function Shell() {
       </header>
 
       <main className="px-4 pb-safe pt-2">
-        {tab === "home" ? <HomeTab onNavigate={navigate} /> : null}
+        {tab === "home" ? <HomeTab onNavigate={navigate} onOpenCalendar={() => setCalendarOpen(true)} /> : null}
         {tab === "quiz" ? <QuizTab onNavigate={navigate} /> : null}
         {tab === "ranking" ? <RankingTab onNavigate={navigate} /> : null}
         {tab === "welfare" ? <WelfareTab onNavigate={navigate} /> : null}
         {tab === "tools" ? <ToolsTab /> : null}
-        {tab === "family" ? <FamilyTab onNavigate={navigate} /> : null}
+        {tab === "family" ? (
+          <FamilyTab onNavigate={navigate} onOpenCalendar={() => setCalendarOpen(true)} />
+        ) : null}
       </main>
 
       <nav
@@ -137,6 +141,8 @@ function Shell() {
           })}
         </div>
       </nav>
+
+      <CalendarScreen open={calendarOpen} onClose={() => setCalendarOpen(false)} />
 
       <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="내 정보 · 설정">
         <div className="rounded-3xl bg-white p-4 shadow-soft">

@@ -36,12 +36,24 @@ export type StoredQuizLog = {
   types: string[];
 };
 
+export type StoredFamilyEvent = {
+  id: string;
+  title: string;
+  date: string;
+  repeatYearly: boolean;
+  kind: string;
+  memo?: string;
+  createdAt?: string;
+};
+
 export type StoredState = {
   code: string;
   profile: StoredProfile | null;
   quizLogs: StoredQuizLog[];
   med: Record<string, { morning: boolean; evening: boolean }>;
   visits: string[];
+  /** 가족안부달력 일정 (한 사람당 한 줄에 JSON 배열로 저장) */
+  familyEvents: StoredFamilyEvent[];
   updatedAt: string;
 };
 
@@ -57,6 +69,7 @@ const TABLE = {
   med: "med_checks",
   visits: "daily_visits",
   rankings: "rankings_weekly",
+  family: "family_events",
 };
 
 async function sb(env: DbEnv, path: string, init: RequestInit = {}): Promise<Response> {
@@ -93,6 +106,7 @@ function memoryMerge(code: string, patch: Partial<StoredState>): StoredState {
       quizLogs: [],
       med: {},
       visits: [],
+      familyEvents: [],
       updatedAt: new Date().toISOString(),
     };
   const next: StoredState = {
@@ -102,6 +116,7 @@ function memoryMerge(code: string, patch: Partial<StoredState>): StoredState {
     quizLogs: patch.quizLogs ?? cur.quizLogs,
     med: patch.med ?? cur.med,
     visits: patch.visits ?? cur.visits,
+    familyEvents: patch.familyEvents ?? cur.familyEvents,
     updatedAt: new Date().toISOString(),
   };
   store.set(code, next);
@@ -193,6 +208,21 @@ export async function saveMed(env: DbEnv, code: string, date: string, morning: b
   return { ok: true, mode: "supabase" as const };
 }
 
+export async function saveFamilyEvents(env: DbEnv, code: string, events: StoredFamilyEvent[]) {
+  const { configured } = supabaseConfig(env);
+  if (!configured) {
+    memoryMerge(code, { familyEvents: events });
+    return { ok: true, mode: "demo" as const };
+  }
+  // 가족 일정은 사용자당 한 줄에 통째로 저장한다(추가·수정·삭제가 한 번에 반영된다).
+  const res = await sb(env, `${TABLE.family}?on_conflict=user_code`, {
+    method: "POST",
+    body: JSON.stringify([{ user_code: code, events, updated_at: new Date().toISOString() }]),
+  });
+  if (!res.ok) throw new Error(`supabase family_events ${res.status}: ${await res.text()}`);
+  return { ok: true, mode: "supabase" as const };
+}
+
 export async function saveVisit(env: DbEnv, code: string, date: string) {
   const { configured } = supabaseConfig(env);
   if (!configured) {
@@ -213,7 +243,7 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
   const { configured } = supabaseConfig(env);
   if (!configured) return memoryGet(code);
 
-  const [users, quiz, med, visits] = await Promise.all([
+  const [users, quiz, med, visits, family] = await Promise.all([
     sb(env, `${TABLE.users}?code=eq.${encodeURIComponent(code)}&limit=1`).then((r) => (r.ok ? r.json() : [])),
     sb(
       env,
@@ -223,6 +253,9 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
       r.ok ? r.json() : []
     ),
     sb(env, `${TABLE.visits}?user_code=eq.${encodeURIComponent(code)}&order=visit_date.desc&limit=30`).then((r) =>
+      r.ok ? r.json() : []
+    ),
+    sb(env, `${TABLE.family}?user_code=eq.${encodeURIComponent(code)}&limit=1`).then((r) =>
       r.ok ? r.json() : []
     ),
   ]);
@@ -269,6 +302,9 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
     ),
     med: medMap,
     visits: (Array.isArray(visits) ? visits : []).map((v: { visit_date: string }) => v.visit_date),
+    familyEvents: (Array.isArray(family) && family[0] && Array.isArray(family[0].events)
+      ? family[0].events
+      : []) as StoredFamilyEvent[],
     updatedAt: new Date().toISOString(),
   };
 }

@@ -10,6 +10,8 @@ export type Profile = {
   avatar?: string;
 };
 
+import type { FamilyEvent } from "./calendar";
+
 export type QuizType = "choseong" | "lyrics" | "spot";
 
 export type QuizLog = {
@@ -44,6 +46,8 @@ export type AppState = {
   daily: DailyQuiz | null;
   med: Record<string, MedRecord>;
   visits: string[];
+  /** 가족안부달력에 저장한 가족 일정 */
+  familyEvents: FamilyEvent[];
   fontSize: 18 | 21 | 24;
   lastVisit: string;
 };

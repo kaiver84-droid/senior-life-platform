@@ -218,13 +218,57 @@ def main():
         res["family_code"] = code
         page.screenshot(path=f"{SHOT}/_live_family.png")
 
-        # 자녀 대시보드
+        # ---------- 가족안부달력 ----------
+        page.get_by_role("button", name="달력 열기").click()
+        page.wait_for_selector("text=다가오는 일정과 소식", timeout=20000)
+        page.wait_for_timeout(600)
+        res["calendar_open"] = True
+        res["calendar_title"] = page.get_by_text("가족안부달력").first.is_visible()
+        res["calendar_legend"] = page.get_by_text("우리동네 소식", exact=True).first.is_visible()
+
+        # 일정 추가 — 오늘 날짜에 생일(매년 반복)
+        page.get_by_role("button", name=re.compile("에 일정 추가")).click()
+        page.wait_for_selector("text=가족 일정 추가", timeout=15000)
+        page.wait_for_timeout(400)
+        page.get_by_placeholder("예: 큰딸 생일, 손주 돌잔치").fill("큰딸 생일")
+        page.get_by_role("button", name="일정 저장하기").click()
+        page.wait_for_timeout(800)
+        res["calendar_event_added"] = page.get_by_text("큰딸 생일").first.is_visible()
+        res["calendar_dday_today"] = page.get_by_text("오늘!").first.is_visible()
+
+        # 4갈래 소식 필터
+        res["calendar_filters"] = all(
+            page.get_by_role("tab", name=re.compile(t)).is_visible() for t in ["행사", "축제", "무료강좌", "복지소식"]
+        )
+        page.get_by_role("tab", name=re.compile("복지소식")).click()
+        page.wait_for_timeout(500)
+        res["calendar_filter_welfare"] = page.get_by_text("복지 소식", exact=True).first.is_visible()
+        page.screenshot(path=f"{SHOT}/neulbom_family_calendar.png")
+        page.get_by_label("달력 닫기").click()
+        page.wait_for_timeout(500)
+        res["calendar_closed"] = page.get_by_text("다가오는 일정과 소식").count() == 0
+
+        # 자녀 대시보드 — 공유한 가족 일정
         page.goto(f"{BASE}/family/?code={code}", wait_until="domcontentloaded")
         page.wait_for_timeout(2500)
         res["dashboard_name"] = page.get_by_text("순자 님의 오늘").is_visible()
         res["dashboard_med"] = page.get_by_text("아침 약").first.is_visible()
         res["dashboard_7days"] = page.get_by_text("최근 7일").is_visible()
+        res["dashboard_calendar"] = page.get_by_text("가족 일정").first.is_visible()
+        res["dashboard_calendar_event"] = page.get_by_text("큰딸 생일").first.is_visible()
         page.screenshot(path=f"{SHOT}/_live_dashboard.png")
+
+        # 일정 삭제 확인
+        page.goto(f"{BASE}/", wait_until="domcontentloaded")
+        page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=20000)
+        page.get_by_role("button", name=re.compile("가족안부달력")).first.click()
+        page.wait_for_selector("text=다가오는 일정과 소식", timeout=20000)
+        page.wait_for_timeout(500)
+        page.get_by_role("button", name="삭제").first.click()
+        page.wait_for_timeout(300)
+        page.get_by_role("button", name="지우기").click()
+        page.wait_for_timeout(600)
+        res["calendar_event_deleted"] = page.get_by_text("큰딸 생일").count() == 0
 
         browser.close()
 

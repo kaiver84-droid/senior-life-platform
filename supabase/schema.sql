@@ -173,3 +173,16 @@ create policy "rankings_read_all" on public.rankings_weekly for select using (tr
 -- anon 키로 직접 쓰기가 필요하면 아래 정책을 쓰되, 운영에서는 service_role 경유를 권장합니다.
 -- drop policy if exists "users_insert_anon" on public.users;
 -- create policy "users_insert_anon" on public.users for insert with check (true);
+
+/* ------------------------------------------------------------------ */
+/* 11. 가족안부달력 — 가족 일정 (사용자당 한 줄에 JSON 배열로 저장)     */
+/* ------------------------------------------------------------------ */
+create table if not exists public.family_events (
+  user_code   text primary key references public.users(code) on delete cascade,
+  events      jsonb not null default '[]'::jsonb,   -- [{ id, title, date, repeatYearly, kind, memo, createdAt }]
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.family_events enable row level security;
+-- 앱은 /api/state(service_role)로만 읽고 쓰므로 별도 정책이 필요 없습니다.
+-- 자녀 확인 화면도 같은 /api/state?code= 로 읽습니다.

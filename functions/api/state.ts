@@ -1,5 +1,5 @@
-import { dbStatus, getState, saveMed, saveQuizLog, saveVisit, upsertUser } from "../../lib/db";
-import type { DbEnv } from "../../lib/db";
+import { dbStatus, getState, saveFamilyEvents, saveMed, saveQuizLog, saveVisit, upsertUser } from "../../lib/db";
+import type { DbEnv, StoredFamilyEvent } from "../../lib/db";
 
 type Ctx = { request: Request; env: DbEnv };
 
@@ -44,6 +44,7 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     }[];
     med?: Record<string, { morning: boolean; evening: boolean }>;
     visits?: string[];
+    familyEvents?: StoredFamilyEvent[];
     today?: string;
   };
   try {
@@ -62,6 +63,7 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     if (latest) await saveQuizLog(env, body.code, latest);
     const med = body.med?.[today];
     if (med) await saveMed(env, body.code, today, med.morning, med.evening);
+    if (Array.isArray(body.familyEvents)) await saveFamilyEvents(env, body.code, body.familyEvents);
     await saveVisit(env, body.code, today);
     return json({ ok: true, mode, savedAt: new Date().toISOString() });
   } catch (e) {

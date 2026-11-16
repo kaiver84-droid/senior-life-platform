@@ -7,6 +7,7 @@ import { renderAnbuCard } from "@/lib/canvas";
 import { shareCard, shareMessageText, shareText } from "@/lib/share";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, useToast } from "./ui";
+import { FamilyCalendarCard } from "./calendar";
 import { FamilyScene } from "./art";
 import {
   IconCheck,
@@ -17,7 +18,13 @@ import {
   IconShare,
 } from "./icons";
 
-export function FamilyTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+export function FamilyTab({
+  onNavigate,
+  onOpenCalendar,
+}: {
+  onNavigate?: (tab: string) => void;
+  onOpenCalendar?: () => void;
+}) {
   const { profile, state, today, toggleMed, streak, todayDaily, code } = useApp();
   const { show } = useToast();
   const med = medToday(state, today);
@@ -78,6 +85,9 @@ export function FamilyTab({ onNavigate }: { onNavigate?: (tab: string) => void }
           <IconFamily size={24} />
         </span>
       </section>
+
+      {/* 가족안부달력 */}
+      <FamilyCalendarCard onOpen={() => onOpenCalendar?.()} />
 
       {/* 따뜻한 가족 배너 */}
       <div className="fade-up overflow-hidden rounded-[1.7rem] bg-white shadow-card">
