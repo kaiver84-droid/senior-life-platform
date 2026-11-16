@@ -435,7 +435,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 /** 연습 모드 결과 — 점수·순위에 들어가지 않는다는 점을 분명히 안내 */
 function QuizCheerBanner() {
   return (
-    <div className="relative flex items-end justify-between gap-1 overflow-hidden rounded-[1.6rem] bg-gradient-to-r from-[#FFF6E2] via-[#FFFBEF] to-[#EAF7F2] pl-4 pr-0.5 shadow-soft">
+    <div className="relative flex items-end justify-between gap-1 overflow-hidden rounded-[1.6rem] bg-gradient-to-r from-[#FFF6E2] via-[#FFFCF2] to-[#F8F4E6] pl-4 pr-0.5 shadow-soft">
       <div className="pb-4 pt-4">
         <p className="hand text-[1.42rem] leading-[1.18] text-ink">하루 3문제로</p>
         <p className="hand text-[1.42rem] leading-[1.18] text-ink">
