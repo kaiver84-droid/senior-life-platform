@@ -224,7 +224,9 @@ export function RankingBoard({ initialScope = "region" }: { initialScope?: Ranki
             </p>
             <p className="text-[0.82rem] font-extrabold text-leaf-dark">
               {hasRecord && view.myPercentile && weekPoints > 0
-                ? `상위 ${view.myPercentile}% · 잘하고 있어요!`
+                ? view.myPercentile <= 50
+                  ? `상위 ${view.myPercentile}% · 잘하고 있어요!`
+                  : `상위 ${view.myPercentile}% · 더 풀면 올라가요`
                 : "퀴즈를 풀면 순위가 생겨요"}
             </p>
           </div>

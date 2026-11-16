@@ -173,7 +173,7 @@ export function HomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
           <button
             type="button"
             onClick={() => setStudio({ open: true, autoShare: false })}
-            className="touch-btn min-h-[54px] w-full bg-sun text-ink shadow-sun active:bg-sun-dark"
+            className="touch-btn min-h-[54px] w-full bg-gold text-ink shadow-sun active:bg-gold-dark"
           >
             <IconSend size={21} /> 인사카드 만들기
           </button>
