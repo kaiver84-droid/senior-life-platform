@@ -28,7 +28,10 @@ function hash(input: string): number {
 }
 
 function pick<T>(arr: T[], seed: number): T {
-  return arr[seed % arr.length];
+  // 시드가 음수여도(해시를 >> 로 시프트하면 int32 로 넘어가 음수가 된다) 항상 유효한 인덱스를 고른다.
+  // Math.abs 만 쓰면 큰 값에서 겹치므로 모듈러 정규화를 쓴다.
+  const i = ((Math.trunc(seed) % arr.length) + arr.length) % arr.length;
+  return arr[i];
 }
 
 export type Fortune = {
