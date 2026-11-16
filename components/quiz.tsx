@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { dailyQuestions, calcPoints, QUIZ_TYPE_LABEL, QUIZ_TYPE_EMOJI, type Question } from "@/lib/quiz";
+import {
+  dailyQuestions,
+  practiceQuestions,
+  calcPoints,
+  QUIZ_TYPE_LABEL,
+  QUIZ_TYPE_EMOJI,
+  QUIZ_TOTAL_COUNT,
+  type Question,
+} from "@/lib/quiz";
 import { renderCertificate, downloadCanvas } from "@/lib/canvas";
 import { shareCard, shareMessageText } from "@/lib/share";
 import { useApp } from "@/lib/storage";
@@ -13,8 +21,11 @@ import { RankingPanel } from "./ranking";
 export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { today, todayDaily, completeQuiz, weekPoints, streak } = useApp();
   const { show } = useToast();
-  const questions = useMemo(() => dailyQuestions(today), [today]);
-  const [mode, setMode] = useState<"intro" | "play" | "done">(todayDaily?.done ? "done" : "intro");
+  const dailyQs = useMemo(() => dailyQuestions(today), [today]);
+  const [mode, setMode] = useState<"intro" | "play" | "done" | "practiceDone">(todayDaily?.done ? "done" : "intro");
+  /** 지금 풀고 있는 문제 세트 (오늘의 3문제 또는 연습 3문제) */
+  const [qs, setQs] = useState<Question[]>(dailyQs);
+  const [isPractice, setIsPractice] = useState(false);
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
@@ -24,7 +35,8 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 
   useEffect(() => {
     setMode(todayDaily?.done ? "done" : "intro");
-  }, [todayDaily?.done]);
+    if (!todayDaily?.done) setQs(dailyQs);
+  }, [todayDaily?.done, dailyQs]);
 
   useEffect(() => {
     if (mode !== "play") return;
@@ -34,8 +46,10 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
     return () => clearInterval(t);
   }, [mode]);
 
-  const start = () => {
+  const startSet = (list: Question[], practice: boolean) => {
     startedAt.current = Date.now();
+    setQs(list);
+    setIsPractice(practice);
     setIndex(0);
     setPicked(null);
     setChecked(false);
@@ -44,7 +58,15 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
     setMode("play");
   };
 
-  const q: Question | undefined = questions[index];
+  const start = () => startSet(dailyQs, false);
+
+  /** 연습 모드: 점수·연속 출석·순위와 무관한 두뇌 훈련용 3문제 */
+  const startPractice = (excludeFrom?: Question[]) => {
+    const exclude = [...dailyQs, ...(excludeFrom ?? [])].map((x) => x.id);
+    startSet(practiceQuestions(exclude), true);
+  };
+
+  const q: Question | undefined = qs[index];
 
   const choose = (i: number) => {
     if (checked || !q) return;
@@ -59,16 +81,20 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 
   const next = () => {
     if (!q) return;
-    if (index + 1 >= questions.length) {
+    if (index + 1 >= qs.length) {
+      if (isPractice) {
+        setMode("practiceDone");
+        return;
+      }
       const finalCorrect = correctCount;
       const secs = Math.max(5, Math.round((Date.now() - startedAt.current) / 1000));
-      const points = calcPoints(finalCorrect, questions.length, secs);
+      const points = calcPoints(finalCorrect, qs.length, secs);
       completeQuiz({
         correct: finalCorrect,
-        total: questions.length,
+        total: qs.length,
         points,
         seconds: secs,
-        types: questions.map((x) => x.type),
+        types: qs.map((x) => x.type),
       });
       setMode("done");
       show(`오늘의 퀴즈 완료! ${finalCorrect}문제 정답, ${points}점이에요.`);
@@ -107,7 +133,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           </div>
 
           <div className="mt-4 space-y-2">
-            {questions.map((qq, i) => (
+            {dailyQs.map((qq, i) => (
               <div key={qq.id} className="flex items-center gap-3 rounded-2xl bg-paper px-3.5 py-2.5">
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-white text-[0.86rem] font-black text-brand-dark shadow-soft">
                   {i + 1}
@@ -125,7 +151,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
             </BigButton>
           </div>
           <p className="mt-2 text-center text-[0.8rem] font-medium text-ink/45">
-            하루 3문제까지만 풀 수 있어요. 내일 또 만나요!
+            하루 3문제는 점수에 들어가요. 다 푼 뒤에는 연습 모드로 더 즐길 수 있어요.
           </p>
         </Card>
       ) : null}
@@ -135,10 +161,10 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           {/* 진행 바 */}
           <div className="flex items-center gap-3 rounded-full bg-ink px-4 py-2.5 shadow-cta">
             <span className="tabular whitespace-nowrap text-[0.9rem] font-extrabold text-white">
-              {index + 1} / {questions.length} 문제
+              {index + 1} / {qs.length} 문제
             </span>
             <span className="flex flex-1 items-center justify-center gap-1.5">
-              {questions.map((_, i) => (
+              {qs.map((_, i) => (
                 <span
                   key={i}
                   className={`h-2.5 rounded-full transition-all ${
@@ -161,11 +187,14 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
               <Badge tone="brand">
                 {QUIZ_TYPE_EMOJI[q.type]} {QUIZ_TYPE_LABEL[q.type]}
               </Badge>
-              {!checked ? (
-                <span className="flex items-center gap-1 text-[0.78rem] font-bold text-ink/40">
-                  <IconClock size={14} /> {seconds}초
-                </span>
-              ) : null}
+              <span className="flex items-center gap-2">
+                {isPractice ? <Badge tone="gold">연습 모드</Badge> : null}
+                {!checked ? (
+                  <span className="flex items-center gap-1 text-[0.78rem] font-bold text-ink/40">
+                    <IconClock size={14} /> {seconds}초
+                  </span>
+                ) : null}
+              </span>
             </div>
 
             {q.type === "spot" ? (
@@ -202,7 +231,13 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
                 <div className="rounded-[1.4rem] bg-sky px-4 py-6 text-center">
                   <p
                     className={`whitespace-pre-line font-black leading-snug text-ink ${
-                      q.type === "choseong" ? "text-[2.5rem] tracking-[0.22em]" : "text-[1.16rem]"
+                      q.type === "choseong"
+                        ? q.prompt.length <= 5
+                          ? "text-[2.5rem] tracking-[0.22em]"
+                          : q.prompt.length <= 13
+                            ? "text-[1.8rem] tracking-[0.12em]"
+                            : "text-[1.35rem] tracking-[0.06em]"
+                        : "text-[1.16rem]"
                     }`}
                   >
                     {q.type === "lyrics" ? q.prompt.replace("___", "＿＿＿＿") : q.prompt}
@@ -271,7 +306,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
                 </div>
                 <div className="mt-3">
                   <BigButton variant="ink" size="lg" full onClick={next}>
-                    {index + 1 >= questions.length ? "결과 보기" : "다음 문제"}
+                    {index + 1 >= qs.length ? (isPractice ? "연습 결과 보기" : "결과 보기") : "다음 문제"}
                   </BigButton>
                 </div>
               </div>
@@ -283,9 +318,19 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       {mode === "done" ? (
         <ResultAndCertificate
           correct={todayDaily?.correct ?? correctCount}
-          total={questions.length}
+          total={dailyQs.length}
           points={todayDaily?.points ?? weekPoints}
           show={show}
+          onPractice={() => startPractice()}
+        />
+      ) : null}
+
+      {mode === "practiceDone" ? (
+        <PracticeResult
+          correct={correctCount}
+          total={qs.length}
+          onAgain={() => startPractice(qs)}
+          onBack={() => setMode(todayDaily?.done ? "done" : "intro")}
         />
       ) : null}
 
@@ -294,21 +339,72 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   );
 }
 
+/** 연습 모드 결과 — 점수·순위에 들어가지 않는다는 점을 분명히 안내 */
+function PracticeResult({
+  correct,
+  total,
+  onAgain,
+  onBack,
+}: {
+  correct: number;
+  total: number;
+  onAgain: () => void;
+  onBack: () => void;
+}) {
+  const praise =
+    correct === total
+      ? "완벽해요! 머리가 아주 맑으시네요"
+      : correct > 0
+        ? "잘하셨어요! 한 세트 더 해 볼까요?"
+        : "괜찮아요. 한 번 더 하면 금방 익숙해져요";
+
+  return (
+    <Card className="fade-up overflow-hidden border-2 border-brand/30 bg-gradient-to-br from-white via-sky to-[#EDF5FB] p-5 text-center">
+      <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white text-[1.8rem] shadow-soft">
+        🧠
+      </span>
+      <p className="mt-2 text-[0.88rem] font-extrabold text-brand-dark/80">연습 모드 결과</p>
+      <p className="mt-1 text-[2.4rem] font-black leading-none text-ink">
+        {correct}
+        <span className="text-[1.2rem] font-extrabold text-ink/45"> / {total}</span>
+      </p>
+      <p className="mt-1 text-[1rem] font-black text-brand-deep">{praise}</p>
+      <p className="mt-2 text-[0.85rem] font-semibold leading-relaxed text-ink/55">
+        연습 모드는 점수와 순위에 들어가지 않아요.
+        <br />
+        마음 편히 두뇌 훈련으로 즐겨 주세요.
+      </p>
+      <div className="mt-4 space-y-2">
+        <BigButton variant="ink" size="lg" full onClick={onAgain}>
+          다른 문제 더 풀어보기 <IconChevron size={20} />
+        </BigButton>
+        <BigButton variant="white" full onClick={onBack}>
+          오늘의 퀴즈로 돌아가기
+        </BigButton>
+      </div>
+      <p className="mt-2 text-[0.78rem] font-medium text-ink/40">
+        전체 {QUIZ_TOTAL_COUNT}문제 중에서 새로 골라 드려요
+      </p>
+    </Card>
+  );
+}
+
 function ResultAndCertificate({
   correct,
   total,
   points,
   show,
+  onPractice,
 }: {
   correct: number;
   total: number;
   points: number;
   show: (m: string) => void;
+  onPractice: () => void;
 }) {
   const { profile, today } = useApp();
   const [certOpen, setCertOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
 
   const save = useCallback(() => {
     if (!canvasRef.current || !profile) return;
@@ -357,6 +453,23 @@ function ResultAndCertificate({
           <br />
           매주 월요일 0시에 순위가 새로 시작됩니다.
         </p>
+      </Card>
+
+      <Card className="fade-up border-2 border-brand/30 bg-white p-4">
+        <div className="flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sky text-[1.3rem]">🧠</span>
+          <div className="flex-1">
+            <p className="text-[1.02rem] font-black leading-snug text-ink">다른 문제 더 풀어보기</p>
+            <p className="mt-1 text-[0.85rem] font-semibold leading-relaxed text-ink/55">
+              연습 모드로 새 3문제를 계속 풀 수 있어요. 점수·순위에는 들어가지 않아요.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3">
+          <BigButton variant="brand" size="lg" full onClick={onPractice}>
+            연습 모드 시작하기 <IconChevron size={20} />
+          </BigButton>
+        </div>
       </Card>
 
       <Sheet

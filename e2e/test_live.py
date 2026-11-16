@@ -133,6 +133,35 @@ def main():
         page.keyboard.press("Escape")
         page.wait_for_timeout(400)
 
+        # ---------- 연습 모드 (새 퀴즈 더 풀기 · 점수 미반영) ----------
+        res["practice_cta"] = page.get_by_role("button", name="연습 모드 시작하기").is_visible()
+        points_before = page.locator("section").first.inner_text()
+
+        def play_practice_set():
+            page.get_by_role("button", name=re.compile("^(연습 모드 시작하기|다른 문제 더 풀어보기)$")).click()
+            page.wait_for_timeout(600)
+            for _ in range(3):
+                page.locator("[data-quiz-option]").first.click()
+                page.wait_for_timeout(200)
+                page.get_by_role("button", name="정답 확인").click()
+                page.wait_for_timeout(300)
+                page.get_by_role("button", name=re.compile("^(다음 문제|연습 결과 보기)$")).click()
+                page.wait_for_timeout(400)
+            page.wait_for_selector("text=연습 모드 결과", timeout=20000)
+
+        play_practice_set()
+        res["practice_badge"] = page.get_by_text("연습 모드").first.is_visible()
+        res["practice_result"] = True
+        res["practice_no_points"] = page.get_by_text("점수와 순위에 들어가지 않아요", exact=False).is_visible()
+        page.screenshot(path=f"{SHOT}/_live_practice.png")
+
+        play_practice_set()  # 한 세트 더
+        res["practice_again"] = True
+        page.get_by_role("button", name="오늘의 퀴즈로 돌아가기").click()
+        page.wait_for_timeout(500)
+        res["practice_back"] = page.get_by_text("오늘의 퀴즈 결과").is_visible()
+        res["points_unchanged"] = points_before == page.locator("section").first.inner_text()
+
         # ---------- 명예의 전당 ----------
         nav.nth(2).click()
         page.wait_for_selector("text=이번 주 순위", timeout=20000)
