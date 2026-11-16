@@ -24,7 +24,6 @@ def start_server():
     return httpd
 
 
-def onboard(page, name="순자", birth="1952", sido="충청북도", sigungu="옥천군"):
 def onboard(page, name="순자", birth="1952", sido="충청북도", sigungu="옥천군", birth_time="묘시"):
     """카카오 로그인 키가 없는 로컬/개발 환경에서 '둘러보기'로 초기 설정을 마친다."""
     page.goto(f"http://127.0.0.1:{PORT}/", wait_until="domcontentloaded")

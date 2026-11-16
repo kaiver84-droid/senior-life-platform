@@ -10,6 +10,7 @@ import urllib.request
 
 sys.path.insert(0, "/workspace/work/senior-platform/e2e")
 from playwright.sync_api import sync_playwright  # noqa: E402
+from test_kakao_onboarding import js_make_code  # noqa: E402
 
 BASE = os.environ.get("BASE", "https://senior-life-platform.pages.dev").rstrip("/")
 SHOT = "/workspace/downloads"
@@ -19,6 +20,17 @@ def api(path):
     req = urllib.request.Request(BASE + path, headers={"User-Agent": "Mozilla/5.0 (E2E check)"})
     with urllib.request.urlopen(req, timeout=20) as r:
         return r.status, json.loads(r.read().decode())
+
+
+def delete_test_user(code):
+    """이전 실행이 남긴 테스트 계정을 지워 항상 '처음 로그인' 경로를 검사한다."""
+    token = open("/workspace/work/senior-platform/.supabase_token").read().strip()
+    body = json.dumps({"query": f"delete from public.users where code = '{code}';"}).encode()
+    req = urllib.request.Request(
+        "https://api.supabase.com/v1/projects/aaslirekynetqguajkpv/database/query",
+        data=body, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, method="POST",
+    )
+    urllib.request.urlopen(req, timeout=25).read()
 
 
 def main():
@@ -62,14 +74,38 @@ def main():
         page.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
+        # 카카오 인가만 스텁한다(실제 카카오 계정 로그인은 사용자 본인만 가능). 페이지·API·DB 는 라이브 그대로.
+        KAKAO_ID = os.environ.get("STUB_KAKAO_ID", "777000333")
+        delete_test_user(js_make_code(f"kakao_{KAKAO_ID}"))
+
+        def _kakao(route, request):
+            if "start=1" in request.url:
+                route.fulfill(status=302, headers={"location": "/?code=STUB-AUTH-CODE"})
+            elif request.method == "POST":
+                route.fulfill(status=200, content_type="application/json", body=json.dumps({
+                    "ok": True,
+                    "profile": {"id": f"kakao_{KAKAO_ID}", "nickname": "카카오순자", "birthYear": 1952,
+                                "source": "kakao", "createdAt": "2026-11-16T00:00:00.000Z"},
+                }))
+            else:
+                route.fulfill(status=200, content_type="application/json", body=json.dumps({
+                    "ok": True, "supabase": "connected", "kakao": "configured",
+                    "kakaoLoginConfigured": True, "kakaoJsConfigured": False, "redirectUri": BASE + "/",
+                }))
+
+        page.route("**/api/auth/kakao**", _kakao)
         page.goto(BASE + "/", wait_until="domcontentloaded")
-        page.wait_for_selector("#nick", timeout=30000)
+        page.wait_for_selector("text=카카오톡으로 시작하기", timeout=30000)
+        res["login_only_ok"] = page.query_selector("#setup-nick") is None
+        page.get_by_role("button", name="카카오톡으로 시작하기").click()
+        page.wait_for_selector("#setup-nick", timeout=30000)
         res["onboarding_ok"] = True
-        page.fill("#nick", "순자")
-        page.select_option("#birth", "1952")
-        page.select_option("#sido", "충청북도")
-        page.select_option("#sigungu", "옥천군")
-        page.get_by_role("button", name="시작하기", exact=True).click()
+        page.fill("#setup-nick", "순자")
+        page.select_option("#setup-birth", "1952")
+        page.select_option("#setup-time", "묘시")
+        page.select_option("#setup-sido", "충청북도")
+        page.select_option("#setup-sigungu", "옥천군")
+        page.get_by_role("button", name="저장하고 늘봄 시작하기").click()
         page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
         page.wait_for_timeout(3000)
 
@@ -261,7 +297,8 @@ def main():
         # 일정 삭제 확인
         page.goto(f"{BASE}/", wait_until="domcontentloaded")
         page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=20000)
-        page.get_by_role("button", name=re.compile("가족안부달력")).first.click()
+        # 홈 배너는 오늘 일정 유무에 따라 이름이 달라진다("가족안부달력 …" / "큰딸 생일 오늘! … 우리 동네 소식")
+        page.get_by_role("button", name=re.compile("우리 동네 소식|가족안부달력")).first.click(timeout=20000)
         page.wait_for_selector("text=다가오는 일정과 소식", timeout=20000)
         page.wait_for_timeout(500)
         page.get_by_role("button", name="삭제").first.click()
