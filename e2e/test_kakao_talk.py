@@ -58,7 +58,7 @@ def main():
         page.on("request", lambda r: requests.append(r.url))
 
         page.goto(BASE + "/", wait_until="domcontentloaded")
-        page.wait_for_selector("#nick", timeout=25000)
+        page.wait_for_selector("text=카카오톡으로 시작하기", timeout=25000)
         page.wait_for_timeout(1500)  # /api/auth/kakao 상태 조회 대기
 
         btn = page.get_by_role("button", name="카카오톡으로 시작하기")
