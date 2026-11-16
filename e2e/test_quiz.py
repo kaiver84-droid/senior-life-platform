@@ -71,25 +71,31 @@ def main():
         d.save_as(cert_path)
         results["cert_saved"] = os.path.getsize(cert_path)
 
-        # 명예의 전당 탭 전환
-        page.get_by_text("명예의 전당").scroll_into_view_if_needed()
+        # 퀴즈 결과 스크린샷
+        page.get_by_text("오늘의 퀴즈 결과").scroll_into_view_if_needed()
         page.wait_for_timeout(600)
+        page.screenshot(path=os.path.join(SHOT, "senior_quiz_result.png"))
+
+        # 전용 랭킹 탭으로 이동
+        page.get_by_role("button", name="랭킹 화면 열기").click()
+        page.wait_for_selector("text=이번 주 순위", timeout=10000)
+        page.wait_for_timeout(800)
+        results["rank_tab_title"] = page.locator("h1").first.inner_text().replace("\n", " ")
         ranks = {}
         for t in ["띠·나이", "개근상", "우리 동네"]:
             page.get_by_role("button", name=t).first.click()
             page.wait_for_timeout(700)
-            ranks[t] = page.get_by_text("내 순위").count()
+            ranks[t] = page.locator("text=내 순위").count()
         results["ranking_tabs"] = ranks
         results["ranking_rows"] = page.locator("text=(나)").count()
         results["percentile"] = page.locator("text=상위").first.inner_text()
-
-        # 스크린샷: 퀴즈 결과 + 상장 + 랭킹
-        page.get_by_text("오늘의 퀴즈 결과").scroll_into_view_if_needed()
-        page.wait_for_timeout(500)
-        page.screenshot(path=os.path.join(SHOT, "senior_quiz_ranking.png"))
-        page.get_by_text("명예의 전당").scroll_into_view_if_needed()
-        page.wait_for_timeout(500)
-        page.screenshot(path=os.path.join(SHOT, "senior_quiz_ranking2.png"))
+        page.screenshot(path=os.path.join(SHOT, "senior_ranking_tab.png"))
+        # 오늘 퀴즈 풀러 가기 → 이미 완료 상태면 결과/상장 보기
+        page.get_by_role("button", name="퀴즈 결과 · 상장 보기").or_(
+            page.get_by_role("button", name="오늘 퀴즈 풀러 가기")
+        ).first.click()
+        page.wait_for_timeout(900)
+        results["quiz_return"] = page.evaluate("location.hash")
 
         results["console_errors"] = errors
         browser.close()

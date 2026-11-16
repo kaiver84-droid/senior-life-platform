@@ -103,7 +103,6 @@ const AppCtx = createContext<Ctx | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(emptyState);
   const [ready, setReady] = useState(false);
-  const synced = useRef(false);
 
   useEffect(() => {
     const loaded = read();
@@ -122,20 +121,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [state, ready]);
 
   // 서버(또는 Supabase)와 조용히 동기화 — 실패해도 화면은 그대로 동작
+  // 퀴즈 완료·복약 체크 등 기록이 바뀔 때마다 1.2초 뒤 한 번씩 저장한다.
   useEffect(() => {
-    if (!ready || !state.profile || synced.current) return;
-    synced.current = true;
-    void fetch("/api/state", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        code: makeCode(state.profile.id),
-        profile: state.profile,
-        quizLogs: state.quizLogs.slice(-40),
-        med: state.med,
-        visits: state.visits.slice(-30),
-      }),
-    }).catch(() => {});
+    if (!ready || !state.profile) return;
+    const t = setTimeout(() => {
+      void fetch("/api/state", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          code: makeCode(state.profile!.id),
+          profile: state.profile,
+          quizLogs: state.quizLogs.slice(-40),
+          med: state.med,
+          visits: state.visits.slice(-30),
+          today: kstDate(),
+        }),
+      }).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
   }, [ready, state.profile, state.quizLogs, state.med, state.visits]);
 
   const saveProfile = useCallback((p: Omit<Profile, "id" | "createdAt">) => {

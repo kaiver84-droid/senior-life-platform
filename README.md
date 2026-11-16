@@ -1,5 +1,7 @@
 # 시니어생활 도우미 (senior-life-platform)
 
+**라이브: https://senior-life-platform.pages.dev** (Cloudflare Pages, 2026-11-16 배포)
+
 카카오톡 웹뷰(모바일 390×844)에 맞춘 **어르신 종합 생활 플랫폼**입니다.
 Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Pages**(정적 빌드 + Pages Functions)에 배포합니다.
 
@@ -28,12 +30,23 @@ npm run typecheck    # tsc --noEmit
 ## Cloudflare Pages 배포
 
 정적 파일은 `out/`, API 는 `functions/api/**`(Pages Functions)로 배포합니다.
+API 핸들러는 `functions-entry.ts` 에서 `/api/*` 라우팅으로 묶여 `out/_worker.js`(Pages Functions Advanced mode)가 됩니다.
 
 ```bash
-npm run build
-npx wrangler pages deploy out --project-name senior-life-platform
-# 또는 Git 연동: Build command `npm run build`, Output directory `out`
+npm run build                                   # out/ 생성
+bun build functions-entry.ts --target browser --format esm --outfile out/_worker.js
+
+# 방법 A) 대시보드 업로드 (검증된 경로)
+python3 -c "import shutil; shutil.make_archive('senior-platform-site','zip','out')"
+# Cloudflare 대시보드 → Workers & Pages → senior-life-platform → Create deployment
+# → zip 업로드 → Save and deploy
+
+# 방법 B) wrangler
+npx wrangler pages deploy out --project-name=senior-life-platform
 ```
+
+> `deploy_cloudflare.py` 는 Pages REST API 직접 업로드용 스크립트다. 프로젝트 생성·배포 기록은 성공했지만
+> 이 계정에서는 업로드된 배포가 500 을 반환해(대시보드 업로드본은 정상) 현재는 방법 A 를 사용한다.
 
 ### 환경변수 (전부 선택 — 없으면 데모 모드)
 

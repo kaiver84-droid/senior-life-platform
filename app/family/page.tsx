@@ -28,7 +28,7 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!queryCode || queryCode === code) return;
+    if (!ready || !queryCode || queryCode === code) return;
     setLoading(true);
     fetch(`/api/state?code=${encodeURIComponent(queryCode)}`)
       .then((r) => r.json())
@@ -44,10 +44,11 @@ function Dashboard() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [queryCode, code]);
+  }, [ready, queryCode, code]);
 
+  const useRemote = Boolean(remote) && !profile;
   const data: { name: string; birthYear: number; region: string; quizLogs: AppState["quizLogs"]; med: AppState["med"]; visits: string[] } =
-    remote
+    useRemote && remote
       ? {
           name: remote.profile?.nickname || "부모님",
           birthYear: remote.profile?.birthYear || 1955,

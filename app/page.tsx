@@ -9,14 +9,16 @@ import { QuizTab } from "@/components/quiz";
 import { WelfareTab } from "@/components/welfare";
 import { ToolsTab } from "@/components/tools";
 import { FamilyTab } from "@/components/family";
-import { IconFamily, IconGift, IconHome, IconQuiz, IconTools } from "@/components/icons";
+import { RankingTab } from "@/components/ranking";
+import { IconFamily, IconGift, IconHome, IconQuiz, IconStar, IconTools } from "@/components/icons";
 
-type TabKey = "home" | "quiz" | "welfare" | "tools" | "family";
+type TabKey = "home" | "quiz" | "ranking" | "welfare" | "tools" | "family";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "home", label: "홈", icon: <IconHome size={24} /> },
-  { key: "quiz", label: "퀴즈", icon: <IconQuiz size={24} /> },
-  { key: "welfare", label: "혜택", icon: <IconGift size={24} /> },
+  { key: "quiz", label: "퀴즈", icon: <IconQuiz size={23} /> },
+  { key: "ranking", label: "랭킹", icon: <IconStar size={23} /> },
+  { key: "welfare", label: "혜택", icon: <IconGift size={23} /> },
   { key: "tools", label: "도구", icon: <IconTools size={24} /> },
   { key: "family", label: "가족", icon: <IconFamily size={24} /> },
 ];
@@ -90,7 +92,8 @@ function Shell() {
 
       <main className="px-4 pb-safe pt-4">
         {tab === "home" ? <HomeTab onNavigate={navigate} /> : null}
-        {tab === "quiz" ? <QuizTab /> : null}
+        {tab === "quiz" ? <QuizTab onNavigate={navigate} /> : null}
+        {tab === "ranking" ? <RankingTab onNavigate={navigate} /> : null}
         {tab === "welfare" ? <WelfareTab /> : null}
         {tab === "tools" ? <ToolsTab /> : null}
         {tab === "family" ? <FamilyTab /> : null}
@@ -100,7 +103,7 @@ function Shell() {
         className="fixed bottom-0 left-1/2 z-50 w-full max-w-[460px] -translate-x-1/2 border-t-2 border-ink/10 bg-white/97 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur"
         aria-label="주요 메뉴"
       >
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {TABS.map((t) => {
             const active = tab === t.key;
             return (
@@ -108,12 +111,12 @@ function Shell() {
                 key={t.key}
                 onClick={() => navigate(t.key)}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-[64px] flex-col items-center justify-center gap-0.5 transition ${
+                className={`flex min-h-[62px] flex-col items-center justify-center gap-0.5 transition ${
                   active ? "text-brand" : "text-ink/45"
                 }`}
               >
                 <span className={active ? "scale-110" : ""}>{t.icon}</span>
-                <span className={`text-[0.78rem] ${active ? "font-black" : "font-bold"}`}>{t.label}</span>
+                <span className={`text-[0.72rem] tracking-tight ${active ? "font-black" : "font-bold"}`}>{t.label}</span>
                 <span className={`h-1 w-6 rounded-full ${active ? "bg-brand" : "bg-transparent"}`} />
               </button>
             );

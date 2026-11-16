@@ -10,7 +10,7 @@ import { Badge, BigButton, Card, ProgressDots, SectionTitle, useToast } from "./
 import { IconDownload, IconShare } from "./icons";
 import { RankingPanel } from "./ranking";
 
-export function QuizTab() {
+export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { profile, today, todayDaily, completeQuiz, weekPoints, streak } = useApp();
   const { show } = useToast();
   const questions = useMemo(() => dailyQuestions(today), [today]);
@@ -230,7 +230,7 @@ export function QuizTab() {
         />
       ) : null}
 
-      <RankingPanel />
+      <RankingPanel onNavigate={onNavigate} />
     </div>
   );
 }

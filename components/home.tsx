@@ -140,9 +140,15 @@ export function HomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
             💰 내 지원금 찾기
           </BigButton>
         </div>
-        <div className="mt-3 rounded-2xl bg-brand-light/70 px-4 py-3 text-center text-[0.95rem] font-bold text-brand-dark">
-          이번 주 퀴즈 점수 <span className="tabular text-[1.15rem]">{weekPoints}</span>점
-        </div>
+        <button
+          onClick={() => onNavigate("ranking")}
+          className="mt-3 flex w-full items-center justify-between rounded-2xl border-2 border-gold/40 bg-gold-light/60 px-4 py-3 text-left"
+        >
+          <span className="text-[0.98rem] font-black text-[#7A5209]">
+            🏆 이번 주 퀴즈 점수 <span className="tabular text-[1.12rem]">{weekPoints}</span>점 · 랭킹 보기
+          </span>
+          <span className="text-[1.1rem] font-black text-[#7A5209]">›</span>
+        </button>
       </section>
     </div>
   );
@@ -280,7 +286,7 @@ function GreetingStudio({ show }: { show: (m: string) => void }) {
               className="h-9 w-full rounded-md"
               style={{ background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
             />
-            <span className="whitespace-nowrap text-[0.72rem] font-extrabold">{t.label}</span>
+            <span className="whitespace-nowrap text-[0.64rem] font-extrabold tracking-tight">{t.label}</span>
           </button>
         ))}
       </div>

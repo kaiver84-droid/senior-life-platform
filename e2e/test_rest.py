@@ -21,7 +21,7 @@ def main():
         nav = page.get_by_role("navigation").get_by_role("button")
 
         # ---------- 혜택 ----------
-        nav.nth(2).click()
+        nav.nth(3).click()
         page.wait_for_selector("text=내게 맞는 지원금", timeout=10000)
         page.wait_for_timeout(500)
         results["matched_badge"] = page.locator("text=받을 수 있어요").first.inner_text()
@@ -58,7 +58,7 @@ def main():
         page.screenshot(path=os.path.join(SHOT, "senior_welfare.png"))
 
         # ---------- 도구 ----------
-        nav.nth(3).click()
+        nav.nth(4).click()
         page.wait_for_selector("text=생활 도구", timeout=10000)
         page.wait_for_timeout(400)
         results["tools_visible"] = page.get_by_text("간편 돋보기").is_visible()
@@ -93,7 +93,7 @@ def main():
         page.wait_for_timeout(300)
 
         # ---------- 가족 ----------
-        nav.nth(4).click()
+        nav.nth(5).click()
         page.wait_for_selector("text=가족 연결", timeout=10000)
         page.wait_for_timeout(400)
         page.get_by_role("button", name="아침 약").click()
@@ -101,7 +101,7 @@ def main():
         page.get_by_role("button", name="저녁 약").click()
         page.wait_for_timeout(500)
         results["med_state"] = page.locator("text=먹었어요").count()
-        results["med_badge"] = page.locator("text=오늘 다 챙겼어요").count()
+        results["med_badge"] = page.locator("text=완료 ✓").count()
         code = page.locator(".tabular").first.inner_text()
         results["family_code"] = code
         page.wait_for_timeout(400)
@@ -110,7 +110,7 @@ def main():
         # 안부 카드 공유 (폴백 다운로드)
         try:
             with page.expect_download(timeout=12000) as dl:
-                page.get_by_role("button", name="자녀에게 오늘 안부 보내기").click()
+                page.get_by_role("button", name="안부 카드 보내기").click()
             d = dl.value
             p2 = os.path.join(SHOT, "senior_anbu_card.png")
             d.save_as(p2)
