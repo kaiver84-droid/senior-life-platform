@@ -196,3 +196,68 @@ create table if not exists public.family_events (
 alter table public.family_events enable row level security;
 -- 앱은 /api/state(service_role)로만 읽고 쓰므로 별도 정책이 필요 없습니다.
 -- 자녀 확인 화면도 같은 /api/state?code= 로 읽습니다.
+
+/* ------------------------------------------------------------------ */
+/* 12. 모임 (groups · group_members · group_posts · group_cheers)        */
+/*    전체 SQL 은 supabase/groups.sql 참고. 앱은 /api/groups(service_role) 로만 접근. */
+/* ------------------------------------------------------------------ */
+create table if not exists public.groups (
+  id           text primary key,                 -- 6자리 초대 코드 (예: FAM101)
+  name         text not null,
+  description  text not null default '',
+  goal_score   int  not null default 500,        -- 우리 모임 주간 목표 점수
+  weekly_goal  int  not null default 5,          -- 한 사람이 일주일에 참여할 목표 일수
+  creator_code text,
+  is_demo      boolean not null default false,   -- 체험 모임 여부
+  created_at   timestamptz not null default now()
+);
+
+create table if not exists public.group_members (
+  id        bigserial primary key,
+  group_id  text not null references public.groups(id) on delete cascade,
+  user_code text not null,                       -- public.users(code) — 가입이 프로필 저장보다 먼저 일어날 수 있어 FK 없음
+  name      text not null,
+  role      text not null default 'member' check (role in ('leader','member','demo')),
+  joined_at timestamptz not null default now(),
+  unique (group_id, user_code)
+);
+create index if not exists group_members_user_idx  on public.group_members (user_code);
+create index if not exists group_members_group_idx on public.group_members (group_id);
+
+create table if not exists public.group_posts (
+  id          bigserial primary key,
+  group_id    text not null references public.groups(id) on delete cascade,
+  user_code   text not null,
+  author_name text not null,
+  content     text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists group_posts_group_idx on public.group_posts (group_id, created_at desc);
+
+create table if not exists public.group_cheers (
+  post_id   bigint not null references public.group_posts(id) on delete cascade,
+  user_code text not null,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_code)
+);
+
+-- 기본 선택 모임 (다시 로그인해도 보던 모임으로)
+alter table public.users add column if not exists active_group_id text;
+
+alter table public.groups        enable row level security;
+alter table public.group_members enable row level security;
+alter table public.group_posts   enable row level security;
+alter table public.group_cheers  enable row level security;
+
+-- 체험 모임 '우리 가족 사랑방'(FAM101) — 첫 화면이 비어 보이지 않도록 10명이 활동 중
+insert into public.groups (id, name, description, goal_score, weekly_goal, creator_code, is_demo)
+values ('FAM101', '우리 가족 사랑방', '온 가족이 함께 두뇌 퀴즈로 건강을 챙기는 체험 모임이에요', 500, 5, 'FAM1A1', true)
+on conflict (id) do update set name = excluded.name, description = excluded.description, is_demo = true;
+
+insert into public.group_members (group_id, user_code, name, role) values
+  ('FAM101', 'FAM1A1', '김영희', 'demo'), ('FAM101', 'FAM2B3', '박철수', 'demo'),
+  ('FAM101', 'FAM3C5', '이정숙', 'demo'), ('FAM101', 'FAM4D7', '최민수', 'demo'),
+  ('FAM101', 'FAM5E9', '정순자', 'demo'), ('FAM101', 'FAM6F2', '강옥분', 'demo'),
+  ('FAM101', 'FAM7G4', '조말순', 'demo'), ('FAM101', 'FAM8H6', '윤정희', 'demo'),
+  ('FAM101', 'FAM9J8', '장미숙', 'demo'), ('FAM101', 'FAMA0K', '임금자', 'demo')
+on conflict (group_id, user_code) do nothing;

@@ -48,10 +48,12 @@ export function buildRanking(input: RankingInput): RankingResult {
       ? `${weekId}|${input.sido || ""}|${input.sigungu || ""}`
       : scope === "zodiac"
         ? `${weekId}|zodiac|${Math.floor((input.birthYear || 1955) / 12)}`
-        : `${weekId}|streak`;
+        : scope === "national"
+          ? `${weekId}|national`
+          : `${weekId}|streak`;
 
   const rnd = mulberry32(hashStr(seedBase));
-  const count = 46 + Math.floor(rnd() * 14); // 46 ~ 59명
+  const count = scope === "national" ? 120 + Math.floor(rnd() * 30) : 46 + Math.floor(rnd() * 14); // 46 ~ 59명
   const used = new Set<string>();
   const rows: { name: string; points: number; streak: number; isMe: boolean }[] = [];
 
@@ -104,6 +106,8 @@ export function buildRanking(input: RankingInput): RankingResult {
 }
 
 export function scopeLabel(scope: RankingScope, sido?: string, sigungu?: string): string {
+  if (scope === "group") return "우리 모임";
+  if (scope === "national") return "전국";
   if (scope === "region") return `${sigungu || sido || "우리 동네"}`;
   if (scope === "zodiac") return "같은 띠·나이";
   return "개근상";

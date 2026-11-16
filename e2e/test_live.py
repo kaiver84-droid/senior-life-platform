@@ -110,7 +110,7 @@ def main():
         page.wait_for_timeout(3000)
 
         nav = page.get_by_role("navigation").get_by_role("button")
-        res["nav_tabs"] = nav.count()
+        res["nav_tabs"] = nav.count()  # 홈 · 모임 · 퀴즈 · 랭킹 · 혜택 · 더보기
 
         # ---------- 홈 ----------
         res["home_greeting"] = page.get_by_text("안녕하세요,").is_visible()
@@ -140,7 +140,7 @@ def main():
         page.wait_for_timeout(400)
 
         # ---------- 퀴즈 ----------
-        nav.nth(1).click()
+        nav.nth(2).click()
         page.wait_for_selector("text=1분 두뇌 퀴즈", timeout=20000)
         res["quiz_intro"] = page.get_by_role("button", name="퀴즈 시작하기").is_visible()
         page.get_by_role("button", name="퀴즈 시작하기").click()
@@ -199,18 +199,21 @@ def main():
         res["points_unchanged"] = points_before == page.locator("section").first.inner_text()
 
         # ---------- 명예의 전당 ----------
-        nav.nth(2).click()
+        nav.nth(3).click()
         page.wait_for_selector("text=이번 주 순위", timeout=20000)
         page.wait_for_timeout(1200)
-        res["ranking_podium"] = page.get_by_text("이번 주 1위를 축하합니다", exact=False).is_visible()
         res["ranking_tabs"] = all(
-            page.get_by_role("tab", name=t).is_visible() for t in ["우리 동네", "출생연도", "개근왕"]
+            page.get_by_role("tab", name=t).is_visible() for t in ["우리 모임", "전국", "지역별", "개근왕"]
         )
+        res["ranking_group_empty"] = page.get_by_text("아직 모임이 없어요").is_visible()
+        page.get_by_role("tab", name="전국").click()
+        page.wait_for_timeout(1500)
+        res["ranking_podium"] = page.get_by_text("이번 주 1위를 축하합니다", exact=False).is_visible()
         res["ranking_my_rank"] = page.get_by_text("내 순위").first.is_visible()
         page.screenshot(path=f"{SHOT}/_live_ranking.png")
 
         # ---------- 복지 혜택 ----------
-        nav.nth(3).click()
+        nav.nth(4).click()
         page.wait_for_selector("text=내게 맞는 복지 혜택", timeout=20000)
         page.wait_for_timeout(800)
         res["welfare_hero"] = page.get_by_text("기초연금").first.is_visible()
@@ -223,8 +226,10 @@ def main():
         page.keyboard.press("Escape")
         page.wait_for_timeout(400)
 
-        # ---------- 도구 ----------
-        nav.nth(4).click()
+        # ---------- 도구 (더보기 → 도구 모음) ----------
+        nav.nth(5).click()
+        page.wait_for_timeout(600)
+        page.get_by_role("button", name=re.compile("도구 모음")).click()
         page.wait_for_selector("text=생활 속 스마트 도구", timeout=20000)
         res["tools_segments"] = all(
             page.get_by_role("tab", name=t).is_visible() for t in ["돋보기", "손전등", "가이드"]
@@ -242,8 +247,10 @@ def main():
         page.wait_for_timeout(500)
         res["tools_guides"] = page.get_by_text("1분 카드뉴스").first.is_visible()
 
-        # ---------- 가족 ----------
-        nav.nth(5).click()
+        # ---------- 가족 (더보기 → 가족 확인 화면) ----------
+        page.get_by_role("button", name="더보기로 돌아가기").click()
+        page.wait_for_timeout(500)
+        page.get_by_role("button", name=re.compile("가족 확인 화면")).click()
         page.wait_for_selector("text=가족에게 안부 전하기", timeout=20000)
         page.wait_for_timeout(700)
         page.get_by_role("button", name="아침 약").click()

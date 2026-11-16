@@ -18,10 +18,11 @@ Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Page
 |---|---|---|
 | ① | 오늘의 운세(띠·생년월일) + 날씨 생활 팁 + 이름이 들어간 안부 인사카드(Canvas 1080×1350) 생성·저장·카카오 공유 | 홈 |
 | ② | 1분 두뇌 퀴즈(초성 / 옛날 노래 가사 / 틀린 그림 찾기, 하루 3문제, 정답 확인 단계) + 금빛 상장 PNG | 퀴즈 |
-| ②′ | 명예의 전당 — 알약형 3탭(우리 동네 · 출생연도 · 개근왕), 1·2·3위 시상대, 4~10위, 내 순위·상위 % | 랭킹 |
+| ②′ | 명예의 전당 — 알약형 4탭(**우리 모임** · 전국 · 지역별 · 개근왕), 1·2·3위 시상대, 4~10위, 내 순위·상위 %, 우리 모임 달성률 배너 | 랭킹 |
 | ③ | 출생연도·거주지 기반 맞춤 지원금 14종 + 3단계 행동 지침 + 문의처 전화 연결 | 혜택 |
-| ④ | 카메라 돋보기 1~4배(손전등·화면 밝게), 카드뉴스(보이스피싱·KTX·카톡 글씨·병원) | 도구 |
-| ⑤ | 아침/저녁 복약 체크 + 원터치 안부 카드 + 자녀 확인 대시보드(`/family`) | 가족 |
+| ④ | 카메라 돋보기 1~4배(손전등·화면 밝게), 카드뉴스(보이스피싱·KTX·카톡 글씨·병원) | 더보기 → 도구 |
+| ⑤ | 아침/저녁 복약 체크 + 원터치 안부 카드 + 자녀 확인 대시보드(`/family`) | 더보기 → 가족 |
+| ⑥ | **우리 모임** — 모임 만들기/초대 코드 가입, `?group=XXXXXX` 초대로 자동 가입, 회원별 오늘 출석 도장 · 이번 주 달성률 게이지 · 모임 전용 한 줄 게시판(응원) | 홈 · 모임 |
 | ⑤′ | **가족안부달력** — 자녀 생일·기념일·가족 일정·병원약속(매년 반복·D-Day) 과 **우리동네 소식**(지역 행사·축제·무료 강좌·복지) 을 한 달 달력에 점으로 구분해 보여 주고, 날짜별 상세·일정 추가/수정/삭제·카톡 알리기까지 한 화면에서 | 홈 배너 · 가족 · `/family` |
 
 ## 실행
@@ -142,8 +143,10 @@ JS SDK 간편로그인을 쓰려면 **플랫폼 > Web > 사이트 도메인**에
 ### Supabase
 
 `supabase/schema.sql` 을 Supabase SQL Editor 에서 실행하면
-`users`, `quiz_logs`, `rankings_weekly`, `med_checks`, `daily_visits`, `family_links`, `anbu_messages`
+`users`, `quiz_logs`, `rankings_weekly`, `med_checks`, `daily_visits`, `family_links`, `anbu_messages`,
+`family_events`, **`groups`·`group_members`·`group_posts`·`group_cheers`**
 테이블과 주간 집계 함수(`refresh_weekly_rankings`), 상위 10명 뷰(`v_weekly_top`)가 만들어집니다.
+모임 테이블만 따로 적용하려면 `supabase/groups.sql` 을 실행합니다(체험 모임 `FAM101` 시드 포함).
 
 키가 없을 때는 `lib/db.ts` 의 **메모리 폴백**이 동작해 저장·가족 대시보드가 라이브에서도 그대로 보입니다.
 (브라우저 `localStorage` 가 원본이고, 서버는 보조 저장소입니다.)
@@ -166,14 +169,23 @@ lib/
   local-news.ts     우리동네 소식(지역 행사·축제·무료 강좌·복지) 데이터 · 지역별 생성
   canvas.ts         인사카드·상장·안부카드 Canvas 렌더러
   storage.tsx       localStorage 상태 + 가족 코드 (+ 가족 일정 추가/수정/삭제)
+  groups.ts         모임 API 호출 · 초대 링크(?group=) 기억 · 시간 표기
+  group-store.tsx   모임 상태(목록·상세·오늘 출석·달성률)와 만들기/가입/글쓰기/응원
+  group-demo.ts     체험 모임 회원의 날짜·주차 기반 결정론 데이터(서버·오프라인 공용)
+  group-local.ts    서버에 못 붙을 때의 localStorage 모임 폴백
   db.ts             Supabase(PostgREST) 연결 + 메모리 폴백
-functions/api/      Pages Functions (auth/kakao, state, rankings, health)
+functions/api/      Pages Functions (auth/kakao, state, rankings, groups, health)
 supabase/schema.sql DB 스키마
+supabase/groups.sql 모임 테이블 + 체험 모임 시드
 ```
 
 ## 검증
 
 - `npm run typecheck`, `npm run build` 통과
+- 모임 API 검증(실제 Supabase): `node e2e/test_groups_api.mjs` — 만들기·가입·글쓰기·응원·선택·나가기·오류 처리 24항목
+- 모임 라이브 E2E: `python3 e2e/test_live_groups.py`
+  (홈 모임 배너·모임 현황·미션 → 체험 모임 가입·출석·달성률·게시판 → 초대 링크 → 모임 만들기 →
+   `?group=CODE` 자동 가입 → 랭킹 4탭/시상대/달성률 → 퀴즈 공동 배지·결과 알리기 → 더보기 도구·가족·달력)
 - Playwright 모바일 390×844 E2E: `BASE=https://senior-life-platform.pages.dev python3 e2e/test_live.py`
   (체험 로그인 → 인사카드 캔버스 → 퀴즈 3문제·금빛 상장 → 시상대 → 지원금 3단계 → 돋보기·가이드 → 복약·가족 대시보드
   → 가족안부달력 일정 추가·삭제·4갈래 소식 필터·자녀 화면 공유 일정)

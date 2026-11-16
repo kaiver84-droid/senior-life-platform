@@ -14,3 +14,6 @@ __pycache__/
 
 # 로컬 검증용 번들 결과물
 e2e/.local-api.mjs
+
+# 모임 API 테스트가 만드는 임시 번들
+e2e/.worker.mjs

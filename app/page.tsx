@@ -19,25 +19,32 @@ import { FamilyTab } from "@/components/family";
 import { RankingTab } from "@/components/ranking";
 import { CalendarScreen } from "@/components/calendar";
 import { NeulbomMark } from "@/components/art";
+import { GroupProvider, useGroup } from "@/lib/group-store";
+import { captureInviteFromUrl } from "@/lib/groups";
+import { GroupTab } from "@/components/groups";
 import {
-  IconFamily,
+  IconChevron,
   IconGear,
   IconGift,
   IconHome,
+  IconMore,
   IconQuiz,
-  IconTools,
   IconTrophy,
+  IconUsers,
 } from "@/components/icons";
 
-type TabKey = "home" | "quiz" | "ranking" | "welfare" | "tools" | "family";
+// 친구가 보낸 모임 초대 링크(?group=XXXXXX)를 화면이 그려지기 전에 붙잡아 둔다.
+captureInviteFromUrl();
+
+type TabKey = "home" | "group" | "quiz" | "ranking" | "welfare" | "more";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "home", label: "홈", icon: <IconHome size={24} /> },
+  { key: "group", label: "모임", icon: <IconUsers size={24} /> },
   { key: "quiz", label: "퀴즈", icon: <IconQuiz size={24} /> },
   { key: "ranking", label: "랭킹", icon: <IconTrophy size={24} /> },
   { key: "welfare", label: "혜택", icon: <IconGift size={23} /> },
-  { key: "tools", label: "도구", icon: <IconTools size={24} /> },
-  { key: "family", label: "가족", icon: <IconFamily size={24} /> },
+  { key: "more", label: "더보기", icon: <IconMore size={24} /> },
 ];
 
 const FONT_LABEL: Record<number, string> = { 18: "보통", 21: "크게", 24: "아주 크게" };
@@ -46,6 +53,7 @@ function Shell() {
   const { ready, profile, fontSize, setFontSize, logout, code, updateProfile } = useApp();
   const { show } = useToast();
   const [tab, setTab] = useState<TabKey>("home");
+  const [moreView, setMoreView] = useState<"menu" | "tools" | "family">("menu");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -58,12 +66,26 @@ function Shell() {
   });
 
   useEffect(() => {
-    const fromHash = (window.location.hash || "").replace("#", "") as TabKey;
-    if (TABS.some((t) => t.key === fromHash)) setTab(fromHash);
+    const fromHash = (window.location.hash || "").replace("#", "");
+    if (fromHash === "tools" || fromHash === "family") {
+      setMoreView(fromHash);
+      setTab("more");
+      return;
+    }
+    if (TABS.some((t) => t.key === fromHash)) setTab(fromHash as TabKey);
   }, []);
 
+  // 예전 바로가기(도구·가족)도 그대로 열린다 — ‘더보기’ 안에서 이어서 보여 준다.
   const navigate = (key: string) => {
+    if (key === "tools" || key === "family") {
+      setMoreView(key);
+      setTab("more");
+      window.location.hash = "more";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     const k = (TABS.some((t) => t.key === key) ? key : "home") as TabKey;
+    if (k === "more") setMoreView("menu");
     setTab(k);
     window.location.hash = k;
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -156,12 +178,18 @@ function Shell() {
 
       <main className="px-4 pb-safe pt-2">
         {tab === "home" ? <HomeTab onNavigate={navigate} onOpenCalendar={() => setCalendarOpen(true)} /> : null}
+        {tab === "group" ? <GroupTab onNavigate={navigate} /> : null}
         {tab === "quiz" ? <QuizTab onNavigate={navigate} /> : null}
         {tab === "ranking" ? <RankingTab onNavigate={navigate} /> : null}
         {tab === "welfare" ? <WelfareTab onNavigate={navigate} /> : null}
-        {tab === "tools" ? <ToolsTab /> : null}
-        {tab === "family" ? (
-          <FamilyTab onNavigate={navigate} onOpenCalendar={() => setCalendarOpen(true)} />
+        {tab === "more" ? (
+          <MoreTab
+            view={moreView}
+            onView={setMoreView}
+            onNavigate={navigate}
+            onOpenCalendar={() => setCalendarOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
         ) : null}
       </main>
 
@@ -296,11 +324,151 @@ function Shell() {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* 더보기 탭 — 도구 · 가족/달력 · 설정을 한 번에                        */
+/* ------------------------------------------------------------------ */
+
+function MoreRow({
+  emoji,
+  title,
+  sub,
+  onClick,
+}: {
+  emoji: string;
+  title: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="card flex w-full items-center gap-3 p-3.5 text-left active:scale-[0.995]"
+    >
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[1rem] bg-brand-light text-[1.5rem]">
+        {emoji}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[1.02rem] font-black leading-tight text-ink">{title}</span>
+        <span className="mt-0.5 block truncate text-[0.84rem] font-semibold text-ink/50">{sub}</span>
+      </span>
+      <IconChevron size={20} className="shrink-0 text-ink/25" />
+    </button>
+  );
+}
+
+function MoreTab({
+  view,
+  onView,
+  onNavigate,
+  onOpenCalendar,
+  onOpenSettings,
+}: {
+  view: "menu" | "tools" | "family";
+  onView: (v: "menu" | "tools" | "family") => void;
+  onNavigate: (tab: string) => void;
+  onOpenCalendar: () => void;
+  onOpenSettings: () => void;
+}) {
+  const { active, detail } = useGroup();
+  const { fontSize, setFontSize } = useApp();
+
+  if (view === "tools" || view === "family") {
+    return (
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={() => onView("menu")}
+          aria-label="더보기로 돌아가기"
+          className="flex items-center gap-1 pt-1 text-[0.9rem] font-black text-ink/55"
+        >
+          <IconChevron size={18} className="rotate-180" /> 더보기
+        </button>
+        {view === "tools" ? <ToolsTab /> : <FamilyTab onNavigate={onNavigate} onOpenCalendar={onOpenCalendar} />}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="fade-up pt-1">
+        <Badge tone="brand">
+          <IconMore size={13} /> 더보기
+        </Badge>
+        <h1 className="mt-1.5 text-[1.5rem] font-black leading-snug text-ink">도구 · 가족 · 설정</h1>
+        <p className="mt-1 text-[0.9rem] font-semibold text-ink/55">필요한 기능을 한 번에 열 수 있어요.</p>
+      </section>
+
+      <div className="fade-up grid grid-cols-1 gap-2">
+        <MoreRow
+          emoji="🔍"
+          title="도구 모음"
+          sub="돋보기 · 손전등 · 생활 가이드"
+          onClick={() => onView("tools")}
+        />
+        <MoreRow
+          emoji="👨‍👩‍👧"
+          title="가족 확인 화면"
+          sub="자녀가 부모님 안부를 확인해요"
+          onClick={() => onView("family")}
+        />
+        <MoreRow
+          emoji="🗓️"
+          title="가족안부달력"
+          sub="가족 일정 · 기념일 · 동네 소식"
+          onClick={onOpenCalendar}
+        />
+        <MoreRow
+          emoji="👥"
+          title={active ? `${active.name} · 모임` : "우리 모임"}
+          sub={
+            active
+              ? `멤버 ${detail?.memberCount ?? active.memberCount}명 · 오늘 ${detail?.todayAttended ?? 0}명 출석`
+              : "모임을 만들고 가족을 초대해요"
+          }
+          onClick={() => onNavigate("group")}
+        />
+        <MoreRow
+          emoji="⚙️"
+          title="내 정보 · 설정"
+          sub="이름 · 지역 · 글씨 크기 · 가족 코드"
+          onClick={onOpenSettings}
+        />
+      </div>
+
+      <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
+        <p className="mb-2 text-[0.95rem] font-black">글씨 크기</p>
+        <div className="grid grid-cols-3 gap-2">
+          {([18, 21, 24] as const).map((size, i) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => setFontSize(size)}
+              aria-pressed={fontSize === size}
+              className={`min-h-[52px] rounded-2xl border-2 text-[0.9rem] font-extrabold ${
+                fontSize === size ? "border-brand bg-brand text-white" : "border-ink/10 bg-paper text-ink/70"
+              }`}
+            >
+              {["보통", "크게", "아주 크게"][i]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="flex items-center justify-center gap-1.5 pb-1 text-[0.76rem] font-semibold text-ink/35">
+        <NeulbomMark size={16} /> 늘봄과 함께, 더 편안한 하루
+      </p>
+    </div>
+  );
+}
+
 export default function Page() {
   return (
     <AppProvider>
       <ToastProvider>
-        <Shell />
+        <GroupProvider>
+          <Shell />
+        </GroupProvider>
       </ToastProvider>
     </AppProvider>
   );

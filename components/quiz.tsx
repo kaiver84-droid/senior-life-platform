@@ -11,8 +11,10 @@ import {
   type Question,
 } from "@/lib/quiz";
 import { renderCertificate, downloadCanvas } from "@/lib/canvas";
-import { shareCard, shareMessageText } from "@/lib/share";
+import { shareCard, shareLink, shareMessageText } from "@/lib/share";
 import { useApp } from "@/lib/storage";
+import { useGroup } from "@/lib/group-store";
+import { siteOrigin } from "@/lib/groups";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { IconChevron, IconClock, IconDownload, IconShare, IconTrophy } from "./icons";
@@ -20,6 +22,7 @@ import { RankingPanel } from "./ranking";
 
 export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { today, todayDaily, completeQuiz, weekPoints, streak } = useApp();
+  const { detail: groupDetail, active: activeGroup } = useGroup();
   const { show } = useToast();
   const dailyQs = useMemo(() => dailyQuestions(today), [today]);
   const [mode, setMode] = useState<"intro" | "play" | "done" | "practiceDone">(todayDaily?.done ? "done" : "intro");
@@ -119,6 +122,18 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           <IconTrophy size={24} />
         </span>
       </section>
+
+      {activeGroup && groupDetail ? (
+        <div className="fade-up flex items-center justify-between gap-2 rounded-2xl bg-white px-3.5 py-2.5 shadow-soft">
+          <Badge tone="coral">👥 우리 모임 공동 퀴즈</Badge>
+          <p className="text-[0.84rem] font-extrabold text-ink/60">
+            우리 모임 참여자{" "}
+            <span className="tabular text-brand-dark">
+              {groupDetail.todayAttended} / {groupDetail.memberCount}명
+            </span>
+          </p>
+        </div>
+      ) : null}
 
       {mode === "intro" ? (
         <Card className="fade-up overflow-hidden p-5">
@@ -403,6 +418,7 @@ function ResultAndCertificate({
   onPractice: () => void;
 }) {
   const { profile, today } = useApp();
+  const { detail: groupDetail, inviteLink } = useGroup();
   const [certOpen, setCertOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -448,6 +464,28 @@ function ResultAndCertificate({
             🏅 금빛 상장 만들기
           </BigButton>
         </div>
+        {groupDetail ? (
+          <div className="mt-2">
+            <BigButton
+              variant="sun"
+              full
+              onClick={async () => {
+                const result = await shareLink({
+                  title: `${profile?.nickname || "가족"} 님의 오늘 두뇌 퀴즈 결과`,
+                  description: `${total}문제 중 ${correct}문제 정답! ${groupDetail.name}에서 함께 겨뤄요.`,
+                  url: inviteLink(groupDetail.id) || siteOrigin(),
+                  buttonTitle: "모임에서 함께하기",
+                });
+                show(shareMessageText(result));
+              }}
+            >
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
+                TALK
+              </span>
+              모임에 결과 알리기
+            </BigButton>
+          </div>
+        ) : null}
         <p className="mt-2 text-[0.82rem] font-semibold leading-relaxed text-ink/50">
           내일 0시에 새로운 3문제가 열려요.
           <br />

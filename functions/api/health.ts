@@ -16,6 +16,7 @@ export const onRequestGet = async ({ env }: Ctx) =>
         "quiz",
         "certificate",
         "ranking",
+        "groups",
         "welfare",
         "magnifier",
         "family",

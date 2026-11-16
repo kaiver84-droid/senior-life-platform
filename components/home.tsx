@@ -11,6 +11,7 @@ import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
 import { Badge, BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
 import { HomeCalendarBanner } from "./calendar";
+import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
 import { HeroScene, NeulbomMark, WeatherArt } from "./art";
 import {
   IconBank,
@@ -153,6 +154,10 @@ export function HomeTab({
         </div>
       </section>
 
+      {/* 우리 모임 — 지금 보고 있는 모임과 오늘의 현황 */}
+      <GroupSelectorBanner />
+      <TodayGroupCard />
+
       {/* 감성 인사카드 히어로 */}
       <section className="fade-up overflow-hidden rounded-[1.75rem] bg-white shadow-card">
         <div className="relative h-[228px] overflow-hidden">
@@ -197,6 +202,9 @@ export function HomeTab({
           </button>
         </div>
       </section>
+
+      {/* 오늘의 모임 미션 */}
+      <GroupMissionBanner onJoin={() => onNavigate("quiz")} />
 
       {/* 오늘의 운세 */}
       <button

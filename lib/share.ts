@@ -151,6 +151,60 @@ export async function shareCard(opts: {
   return saved ? "downloaded" : "failed";
 }
 
+/**
+ * 링크(모임 초대 · 퀴즈 결과)를 카카오톡으로 보낸다.
+ * 카카오 JS 키가 없으면 휴대폰 공유창 → 클립보드 순서로 내려간다.
+ */
+export async function shareLink(opts: {
+  title: string;
+  description: string;
+  url: string;
+  buttonTitle?: string;
+  imageUrl?: string;
+}): Promise<ShareResult> {
+  const { title, description, url, buttonTitle } = opts;
+  const image = opts.imageUrl || `${url.split("?")[0].replace(/\/$/, "")}/share-card.png`;
+
+  try {
+    const ok = await loadKakaoSdk();
+    if (ok) {
+      const w = window as KakaoWindow;
+      w.Kakao?.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title,
+          description,
+          imageUrl: image,
+          imageWidth: 1200,
+          imageHeight: 630,
+          link: { mobileWebUrl: url, webUrl: url },
+        },
+        buttons: [{ title: buttonTitle || "늘봄 열기", link: { mobileWebUrl: url, webUrl: url } }],
+        installTalk: true,
+      });
+      return "kakao";
+    }
+  } catch {
+    /* 아래 폴백으로 */
+  }
+
+  try {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      await navigator.share({ title, text: `${title}\n${description}`, url });
+      return "share";
+    }
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") return "share";
+  }
+
+  try {
+    await navigator.clipboard.writeText(`${title}\n${description}\n${url}`);
+    return "downloaded";
+  } catch {
+    return "failed";
+  }
+}
+
 export async function shareText(opts: { title: string; text: string }): Promise<ShareResult> {
   const url = typeof window !== "undefined" ? window.location.href : "";
   try {

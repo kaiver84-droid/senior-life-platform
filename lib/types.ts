@@ -56,7 +56,7 @@ export type AppState = {
   lastVisit: string;
 };
 
-export type RankingScope = "region" | "zodiac" | "streak";
+export type RankingScope = "region" | "zodiac" | "streak" | "national" | "group";
 
 export type RankingRow = {
   rank: number;
@@ -75,6 +75,69 @@ export type RankingResult = {
   myRank: number | null;
   myPercentile: number | null;
   sample: boolean;
+};
+
+/* ------------------------------------------------------------------ */
+/* 모임 (groups · group_members · group_posts)                         */
+/* ------------------------------------------------------------------ */
+
+export type GroupRole = "leader" | "member" | "demo";
+
+export type GroupSummary = {
+  id: string;
+  name: string;
+  description: string;
+  isDemo: boolean;
+  memberCount: number;
+  goalScore: number;
+  weeklyGoal: number;
+  myRole: GroupRole;
+};
+
+export type GroupMemberInfo = {
+  code: string;
+  name: string;
+  isMe: boolean;
+  isLeader: boolean;
+  isDemo: boolean;
+  /** 오늘 출석(접속·퀴즈) 했는지 */
+  todayAttended: boolean;
+  /** 이번 주 참여 일수 */
+  weekDays: number;
+  /** 이번 주 퀴즈 점수 */
+  points: number;
+  rank: number;
+};
+
+export type GroupPostInfo = {
+  id: string;
+  authorCode: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+  cheers: number;
+  cheeredByMe: boolean;
+};
+
+export type GroupDetail = GroupSummary & {
+  creatorCode: string;
+  members: GroupMemberInfo[];
+  posts: GroupPostInfo[];
+  /** 오늘 출석 인원 */
+  todayAttended: number;
+  /** 오늘 출석률 % */
+  attendanceRate: number;
+  /** 이번 주 모임 달성률 % (참여 일수 / 목표) */
+  weeklyRate: number;
+  totalPoints: number;
+  myRank: number | null;
+  top: { name: string; points: number } | null;
+};
+
+export type GroupsPayload = {
+  groups: GroupSummary[];
+  activeGroupId: string | null;
+  detail: GroupDetail | null;
 };
 
 export type WelfareProgram = {

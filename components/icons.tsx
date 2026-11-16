@@ -255,6 +255,33 @@ export const IconSparkle = ({ className, size }: P) => (
   </svg>
 );
 
+/** 모임(사람들) */
+export const IconUsers = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <circle cx="9" cy="8.2" r="3.3" />
+    <circle cx="16.8" cy="9.6" r="2.5" />
+    <path d="M3.2 20c0-3.4 2.6-5.7 5.8-5.7s5.8 2.3 5.8 5.7" />
+    <path d="M15.6 20c0-2.3 1-4.1 3.1-4.1 2.2 0 3.3 1.7 3.3 4.1" />
+  </svg>
+);
+
+/** 더보기(⋯) */
+export const IconMore = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <circle cx="5.4" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="18.6" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+/** 출석 도장 */
+export const IconStamp = ({ className, size }: P) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <circle cx="12" cy="12" r="8.6" />
+    <path d="m8 12.4 2.8 2.8L16.2 9.6" />
+  </svg>
+);
+
 export const IconClock = ({ className, size }: P) => (
   <svg {...base(size)} className={className} aria-hidden>
     <circle cx="12" cy="12" r="8.6" />

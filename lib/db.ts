@@ -77,7 +77,8 @@ const TABLE = {
   family: "family_events",
 };
 
-async function sb(env: DbEnv, path: string, init: RequestInit = {}): Promise<Response> {
+/** PostgREST 호출 (모임 API 등 다른 모듈에서도 같은 키·헤더로 쓴다) */
+export async function sbRequest(env: DbEnv, path: string, init: RequestInit = {}): Promise<Response> {
   const { url, key } = supabaseConfig(env);
   return fetch(`${url}/rest/v1/${path}`, {
     ...init,
@@ -151,7 +152,7 @@ export async function upsertUser(env: DbEnv, code: string, profile: StoredProfil
     memoryMerge(code, { profile });
     return { ok: true, mode: "demo" as const };
   }
-  const res = await sb(env, `${TABLE.users}?on_conflict=code`, {
+  const res = await sbRequest(env, `${TABLE.users}?on_conflict=code`, {
     method: "POST",
     body: JSON.stringify([
       {
@@ -180,7 +181,7 @@ export async function saveQuizLog(env: DbEnv, code: string, log: StoredQuizLog) 
     memoryMerge(code, { quizLogs: [...logs, log] });
     return { ok: true, mode: "demo" as const };
   }
-  const res = await sb(env, `${TABLE.quiz}?on_conflict=user_code,quiz_date`, {
+  const res = await sbRequest(env, `${TABLE.quiz}?on_conflict=user_code,quiz_date`, {
     method: "POST",
     body: JSON.stringify([
       {
@@ -207,7 +208,7 @@ export async function saveMed(env: DbEnv, code: string, date: string, morning: b
     memoryMerge(code, { med });
     return { ok: true, mode: "demo" as const };
   }
-  const res = await sb(env, `${TABLE.med}?on_conflict=user_code,check_date`, {
+  const res = await sbRequest(env, `${TABLE.med}?on_conflict=user_code,check_date`, {
     method: "POST",
     body: JSON.stringify([{ user_code: code, check_date: date, morning, evening, updated_at: new Date().toISOString() }]),
   });
@@ -222,7 +223,7 @@ export async function saveFamilyEvents(env: DbEnv, code: string, events: StoredF
     return { ok: true, mode: "demo" as const };
   }
   // 가족 일정은 사용자당 한 줄에 통째로 저장한다(추가·수정·삭제가 한 번에 반영된다).
-  const res = await sb(env, `${TABLE.family}?on_conflict=user_code`, {
+  const res = await sbRequest(env, `${TABLE.family}?on_conflict=user_code`, {
     method: "POST",
     body: JSON.stringify([{ user_code: code, events, updated_at: new Date().toISOString() }]),
   });
@@ -238,7 +239,7 @@ export async function saveVisit(env: DbEnv, code: string, date: string) {
     memoryMerge(code, { visits });
     return { ok: true, mode: "demo" as const };
   }
-  const res = await sb(env, `${TABLE.visits}?on_conflict=user_code,visit_date`, {
+  const res = await sbRequest(env, `${TABLE.visits}?on_conflict=user_code,visit_date`, {
     method: "POST",
     body: JSON.stringify([{ user_code: code, visit_date: date }]),
   });
@@ -251,18 +252,18 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
   if (!configured) return memoryGet(code);
 
   const [users, quiz, med, visits, family] = await Promise.all([
-    sb(env, `${TABLE.users}?code=eq.${encodeURIComponent(code)}&limit=1`).then((r) => (r.ok ? r.json() : [])),
-    sb(
+    sbRequest(env, `${TABLE.users}?code=eq.${encodeURIComponent(code)}&limit=1`).then((r) => (r.ok ? r.json() : [])),
+    sbRequest(
       env,
       `${TABLE.quiz}?user_code=eq.${encodeURIComponent(code)}&order=quiz_date.desc&limit=40`
     ).then((r) => (r.ok ? r.json() : [])),
-    sb(env, `${TABLE.med}?user_code=eq.${encodeURIComponent(code)}&order=check_date.desc&limit=30`).then((r) =>
+    sbRequest(env, `${TABLE.med}?user_code=eq.${encodeURIComponent(code)}&order=check_date.desc&limit=30`).then((r) =>
       r.ok ? r.json() : []
     ),
-    sb(env, `${TABLE.visits}?user_code=eq.${encodeURIComponent(code)}&order=visit_date.desc&limit=30`).then((r) =>
+    sbRequest(env, `${TABLE.visits}?user_code=eq.${encodeURIComponent(code)}&order=visit_date.desc&limit=30`).then((r) =>
       r.ok ? r.json() : []
     ),
-    sb(env, `${TABLE.family}?user_code=eq.${encodeURIComponent(code)}&limit=1`).then((r) =>
+    sbRequest(env, `${TABLE.family}?user_code=eq.${encodeURIComponent(code)}&limit=1`).then((r) =>
       r.ok ? r.json() : []
     ),
   ]);
@@ -323,7 +324,7 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
 export async function getWeeklyRanking(env: DbEnv, weekId: string, limit = 200) {
   const { configured } = supabaseConfig(env);
   if (!configured) return null;
-  const res = await sb(
+  const res = await sbRequest(
     env,
     `${TABLE.quiz}?week_id=eq.${encodeURIComponent(weekId)}&select=user_code,points,quiz_date&limit=${limit}`
   );

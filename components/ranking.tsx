@@ -2,19 +2,20 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { buildRanking } from "@/lib/rankings";
-import type { RankingResult, RankingScope } from "@/lib/types";
+import type { RankingResult, RankingScope, RankingRow } from "@/lib/types";
 import { periodLabel, resetCountdown, weekIdOf } from "@/lib/week";
 import { useApp } from "@/lib/storage";
+import { useGroup } from "@/lib/group-store";
 import { Badge, BigButton, Card, PillTabs, SectionTitle } from "./ui";
-import { IconChevron, IconCrown, IconQuiz, IconSparkle, IconTrophy } from "./icons";
+import { IconChevron, IconCrown, IconQuiz, IconSparkle, IconTrophy, IconUsers } from "./icons";
+import { GroupRankingBanner } from "./groups";
 
 const TABS: { key: RankingScope; label: string; emoji: string; desc: string }[] = [
-  { key: "region", label: "우리 동네", emoji: "🏘️", desc: "같은 시·군·구 어르신" },
-  { key: "zodiac", label: "출생연도", emoji: "🐯", desc: "같은 띠 · 비슷한 나이" },
+  { key: "group", label: "우리 모임", emoji: "👥", desc: "가족·친구와 함께 겨루는 순위" },
+  { key: "national", label: "전국", emoji: "🇰🇷", desc: "전국 어르신 순위" },
+  { key: "region", label: "지역별", emoji: "🏘️", desc: "같은 시·군·구 어르신" },
   { key: "streak", label: "개근왕", emoji: "📅", desc: "연속 출석 일수" },
 ];
-
-const MEDALS = ["🥇", "🥈", "🥉"];
 
 function useRanking(scope: RankingScope) {
   const { profile, weekPoints, streak } = useApp();
@@ -38,6 +39,10 @@ function useRanking(scope: RankingScope) {
   );
 
   useEffect(() => {
+    if (scope === "group") {
+      setLoading(false);
+      return;
+    }
     const params = new URLSearchParams({
       scope,
       weekId,
@@ -93,14 +98,12 @@ function Podium({
     place,
     height,
     bar,
-    medal,
     avatar,
   }: {
     row?: RankingResult["rows"][number];
     place: number;
     height: number;
     bar: string;
-    medal: string;
     avatar: string;
   }) => (
     <div className="flex flex-1 flex-col items-center">
@@ -131,9 +134,143 @@ function Podium({
 
   return (
     <div className="flex items-end gap-2">
-      <Column row={second} place={2} height={62} bar="bg-[#9FB3C8]" medal="🥈" avatar="bg-[#9FB3C8]" />
-      <Column row={first} place={1} height={92} bar="bg-gradient-to-b from-gold to-[#E9AE20]" medal="🥇" avatar="bg-gradient-to-br from-[#F7C346] to-[#E09A12]" />
-      <Column row={third} place={3} height={46} bar="bg-[#D8A583]" medal="🥉" avatar="bg-[#D8A583]" />
+      <Column row={second} place={2} height={62} bar="bg-[#9FB3C8]" avatar="bg-[#9FB3C8]" />
+      <Column row={first} place={1} height={92} bar="bg-gradient-to-b from-gold to-[#E9AE20]" avatar="bg-gradient-to-br from-[#F7C346] to-[#E09A12]" />
+      <Column row={third} place={3} height={46} bar="bg-[#D8A583]" avatar="bg-[#D8A583]" />
+    </div>
+  );
+}
+
+/** 4위부터의 목록 */
+function RestList({ rows, scope }: { rows: RankingResult["rows"]; scope: RankingScope }) {
+  if (!rows.length) return null;
+  return (
+    <Card className="p-3.5">
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-[0.86rem] font-black text-ink/60">4위 ~ {3 + rows.length}위</p>
+        <p className="text-[0.76rem] font-bold text-ink/35">
+          {scope === "streak" ? "연속 출석" : scope === "group" ? "이번 주 점수" : "이번 주 점수"}
+        </p>
+      </div>
+      <div className="space-y-1">
+        {rows.map((row) => (
+          <div
+            key={`${row.rank}-${row.name}`}
+            className={`flex items-center gap-3 rounded-xl px-2.5 py-2 ${row.isMe ? "bg-brand-light" : ""}`}
+          >
+            <span className="w-6 text-center text-[0.92rem] font-black text-ink/45">{row.rank}</span>
+            <span className={`flex-1 truncate text-[0.96rem] ${row.isMe ? "font-black text-brand-deep" : "font-bold text-ink/85"}`}>
+              {row.name}
+              {row.isMe ? <span className="ml-1 text-[0.74rem] font-extrabold text-brand">(나)</span> : null}
+            </span>
+            <span className="tabular text-[0.92rem] font-extrabold text-ink/70">
+              {scope === "streak" ? `${row.streak}일` : `${row.points}점`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* 우리 모임 순위 (실제 모임 회원 데이터)                              */
+/* ---------------------------------------------------------------- */
+
+function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+  const { detail, active } = useGroup();
+  const { weekPoints, streak } = useApp();
+
+  if (!detail || !active) {
+    return (
+      <Card className="p-5 text-center">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-light text-brand-dark">
+          <IconUsers size={26} />
+        </span>
+        <p className="mt-2 text-[1.05rem] font-black text-ink">아직 모임이 없어요</p>
+        <p className="mt-1 text-[0.9rem] font-semibold leading-relaxed text-ink/55">
+          모임에 들어가면 가족·친구와 함께
+          <br />
+          이번 주 순위를 겨룰 수 있어요.
+        </p>
+        <div className="mt-3">
+          <BigButton variant="ink" full onClick={() => onNavigate?.("group")}>
+            <IconUsers size={20} /> 우리 모임 시작하기
+          </BigButton>
+        </div>
+      </Card>
+    );
+  }
+
+  const rows: RankingRow[] = detail.members.map((m) => ({
+    rank: m.rank,
+    name: m.name,
+    points: m.points,
+    streak: m.weekDays,
+    isMe: m.isMe,
+  }));
+  const rest = rows.slice(3, 10);
+  const me = rows.find((r) => r.isMe);
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card">
+        <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
+          <IconTrophy size={16} /> {active.name} · {periodLabel()}
+        </div>
+        <Podium rows={rows.slice(0, 10)} scope="group" />
+
+        <div className="mt-3 rounded-2xl bg-gradient-to-r from-plum to-[#5B4FA8] px-3.5 py-2.5 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-[0.9rem] font-black text-white">
+            <IconSparkle size={16} className="text-[#FFE28A]" />
+            {detail.top ? `${detail.top.name} 님, 우리 모임 1위예요!` : "이번 주 1위를 기다리고 있어요"}
+          </p>
+        </div>
+      </div>
+
+      <p className="text-center text-[0.8rem] font-semibold text-ink/45">
+        오늘 {detail.todayAttended}명 참여 · 모임 회원 {detail.memberCount}명
+      </p>
+
+      <RestList rows={rest} scope="group" />
+
+      <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[0.8rem] font-bold text-ink/50">우리 모임 내 순위</p>
+            <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
+              {detail.myRank ? (
+                <>
+                  {detail.myRank}
+                  <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {detail.memberCount}명</span>
+                </>
+              ) : (
+                <span className="text-[1.05rem] text-ink/45">아직 참여 전이에요</span>
+              )}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[0.8rem] font-bold text-ink/50">이번 주 점수</p>
+            <p className="tabular text-[1.15rem] font-black text-brand-dark">{weekPoints}점</p>
+            <p className="text-[0.82rem] font-extrabold text-leaf-dark">🔥 {streak}일 연속</p>
+          </div>
+        </div>
+        {me ? (
+          <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-center text-[0.86rem] font-bold text-ink/60">
+            이번 주 {me.streak}일 참여했어요. 퀴즈를 풀면 점수가 더 올라가요!
+          </p>
+        ) : (
+          <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-center text-[0.86rem] font-bold text-ink/60">
+            퀴즈를 풀면 우리 모임 순위에 이름이 올라가요.
+          </p>
+        )}
+      </Card>
+
+      <GroupRankingBanner onNavigate={onNavigate} />
+
+      <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
+        매주 월요일 0시에 우리 모임 순위도 새로 시작해요 (앞으로 {resetCountdown()}).
+      </p>
     </div>
   );
 }
@@ -142,7 +279,13 @@ function Podium({
 /* 랭킹 보드 (탭 포함)                                                */
 /* ---------------------------------------------------------------- */
 
-export function RankingBoard({ initialScope = "region" }: { initialScope?: RankingScope }) {
+export function RankingBoard({
+  initialScope = "group",
+  onNavigate,
+}: {
+  initialScope?: RankingScope;
+  onNavigate?: (tab: string) => void;
+}) {
   const [scope, setScope] = useState<RankingScope>(initialScope);
   const { view, loading } = useRanking(scope);
   const { streak, weekPoints, state, weekId } = useApp();
@@ -154,103 +297,81 @@ export function RankingBoard({ initialScope = "region" }: { initialScope?: Ranki
 
   return (
     <div className="space-y-3">
-      <PillTabs tabs={TABS.map((t) => ({ key: t.key, label: t.label, emoji: t.emoji }))} value={scope} onChange={setScope} />
+      <PillTabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} value={scope} onChange={setScope} />
       <p className="text-center text-[0.8rem] font-semibold text-ink/45">{tab.desc}</p>
 
-      {/* 시상대 */}
-      <div className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card">
-        <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
-          <IconTrophy size={16} /> {periodLabel()} 명예의 전당
-        </div>
-        <Podium rows={view.rows} scope={scope} />
+      {scope === "group" ? (
+        <GroupRankingBoard onNavigate={onNavigate} />
+      ) : (
+        <>
+          {/* 시상대 */}
+          <div className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card">
+            <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
+              <IconTrophy size={16} /> {periodLabel()} 명예의 전당
+            </div>
+            <Podium rows={view.rows} scope={scope} />
 
-        <div className="mt-3 rounded-2xl bg-gradient-to-r from-plum to-[#5B4FA8] px-3.5 py-2.5 text-center">
-          <p className="flex items-center justify-center gap-1.5 text-[0.9rem] font-black text-white">
-            <IconSparkle size={16} className="text-[#FFE28A]" />
-            {view.rows[0] ? `${view.rows[0].name} 님, 이번 주 1위를 축하합니다!` : "이번 주 1위를 기다리고 있어요"}
-          </p>
-        </div>
-      </div>
-
-      {/* 4~10위 */}
-      {rest.length > 0 ? (
-        <Card className="p-3.5">
-          <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-[0.86rem] font-black text-ink/60">4위 ~ 10위</p>
-            <p className="text-[0.76rem] font-bold text-ink/35">{scope === "streak" ? "연속 출석" : "이번 주 점수"}</p>
+            <div className="mt-3 rounded-2xl bg-gradient-to-r from-plum to-[#5B4FA8] px-3.5 py-2.5 text-center">
+              <p className="flex items-center justify-center gap-1.5 text-[0.9rem] font-black text-white">
+                <IconSparkle size={16} className="text-[#FFE28A]" />
+                {view.rows[0] ? `${view.rows[0].name} 님, 이번 주 1위를 축하합니다!` : "이번 주 1위를 기다리고 있어요"}
+              </p>
+            </div>
           </div>
-          <div className="space-y-1">
-            {rest.map((row) => (
-              <div
-                key={`${row.rank}-${row.name}`}
-                className={`flex items-center gap-3 rounded-xl px-2.5 py-2 ${
-                  row.isMe ? "bg-brand-light" : ""
-                }`}
-              >
-                <span className="w-6 text-center text-[0.92rem] font-black text-ink/45">{row.rank}</span>
-                <span className={`flex-1 truncate text-[0.96rem] ${row.isMe ? "font-black text-brand-deep" : "font-bold text-ink/85"}`}>
-                  {row.name}
-                  {row.isMe ? <span className="ml-1 text-[0.74rem] font-extrabold text-brand">(나)</span> : null}
-                </span>
-                <span className="tabular text-[0.92rem] font-extrabold text-ink/70">
-                  {scope === "streak" ? `${row.streak}일` : `${row.points}점`}
-                </span>
+
+          <RestList rows={rest} scope={scope} />
+
+          {/* 내 순위 */}
+          <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[0.8rem] font-bold text-ink/50">내 순위</p>
+                <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
+                  {hasRecord && view.myRank ? (
+                    <>
+                      {view.myRank}
+                      <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {view.total}명</span>
+                    </>
+                  ) : (
+                    <span className="text-[1.05rem] text-ink/45">아직 기록이 없어요</span>
+                  )}
+                </p>
               </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
+              <div className="text-right">
+                <p className="text-[0.8rem] font-bold text-ink/50">{scope === "streak" ? "연속 출석" : "이번 주 점수"}</p>
+                <p className="tabular text-[1.15rem] font-black text-brand-dark">
+                  {scope === "streak" ? `${streak}일` : `${weekPoints}점`}
+                </p>
+                <p className="text-[0.82rem] font-extrabold text-leaf-dark">
+                  {hasRecord && view.myPercentile && weekPoints > 0
+                    ? view.myPercentile <= 50
+                      ? `상위 ${view.myPercentile}% · 잘하고 있어요!`
+                      : `상위 ${view.myPercentile}% · 더 풀면 올라가요`
+                    : "퀴즈를 풀면 순위가 생겨요"}
+                </p>
+              </div>
+            </div>
+            {me && me.rank > 10 && weekPoints > 0 ? (
+              <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-center text-[0.86rem] font-bold text-ink/60">
+                {me.name} 님은 {me.rank}위예요. <span className="text-leaf-dark">상위 {view.myPercentile}%</span> 안에 들어요!
+              </p>
+            ) : null}
+            {!meInList && hasRecord ? (
+              <p className="mt-2 text-center text-[0.82rem] font-semibold text-ink/50">
+                10위 안에 들면 이름이 여기에 보여요.
+              </p>
+            ) : null}
+          </Card>
 
-      {/* 내 순위 */}
-      <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-[0.8rem] font-bold text-ink/50">내 순위</p>
-            <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
-              {hasRecord && view.myRank ? (
-                <>
-                  {view.myRank}
-                  <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {view.total}명</span>
-                </>
-              ) : (
-                <span className="text-[1.05rem] text-ink/45">아직 기록이 없어요</span>
-              )}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[0.8rem] font-bold text-ink/50">{scope === "streak" ? "연속 출석" : "이번 주 점수"}</p>
-            <p className="tabular text-[1.15rem] font-black text-brand-dark">
-              {scope === "streak" ? `${streak}일` : `${weekPoints}점`}
-            </p>
-            <p className="text-[0.82rem] font-extrabold text-leaf-dark">
-              {hasRecord && view.myPercentile && weekPoints > 0
-                ? view.myPercentile <= 50
-                  ? `상위 ${view.myPercentile}% · 잘하고 있어요!`
-                  : `상위 ${view.myPercentile}% · 더 풀면 올라가요`
-                : "퀴즈를 풀면 순위가 생겨요"}
-            </p>
-          </div>
-        </div>
-        {me && me.rank > 10 && weekPoints > 0 ? (
-          <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-center text-[0.86rem] font-bold text-ink/60">
-            {me.name} 님은 {me.rank}위예요.{" "}
-            <span className="text-leaf-dark">상위 {view.myPercentile}%</span> 안에 들어요!
+          <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
+            매주 월요일 0시에 새로 시작해요 (앞으로 {resetCountdown()}).
+            <br />
+            이름은 뒤 글자를 가려서 보여 드려요.
+            {view.sample ? " 지금은 예시 순위이며, 참여자가 쌓이면 실제 순위로 바뀝니다." : ""}
+            {loading ? " 순위를 새로 불러오는 중…" : ""}
           </p>
-        ) : null}
-        {!meInList && hasRecord ? (
-          <p className="mt-2 text-center text-[0.82rem] font-semibold text-ink/50">
-            10위 안에 들면 이름이 여기에 보여요.
-          </p>
-        ) : null}
-      </Card>
-
-      <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
-        매주 월요일 0시에 새로 시작해요 (앞으로 {resetCountdown()}).
-        <br />
-        이름은 뒤 글자를 가려서 보여 드려요.
-        {view.sample ? " 지금은 예시 순위이며, 참여자가 쌓이면 실제 순위로 바뀝니다." : ""}
-        {loading ? " 순위를 새로 불러오는 중…" : ""}
-      </p>
+        </>
+      )}
     </div>
   );
 }
@@ -267,10 +388,8 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
       </SectionTitle>
       <Card className="flex items-center justify-between gap-2 p-4">
         <div className="min-w-0 flex-1">
-          <p className="text-[0.98rem] font-black leading-snug text-ink">내 순위와 이웃 순위가 궁금하세요?</p>
-          <p className="mt-0.5 text-[0.85rem] font-semibold text-ink/55">
-            우리 동네 · 출생연도 · 개근왕
-          </p>
+          <p className="text-[0.98rem] font-black leading-snug text-ink">우리 모임과 이웃 순위가 궁금하세요?</p>
+          <p className="mt-0.5 text-[0.85rem] font-semibold text-ink/55">우리 모임 · 전국 · 지역별 · 개근왕</p>
         </div>
         <button
           onClick={() => onNavigate?.("ranking")}
@@ -290,6 +409,7 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
 
 export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { profile, streak, weekPoints, todayDaily } = useApp();
+  const { active } = useGroup();
   return (
     <div className="space-y-4">
       <section className="fade-up pt-1">
@@ -302,17 +422,18 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
         </h1>
         <p className="mt-1 text-[0.9rem] font-semibold text-ink/55">
           🔥 {streak}일 연속 출석 · 이번 주 {weekPoints}점
+          {active ? ` · ${active.name}` : ""}
         </p>
       </section>
 
-      <RankingBoard />
+      <RankingBoard onNavigate={onNavigate} />
 
       <div className="grid grid-cols-1 gap-2">
         <BigButton variant={todayDaily?.done ? "white" : "teal"} size="lg" full onClick={() => onNavigate("quiz")}>
           <IconQuiz size={22} /> {todayDaily?.done ? "퀴즈 결과 · 상장 보기" : "오늘 퀴즈 풀러 가기"}
         </BigButton>
-        <BigButton variant="white" full onClick={() => onNavigate("home")}>
-          홈으로
+        <BigButton variant="white" full onClick={() => onNavigate("group")}>
+          <IconUsers size={20} /> 우리 모임 보기
         </BigButton>
       </div>
     </div>

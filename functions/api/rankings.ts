@@ -14,7 +14,9 @@ export const onRequestGet = async ({ request }: Ctx) => {
   const p = new URL(request.url).searchParams;
   const scopeParam = p.get("scope") || "region";
   const scope: RankingScope =
-    scopeParam === "zodiac" || scopeParam === "streak" ? (scopeParam as RankingScope) : "region";
+    scopeParam === "zodiac" || scopeParam === "streak" || scopeParam === "national"
+      ? (scopeParam as RankingScope)
+      : "region";
 
   const result = buildRanking({
     scope,
