@@ -153,7 +153,7 @@ export async function saveQuizLog(env: DbEnv, code: string, log: StoredQuizLog) 
     memoryMerge(code, { quizLogs: [...logs, log] });
     return { ok: true, mode: "demo" as const };
   }
-  const res = await sb(env, TABLE.quiz, {
+  const res = await sb(env, `${TABLE.quiz}?on_conflict=user_code,quiz_date`, {
     method: "POST",
     body: JSON.stringify([
       {

@@ -10,3 +10,4 @@ out/
 *.tsbuildinfo
 __pycache__/
 *.pyc
+.supabase_token

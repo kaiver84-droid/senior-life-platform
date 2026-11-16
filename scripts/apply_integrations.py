@@ -29,6 +29,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -36,6 +37,7 @@ ENV_FILE = ROOT / ".env.integrations"
 ACCOUNT = os.environ.get("CF_ACCOUNT_ID", "bbddf7735b353b9656460deab2744f9b")
 PROJECT = os.environ.get("CF_PROJECT", "senior-life-platform")
 API = "https://api.cloudflare.com/client/v4"
+SITE = os.environ.get("SITE_URL", "https://senior-life-platform.pages.dev")
 NODE_BIN = "/workspace/work/.tools/node-v20.18.0-linux-x64/bin"
 
 RUNTIME_KEYS = [
@@ -111,7 +113,13 @@ def run(cmd: list, cwd: pathlib.Path, env_extra: dict | None = None) -> None:
 def deploy(values: dict) -> None:
     build_env = {k: v for k, v in values.items() if k.startswith("NEXT_PUBLIC_")}
     build_env.setdefault("NEXT_PUBLIC_SITE_URL", "https://senior-life-platform.pages.dev")
-    run(["npm", "install", "--no-audit", "--no-fund"], ROOT)
+    # node_modules 가 이미 있으면 npm install 을 건너뛴다.
+    # (package-lock.json 의 optional fsevents 항목에 version 이 비어 있어 `npm install` 이
+    #  `Invalid Version` 으로 실패하는 상태 — 의존성은 이미 설치돼 있으므로 빌드에는 영향 없음)
+    if (ROOT / "node_modules").is_dir():
+        print("node_modules 있음 → npm install 건너뜀")
+    else:
+        run(["npm", "install", "--no-audit", "--no-fund", "--omit=optional"], ROOT)
     run(["npm", "run", "build"], ROOT, build_env)
     run(
         ["npx", "--yes", "esbuild@0.24.0", "functions-entry.ts", "--bundle", "--format=esm",
@@ -126,26 +134,69 @@ def deploy(values: dict) -> None:
     )
 
 
+def get_json(path: str, method: str = "GET", body: dict | None = None) -> tuple[int, dict]:
+    data = None if body is None else json.dumps(body).encode()
+    req = urllib.request.Request(
+        SITE + path,
+        data=data,
+        method=method,
+        headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            return res.status, json.loads(res.read().decode() or "{}")
+    except urllib.error.HTTPError as e:
+        return e.code, {"raw": e.read().decode()[:300]}
+
+
 def verify() -> int:
-    health = urllib.request.urlopen(
-        urllib.request.Request(
-            "https://senior-life-platform.pages.dev/api/health",
-            headers={"User-Agent": "Mozilla/5.0"},
-        ),
-        timeout=30,
-    ).read().decode()
-    kakao = urllib.request.urlopen(
-        urllib.request.Request(
-            "https://senior-life-platform.pages.dev/api/auth/kakao",
-            headers={"User-Agent": "Mozilla/5.0"},
-        ),
-        timeout=30,
-    ).read().decode()
-    print("health:", health)
-    print("kakao :", kakao)
-    ok = '"supabase":"ok"' in health.replace(" ", "") and '"kakaoConfigured":true' in kakao.replace(" ", "")
+    """라이브 검증: health(DB 연결) → state 쓰기/읽기(Supabase 왕복) → rankings.
+
+    주의: lib/db.ts 의 dbStatus() 는 연결 시 `"connected"` 를 돌려준다(구버전 표기 `"ok"` 도 허용).
+    """
+    ok = True
+
+    status, health = get_json("/api/health")
+    print(f"health  [{status}]", json.dumps(health, ensure_ascii=False))
+    supabase_ok = status == 200 and health.get("supabase") in ("connected", "ok")
+    ok = ok and supabase_ok
+
+    code = "VERIFY01"
+    today = subprocess.run(["date", "-u", "+%Y-%m-%d"], capture_output=True, text=True).stdout.strip()
+    profile = {
+        "id": "verify",
+        "nickname": "연동검증",
+        "birthYear": 1955,
+        "sido": "충청북도",
+        "sigungu": "옥천군",
+        "source": "demo",
+        "createdAt": today + "T00:00:00Z",
+    }
+    status, saved = get_json(
+        "/api/state",
+        "POST",
+        {"code": code, "profile": profile, "today": today,
+         "quizLogs": [{"date": today, "weekId": "VERIFY-W", "correct": 2, "total": 3, "points": 20, "seconds": 40, "types": ["add"]}]},
+    )
+    print(f"state POST [{status}]", json.dumps(saved, ensure_ascii=False))
+    ok = ok and status == 200 and bool(saved.get("ok")) and saved.get("mode") == "connected"
+
+    status, state = get_json(f"/api/state?code={code}")
+    print(f"state GET  [{status}]", json.dumps(state, ensure_ascii=False)[:300])
+    got_profile = ((state.get("state") or {}).get("profile") or {}).get("nickname")
+    ok = ok and status == 200 and got_profile == profile["nickname"]
+
+    status, rankings = get_json("/api/rankings?scope=region&sido=충청북도&sigungu=옥천군&points=20&streak=1")
+    print(f"rankings   [{status}]", json.dumps(rankings, ensure_ascii=False)[:200])
+    ok = ok and status == 200 and bool(rankings.get("ok"))
+
+    status, kakao = get_json("/api/auth/kakao")
+    print(f"kakao      [{status}]", json.dumps(kakao, ensure_ascii=False)[:200], "(카카오 키는 이번 범위 아님)")
+
     if not ok:
-        print("주의: 아직 demo/not-configured 입니다. 키 값과 Cloudflare 변수 타입(secret_text)을 확인하세요.")
+        print("주의: 아직 demo 상태입니다. 키 값과 Cloudflare 변수 타입(secret_text), 재배포 여부를 확인하세요.")
+    else:
+        print("검증 통과: Supabase 실연동 확인(health/state 쓰기·읽기/rankings).")
     return 0 if ok else 1
 
 
@@ -160,8 +211,10 @@ def main() -> None:
     optional = ("KAKAO_REDIRECT_URI", "NEXT_PUBLIC_SITE_URL")
     missing = [k for k in RUNTIME_KEYS if not values.get(k) and k not in optional]
     if missing:
-        print("빠진 키:", ", ".join(missing), file=sys.stderr)
-        sys.exit(1)
+        # 부분 연동 허용: 없는 키는 건너뛰고 경고만 남긴다(예: 카카오 키 없이 Supabase만 연결).
+        print("넘어갈 키(값 없음):", ", ".join(missing), file=sys.stderr)
+    if not values.get("NEXT_PUBLIC_SUPABASE_URL"):
+        sys.exit("NEXT_PUBLIC_SUPABASE_URL 이 없으면 아무것도 연결할 수 없습니다.")
     values.setdefault("KAKAO_REDIRECT_URI", "https://senior-life-platform.pages.dev/")
 
     print("Cloudflare Pages 환경변수 등록(secret_text):")

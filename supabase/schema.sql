@@ -126,7 +126,7 @@ as $$
     q.user_code,
     u.nickname,
     sum(q.points)::int as points,
-    max(0, count(distinct q.quiz_date))::int as streak
+    greatest(0, count(distinct q.quiz_date))::int as streak
   from public.quiz_logs q
   join public.users u on u.code = q.user_code
   where (p_week is null or q.week_id = p_week)
