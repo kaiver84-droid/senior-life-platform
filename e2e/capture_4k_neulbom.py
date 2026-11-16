@@ -154,7 +154,18 @@ def main():
         page = ctx.new_page()
         page.on("pageerror", lambda e: errs.append(f"pageerror: {e}"))
         page.on("console", lambda m: errs.append(f"error: {m.text}") if m.type == "error" else None)
-        page.on("requestfailed", lambda r: errs.append(f"requestfailed: {r.url}"))
+        def on_fail(req):
+            # 화면 이동·지연 로딩 취소(ERR_ABORTED)는 오류가 아니다 — 실제 실패만 모은다
+            reason = ""
+            try:
+                reason = req.failure or ""
+            except Exception:
+                pass
+            if "ERR_ABORTED" in reason:
+                return
+            errs.append(f"requestfailed: {req.url} ({reason})")
+
+        page.on("requestfailed", on_fail)
 
         # ---------- ① 접속 첫 화면 ----------
         page.goto(BASE + "/", wait_until="domcontentloaded")
