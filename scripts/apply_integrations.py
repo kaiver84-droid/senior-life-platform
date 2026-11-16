@@ -30,6 +30,7 @@ import re
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -186,7 +187,11 @@ def verify() -> int:
     got_profile = ((state.get("state") or {}).get("profile") or {}).get("nickname")
     ok = ok and status == 200 and got_profile == profile["nickname"]
 
-    status, rankings = get_json("/api/rankings?scope=region&sido=충청북도&sigungu=옥천군&points=20&streak=1")
+    status, rankings = get_json(
+        "/api/rankings?" + urllib.parse.urlencode(
+            {"scope": "region", "sido": "충청북도", "sigungu": "옥천군", "points": 20, "streak": 1}
+        )
+    )
     print(f"rankings   [{status}]", json.dumps(rankings, ensure_ascii=False)[:200])
     ok = ok and status == 200 and bool(rankings.get("ok"))
 
