@@ -74,6 +74,15 @@ print(json.loads(urllib.request.urlopen(req).read())["success"])
 PY
 ```
 
+### 연동 키 한 번에 넣기
+
+키를 받으면 `work/senior-platform/.env.integrations`(git 제외)에 적고 아래를 실행한다.
+런타임 변수는 전부 `secret_text` 로 들어가고, `--deploy` 를 주면 빌드·배포·라이브 검증까지 한다.
+
+```bash
+python3 scripts/apply_integrations.py --deploy
+```
+
 ### 카카오 로그인 흐름
 
 1. 온보딩 화면의 **카카오톡으로 시작하기** → `GET /api/auth/kakao?start=1` 이 카카오 인가 화면으로 302
