@@ -30,6 +30,39 @@ export function Onboarding() {
       .catch(() => {});
   }, []);
 
+  // 카카오 로그인 콜백(?code=...) 처리
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    setBusy(true);
+    fetch("/api/auth/kakao", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code }),
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j?.ok || !j.profile) {
+          show("카카오 로그인에 실패했어요. 이름과 지역을 직접 골라 주세요.");
+          return;
+        }
+        const p = j.profile as { nickname?: string; birthYear?: number; avatar?: string };
+        const year = Number(p.birthYear || 0) >= 1930 && Number(p.birthYear || 0) <= 1973 ? Number(p.birthYear) : birthYear;
+        const name = (p.nickname || "").trim() || "카카오 이용자";
+        saveProfile({ nickname: name, birthYear: year, sido, sigungu, source: "kakao", avatar: p.avatar });
+        show(`${name} 님, 카카오로 시작합니다!`);
+      })
+      .catch(() => show("카카오 로그인에 실패했어요. 이름과 지역을 직접 골라 주세요."))
+      .finally(() => setBusy(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startKakao = () => {
+    window.location.href = "/api/auth/kakao?start=1";
+  };
+
   const submit = async () => {
     const name = nickname.trim();
     if (name.length < 1) {
@@ -141,12 +174,20 @@ export function Onboarding() {
           </BigButton>
 
           <div className="rounded-2xl bg-[#FEE500]/35 p-3 text-center">
-            <p className="text-[0.95rem] font-bold text-[#3C1E1E]">
-              🟡 카카오 간편 로그인 (체험)
-            </p>
-            <p className="mt-1 text-[0.85rem] font-medium text-[#3C1E1E]/80">
+            <p className="text-[0.95rem] font-bold text-[#3C1E1E]">🟡 카카오 간편 로그인</p>
+            {kakao.configured ? (
+              <button
+                type="button"
+                onClick={startKakao}
+                disabled={busy}
+                className="mt-2 w-full rounded-xl bg-[#FEE500] px-4 py-3 text-[1rem] font-extrabold text-[#3C1E1E] shadow-sm transition active:scale-[0.99] disabled:opacity-60"
+              >
+                카카오톡으로 시작하기
+              </button>
+            ) : null}
+            <p className="mt-1.5 text-[0.85rem] font-medium text-[#3C1E1E]/80">
               {kakao.configured
-                ? "카카오 앱 키가 연결되어 있어요. 위 정보로 바로 시작할 수 있어요."
+                ? "위 정보를 직접 골라도 되고, 카카오톡으로 한 번에 시작해도 돼요."
                 : "앱 키를 넣기 전에도 위 정보만으로 모든 기능을 써 볼 수 있어요."}
             </p>
           </div>

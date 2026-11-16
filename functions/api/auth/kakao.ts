@@ -29,6 +29,17 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
 
+  // 카카오 로그인 시작: 카카오 인가 화면으로 302 (REST 키는 서버에만 둔다)
+  if (url.searchParams.get("start")) {
+    if (!env.KAKAO_CLIENT_ID) return json({ ok: false, error: "kakao_not_configured" }, 503);
+    const redirectUri = env.KAKAO_REDIRECT_URI || `${url.origin}/`;
+    const authorize = new URL("https://kauth.kakao.com/oauth/authorize");
+    authorize.searchParams.set("client_id", env.KAKAO_CLIENT_ID);
+    authorize.searchParams.set("redirect_uri", redirectUri);
+    authorize.searchParams.set("response_type", "code");
+    return new Response(null, { status: 302, headers: { location: authorize.toString() } });
+  }
+
   if (!code) {
     return json({
       ok: true,
