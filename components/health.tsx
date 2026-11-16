@@ -12,9 +12,18 @@ import {
 } from "@/lib/health";
 import { koreanDate } from "@/lib/week";
 import { BigButton, useToast } from "./ui";
-import { Icon3D } from "./art";
+import { Icon3D, type Icon3DName } from "./art";
 import { IconChevron, IconShare, IconStamp } from "./icons";
 import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
+
+/** 챌린지 항목별 3D 클레이 아이콘 — 이모지 대신 쓴다 */
+const HEALTH_ICON: Record<string, Icon3DName> = {
+  water: "icon-3d-water",
+  walk: "icon-3d-walk",
+  stretch: "icon-3d-stretch",
+  medicine: "icon-3d-medicine",
+  family: "icon-3d-call",
+};
 
 /**
  * 오늘의 건강생활 챌린지 — 원터치 완료 도장.
@@ -124,8 +133,12 @@ export function HealthChallengeCard({ where = "home" }: { where?: "home" | "grou
                   on ? "border-leaf bg-leaf-light" : "border-ink/8 bg-paper"
                 }`}
               >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-[1.2rem] shadow-soft">
-                  {c.emoji}
+                <span className="grid h-10 w-10 shrink-0 place-items-center">
+                  {HEALTH_ICON[c.id] ? (
+                    <Icon3D name={HEALTH_ICON[c.id]} size={40} className="drop-shadow-[0_4px_8px_rgba(60,80,70,0.18)]" />
+                  ) : (
+                    <span className="text-[1.2rem]">{c.emoji}</span>
+                  )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className={`block text-[1rem] font-black leading-tight ${on ? "text-leaf-dark" : "text-ink"}`}>

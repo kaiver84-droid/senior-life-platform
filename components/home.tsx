@@ -9,7 +9,7 @@ import { kakaoConfig } from "@/lib/share";
 import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
-import { Badge, BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
+import { BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
 import { HomeCalendarBanner } from "./calendar";
 import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
 import { HealthChallengeCard } from "./health";
@@ -122,26 +122,40 @@ export function HomeTab({
 
   return (
     <div className="space-y-4 pb-2">
-      {/* 인사 + 날짜 */}
-      <section className="fade-up flex items-start justify-between gap-3 pt-1">
-        <div className="min-w-0">
-          <p className="text-[0.86rem] font-extrabold tracking-tight text-brand-dark/80">안녕하세요,</p>
-          <h1 className="mt-0.5 flex items-center gap-1.5 text-[1.52rem] font-black leading-tight text-ink">
-            <span className="truncate">{profile?.nickname}</span>
-            <span className="text-[1.3rem]">😊</span>
-          </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {streak > 0 ? <Badge tone="coral">🔥 {streak}일 연속</Badge> : null}
-            <span className="text-[0.82rem] font-semibold text-ink/50">
-              {shortSido(profile?.sido || "")} {profile?.sigungu}
-            </span>
+      {/* 인사 히어로 — 아침 햇살 가득한 봄 마을, 손 흔드는 어르신 */}
+      <section data-home-hero className="fade-up overflow-hidden rounded-[1.9rem] bg-[#CFE7F7] shadow-card">
+        <div className="relative h-[224px] overflow-hidden">
+          <AssetImage
+            name="home-hero"
+            alt="아침 햇살이 비치는 봄 마을 정원에서 환하게 손을 흔드는 어르신"
+            priority
+            className="absolute inset-0 h-full w-full object-cover object-[54%_36%]"
+          />
+          {/* 딥네이비 그라디언트 — 흰 인사말이 어떤 그림 위에서도 또렷하게 읽힌다 */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B2233]/95 via-[#0B2233]/40 to-transparent" />
+          <div className="absolute left-3.5 top-3.5 flex items-center gap-1.5 rounded-2xl bg-white/95 px-2.5 py-1.5 shadow-soft backdrop-blur">
+            <IconCalendar size={19} className="text-brand" />
+            <div className="leading-tight">
+              <p className="tabular text-[0.82rem] font-black text-ink">{dateLabel.date}</p>
+              <p className="text-[0.68rem] font-bold text-ink/50">{dateLabel.day}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-soft">
-          <IconCalendar size={20} className="text-brand" />
-          <div className="leading-tight">
-            <p className="tabular text-[0.86rem] font-black text-ink">{dateLabel.date}</p>
-            <p className="text-[0.72rem] font-bold text-ink/50">{dateLabel.day}</p>
+          <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
+            <p className="text-[0.84rem] font-extrabold tracking-tight text-white/90">안녕하세요,</p>
+            <h1 className="mt-0.5 flex items-center gap-1.5 text-[1.72rem] font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(8,24,38,0.45)]">
+              <span className="truncate">{profile?.nickname}</span>
+              <span className="text-[1.42rem]">😊</span>
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {streak > 0 ? (
+                <span className="rounded-full bg-white/95 px-2.5 py-1 text-[0.74rem] font-extrabold text-[#C0453A] shadow-soft">
+                  🔥 {streak}일 연속
+                </span>
+              ) : null}
+              <span className="text-[0.8rem] font-bold text-white/85">
+                {shortSido(profile?.sido || "")} {profile?.sigungu}
+              </span>
+            </div>
           </div>
         </div>
       </section>

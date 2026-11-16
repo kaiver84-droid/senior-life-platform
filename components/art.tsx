@@ -14,6 +14,7 @@ export type AssetName =
   | "quiz-couple"
   | "welfare-pension-bg"
   | "family-greeting-couple"
+  | "home-hero"
   | "onboarding-hero";
 
 export function AssetImage({
@@ -59,7 +60,12 @@ export type Icon3DName =
   | "icon-3d-magnifier"
   | "icon-3d-pill"
   | "icon-3d-mail"
-  | "icon-3d-book";
+  | "icon-3d-book"
+  | "icon-3d-water"
+  | "icon-3d-walk"
+  | "icon-3d-stretch"
+  | "icon-3d-medicine"
+  | "icon-3d-call";
 
 export function Icon3D({
   name,

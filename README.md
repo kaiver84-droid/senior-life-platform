@@ -33,9 +33,13 @@ Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Page
 - `public/images/` 의 배너·사진은 **원본 해상도 그대로**(1536~1693px, WebP 92~95 / JPEG 94) 두어
   아이폰 3배 화면에서도 흐려지지 않습니다. 예전에는 1000px·40KB대로 줄여 두어 흐릿했습니다.
 - `public/images/onboarding-hero.*` — 접속 첫 화면 상단 배너(맑은 봄 하늘·노란 국화·웃는 가족, 글자 없음).
-- `public/images/icon-3d-*.png|webp` — 클레이·글래스 질감의 **3D 입체 아이콘** 9종(640px 원본,
-  모서리는 투명). 접속 첫 화면 3개 카드·홈 바로가기 6개 타일·오늘의 운세/날씨·건강 챌린지에 씁니다.
-- 검증: `python3 e2e/capture_4k_neulbom.py` (390×844 · DPR 3, naturalWidth·깨진 이미지·콘솔 오류 확인 + 스크린샷)
+- `public/images/home-hero.*` — 로그인 후 홈 첫 화면 인사 히어로(아침 햇살 봄 마을 정원에서 손 흔드는 어르신,
+  1672×941, 글자 없음). 위에 딥네이비 그라디언트를 얹어 흰 인사말이 또렷하게 읽힙니다.
+- `public/images/icon-3d-*.png|webp` — 클레이·글래스 질감의 **3D 입체 아이콘** 14종(640px 원본,
+  모서리는 투명). 접속 첫 화면 3개 카드·홈 바로가기 6개 타일·오늘의 운세/날씨·건강 챌린지 제목과
+  **건강 챌린지 5개 항목**(물·걷기·스트레칭·복약·안부)에 씁니다.
+- 검증: `python3 e2e/capture_4k_neulbom.py` (390×844 · DPR 3, naturalWidth·깨진 이미지·콘솔 오류 확인 + 스크린샷),
+  홈 히어로·건강 아이콘 전용은 `python3 e2e/capture_home_v2.py` (`BASE=https://...` 로 라이브 검증)
 
 ## 실행
 ```bash
