@@ -44,12 +44,12 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
     return json({
       ok: true,
       ...dbStatus(env),
-      kakaoLoginConfigured: Boolean(env.KAKAO_CLIENT_ID && env.KAKAO_CLIENT_SECRET),
+      kakaoLoginConfigured: Boolean(env.KAKAO_CLIENT_ID),
       redirectUri: env.KAKAO_REDIRECT_URI || `${url.origin}/`,
     });
   }
 
-  if (!env.KAKAO_CLIENT_ID || !env.KAKAO_CLIENT_SECRET) {
+  if (!env.KAKAO_CLIENT_ID) {
     return json({ ok: false, error: "kakao_not_configured" }, 503);
   }
 
@@ -61,7 +61,8 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
       body: new URLSearchParams({
         grant_type: "authorization_code",
         client_id: env.KAKAO_CLIENT_ID,
-        client_secret: env.KAKAO_CLIENT_SECRET,
+        // Client Secret 은 콘솔에서 '사용 안 함' 으로 둘 수 있으므로 선택값으로 취급한다.
+        ...(env.KAKAO_CLIENT_SECRET ? { client_secret: env.KAKAO_CLIENT_SECRET } : {}),
         redirect_uri: redirectUri,
         code,
       }),
