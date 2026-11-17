@@ -12,6 +12,7 @@ python3 e2e/test_all_ages.py                                              # 로�
 """
 import json
 import os
+import random
 import sys
 import urllib.request
 
@@ -29,7 +30,8 @@ SHOT = "/workspace/downloads"
 SHOT_NAME = os.environ.get("SHOT_NAME", "neulbom_all_ages" + ("_local" if LOCAL else ""))
 NAME = os.environ.get("NAME", "새싹이")
 BIRTH = os.environ.get("BIRTH", "2012")
-KAKAO_ID = os.environ.get("KAKAO_ID", "777010777")
+# 라이브에서는 실행할 때마다 새 계정으로 시작한다(이미 설정을 마친 계정이면 설정 화면이 안 떠서).
+KAKAO_ID = os.environ.get("KAKAO_ID") or f"77{random.randint(1000000, 9999999)}"
 BANDS = [
     (10, "10대 이하"),
     (20, "20대"),
@@ -53,7 +55,16 @@ def check(cond, label, extra=""):
 
 
 def api_json(path):
-    with urllib.request.urlopen(BASE + path, timeout=25) as r:
+    # Cloudflare가 기본 파이썬 UA를 막아 403을 준다 — 브라우저와 같은 UA로 읽는다.
+    req = urllib.request.Request(
+        BASE + path,
+        headers={
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 "
+            "(KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=25) as r:
         return json.loads(r.read().decode())
 
 
