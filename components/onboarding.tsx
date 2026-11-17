@@ -221,8 +221,9 @@ export function Onboarding() {
       setKakaoStarting(false);
       window.location.href = "/api/auth/kakao?start=1";
     };
-    // 1) 카카오 JS SDK 간편로그인: 모바일에서 카카오톡 앱이 바로 열려 아이디/비밀번호 없이 인증한다.
-    //    동의를 마치면 redirectUri 로 ?code= 가 돌아온다. (정상 호출이면 페이지가 떠난다)
+    // 1) 카카오 JS SDK: Safari 안에서 카카오 웹 로그인 화면(kauth.kakao.com)으로 이동해
+    //    동의를 마치면 redirectUri 로 ?code= 가 바로 돌아온다(카톡 앱 전환·중간 안내 화면 없음).
+    //    정상 호출이면 페이지가 카카오 인가 화면으로 떠난다.
     if (kakao.jsConfigured) {
       setKakaoStarting(true);
       // 이미 로드된 SDK 라면 클릭(사용자 제스처) 안에서 곧바로 호출한다

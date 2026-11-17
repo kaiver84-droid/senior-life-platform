@@ -66,15 +66,20 @@ export function loadKakaoSdk(): Promise<boolean> {
 
 /**
  * 이미 로드된 Kakao SDK 로 즉시 authorize 를 호출한다(동기).
- * iOS Safari 는 사용자 제스처 밖에서 앱 스킴/유니버설 링크 이동을 막을 수 있어서,
- * 버튼 클릭과 같은 작업 안에서 호출해야 카카오톡 앱이 바로 열린다. 호출되면 true.
+ * iOS Safari 는 사용자 제스처 밖 이동을 막을 수 있어서, 버튼 클릭과 같은 작업 안에서 호출한다.
+ *
+ * throughTalk: false — 카카오톡 앱을 거치지 않고 Safari 안에서 카카오 **웹 로그인**
+ * (kauth.kakao.com/oauth/authorize)으로 인증한 뒤 redirectUri 로 곧바로 되돌아온다.
+ * (true 였을 때는 카톡 앱으로 넘어갔다가 '카카오 로그인 완료 — 이용 중이던 서비스로 이동'
+ *  중간 안내 화면을 한 번 거쳐야 했다. 사용자가 그 화면 없이 바로 복귀되기를 원했다.)
+ * 호출되면 true — 정상이면 페이지가 카카오 인가 화면으로 이동한다.
  */
 export function kakaoAuthorizeNow(redirectUri: string): boolean {
   if (typeof window === "undefined") return false;
   const auth = (window as KakaoWindow).Kakao?.Auth;
   if (!auth || typeof auth.authorize !== "function") return false;
   try {
-    auth.authorize({ redirectUri, throughTalk: true });
+    auth.authorize({ redirectUri, throughTalk: false });
     return true;
   } catch {
     return false;
@@ -82,8 +87,9 @@ export function kakaoAuthorizeNow(redirectUri: string): boolean {
 }
 
 /**
- * 카카오톡 앱 간편로그인(원터치) — 아이디/비밀번호 입력 없이 카카오톡으로 인증한다.
- * SDK 미로드/미설정/예외일 때만 false 를 돌려주어 호출한 쪽이 서버 경유로 폴백한다.
+ * 카카오 로그인 — SDK 가 있으면 Safari 안에서 카카오 웹 인가 화면으로 바로 이동한다.
+ * SDK 미로드/미설정/예외일 때만 false 를 돌려주어 호출한 쪽이 서버(/api/auth/kakao?start=1)
+ * 경유 웹 OAuth 로 폴백한다. 어느 길로 가도 카톡 앱 전환 없이 ?code= 로 자동 복귀한다.
  */
 export async function startKakaoLogin(redirectUri: string): Promise<boolean> {
   if (kakaoAuthorizeNow(redirectUri)) return true;
