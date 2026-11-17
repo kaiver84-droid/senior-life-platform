@@ -10,7 +10,7 @@ import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
 import { BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
-import { HomeCalendarBanner } from "./calendar";
+import { HomeCalendarBanner, TodayAlarmCard } from "./calendar";
 import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
 import { HealthChallengeCard } from "./health";
 import { SharePreviewSheet } from "./share-sheet";
@@ -154,6 +154,9 @@ export function HomeTab({
 
   return (
     <div className="space-y-4 pb-2">
+      {/* 🔔 오늘 일정 알람 — 알람 시간이 되면 홈 맨 위에 먼저 보인다 */}
+      <TodayAlarmCard where="home" />
+
       {/* 인사 히어로 — 아침 햇살 가득한 봄 마을, 손 흔드는 어르신 */}
       <section data-home-hero className="fade-up overflow-hidden rounded-[1.9rem] bg-[#CFE7F7] shadow-card">
         <div className="relative h-[224px] overflow-hidden">

@@ -52,6 +52,10 @@ export type StoredFamilyEvent = {
   repeatYearly: boolean;
   kind: string;
   memo?: string;
+  /** 알람 시점 — none(끄기) · 0(당일) · 1(1일 전) · 3(3일 전). 없는 예전 일정은 기본값으로 읽힌다 */
+  alarm?: string;
+  /** 알람 시각 HH:MM */
+  alarmTime?: string;
   createdAt?: string;
 };
 

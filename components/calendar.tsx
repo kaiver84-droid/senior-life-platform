@@ -7,11 +7,20 @@ import { REGIONS, shortSido, sigunguList } from "@/lib/regions";
 import { regionLinks } from "@/lib/region-links";
 import { kstDate } from "@/lib/week";
 import {
+  ALARM_MODES,
+  ALARM_TIMES,
+  DEFAULT_ALARM,
+  DEFAULT_ALARM_TIME,
   EVENT_KINDS,
+  alarmLabel,
+  alarmModeOf,
+  alarmTimeLabel,
+  alarmTimeOf,
   dateKey,
   dayTitle,
   daysBetween,
   ddayLabel,
+  dueAlarms,
   eventsInMonth,
   eventsOnDate,
   kindInfo,
@@ -19,13 +28,18 @@ import {
   monthOf,
   monthTitle,
   nextOccurrence,
+  normalizeAlarm,
+  normalizeAlarmTime,
   shiftMonth,
   upcomingEvents,
   weekdayOf,
+  type DueAlarm,
   type FamilyEvent,
+  type FamilyEventAlarm,
   type FamilyEventKind,
   type YearMonth,
 } from "@/lib/calendar";
+import { eventIcsText, eventsIcsText, icsFileName } from "@/lib/ics";
 import {
   localNewsFor,
   newsAreaName,
@@ -38,6 +52,7 @@ import {
 } from "@/lib/local-news";
 import { Badge, BigButton, Divider, Portal, Sheet, useToast } from "./ui";
 import { IconBack, IconCalendar, IconChat, IconChevron, IconClock, IconPin, IconPlus } from "./icons";
+import { SpeakButton } from "./speak";
 
 type Filter = "all" | "family" | NewsCategory;
 
@@ -57,6 +72,279 @@ const YEARS = Array.from({ length: 106 }, (_, i) => 1930 + i);
 
 function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/* ------------------------------------------------------------------ */
+/* 알람 — 오늘 울릴 일정 · 확인 표시 · 휴대폰 알림                     */
+/* ------------------------------------------------------------------ */
+
+const ackKey = (date: string) => `neulbom.alarm.ack.${date}`;
+const notifiedKey = (date: string) => `neulbom.alarm.notified.${date}`;
+/** 확인했거나 알림을 보낸 일정이 바뀌면 화면들이 함께 새로 고친다 */
+const ACK_EVENT = "neulbom:alarm-ack";
+
+function nowMinutes(): number {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+export function readAlarmAcks(date: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(ackKey(date));
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** ‘확인했어요’ — 오늘은 그 일정 알림을 다시 띄우지 않는다 */
+export function ackAlarms(date: string, ids: string[]) {
+  if (typeof window === "undefined") return;
+  const next = Array.from(new Set([...readAlarmAcks(date), ...ids.filter(Boolean)]));
+  try {
+    window.localStorage.setItem(ackKey(date), JSON.stringify(next));
+  } catch {
+    // 저장이 막힌 브라우저(사생활 보호 모드)에서도 화면은 그대로 쓸 수 있게 둔다
+  }
+  window.dispatchEvent(new Event(ACK_EVENT));
+}
+
+/** 오늘 알람 시각이 지났고 아직 확인하지 않은 일정 */
+export function useDueAlarms(): DueAlarm[] {
+  const { state, today } = useApp();
+  const [minute, setMinute] = useState(() => nowMinutes());
+  const [acks, setAcks] = useState<string[]>([]);
+
+  useEffect(() => {
+    const refresh = () => setAcks(readAlarmAcks(today));
+    const tick = () => setMinute(nowMinutes());
+    refresh();
+    tick();
+    const timer = window.setInterval(tick, 30_000);
+    window.addEventListener(ACK_EVENT, refresh);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(ACK_EVENT, refresh);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [today]);
+
+  return useMemo(
+    () => dueAlarms(state.familyEvents, today, minute).filter((d) => !acks.includes(d.event.id)),
+    [state.familyEvents, today, minute, acks]
+  );
+}
+
+function notificationState(): "granted" | "denied" | "default" | "unsupported" {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return Notification.permission as "granted" | "denied" | "default";
+}
+
+/** 화면 어디서든 한 번만 달아 두면, 알람 시간이 되었을 때 휴대폰 알림을 보낸다 */
+export function AlarmWatcher() {
+  const due = useDueAlarms();
+
+  useEffect(() => {
+    if (!due.length) return;
+    if (notificationState() !== "granted") return;
+    const date = due[0].alarmDate;
+    const ids = due.map((d) => d.event.id).join(",");
+    try {
+      if (window.localStorage.getItem(notifiedKey(date)) === ids) return;
+    } catch {
+      return;
+    }
+    try {
+      const body = due
+        .map((d) => `· ${d.event.title} (${dayTitle(d.occurrence)})`)
+        .join("\n");
+      new Notification("🔔 늘봄 일정 알림", { body, tag: "neulbom-alarm", lang: "ko" });
+      window.localStorage.setItem(notifiedKey(date), ids);
+    } catch {
+      // 알림을 못 보내도 화면 카드가 같은 내용을 보여 준다
+    }
+  }, [due]);
+
+  return null;
+}
+
+/** 🔔 휴대폰 알림 켜기 — 권한을 물어보고, 이미 허용했으면 그대로 알려 준다 */
+export function AlarmPermissionButton({ full = true }: { full?: boolean }) {
+  const { show } = useToast();
+  const [perm, setPerm] = useState<"granted" | "denied" | "default" | "unsupported">("default");
+
+  useEffect(() => {
+    setPerm(notificationState());
+  }, []);
+
+  const ask = async () => {
+    if (notificationState() === "unsupported") {
+      show("이 브라우저는 휴대폰 알림을 지원하지 않아요. 아래 ‘📅 휴대폰 알람에 넣기’를 써 주세요.");
+      return;
+    }
+    try {
+      const p = await Notification.requestPermission();
+      setPerm(p);
+      show(
+        p === "granted"
+          ? "휴대폰 알림을 켰어요. 알람 시간에 알려 드릴게요."
+          : p === "denied"
+            ? "알림이 꺼져 있어요. 브라우저 설정에서 알림을 허용해 주세요."
+            : "알림을 허용하지 않았어요. 필요할 때 다시 눌러 주세요."
+      );
+    } catch {
+      show("알림을 켜지 못했어요. 아이폰은 ‘홈 화면에 추가’한 앱에서 켤 수 있어요.");
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      data-alarm-permission
+      onClick={() => void ask()}
+      className={`flex min-h-[50px] items-center justify-center gap-1.5 rounded-2xl border-2 px-3 text-[0.9rem] font-extrabold ${
+        perm === "granted"
+          ? "border-leaf bg-leaf-light text-leaf-dark"
+          : perm === "denied"
+            ? "border-ink/10 bg-white text-ink/55"
+            : "border-brand/30 bg-white text-brand-dark"
+      } ${full ? "w-full" : ""}`}
+    >
+      🔔 {perm === "granted" ? "휴대폰 알림 켜짐" : perm === "denied" ? "휴대폰 알림이 꺼져 있어요" : "휴대폰 알림 켜기"}
+    </button>
+  );
+}
+
+/** .ics 파일을 만들어 내려받는다 — 받은 파일을 누르면 휴대폰 캘린더에 일정·알람이 들어간다 */
+function downloadIcs(text: string, filename: string) {
+  const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/** 📅 휴대폰 알람(.ics)에 넣기 */
+export function IcsButton({
+  item,
+  items,
+  label = "📅 휴대폰 알람(.ics)에 넣기",
+  className = "",
+}: {
+  item?: { event: FamilyEvent; occurrence: string };
+  items?: { event: FamilyEvent; occurrence: string; alarmDate?: string }[];
+  label?: string;
+  className?: string;
+}) {
+  const { show } = useToast();
+  const save = () => {
+    const list = items ?? (item ? [item] : []);
+    const withAlarm = list.filter((it) => alarmModeOf(it.event) !== "none");
+    if (!withAlarm.length) {
+      show("알람을 ‘당일·1일 전·3일 전’ 중에 골라 두면 휴대폰 알람으로 넣을 수 있어요.");
+      return;
+    }
+    if (withAlarm.length === 1) {
+      const one = withAlarm[0];
+      downloadIcs(eventIcsText(one.event, { occurrence: one.occurrence }), icsFileName(one.event, one.occurrence));
+    } else {
+      downloadIcs(eventsIcsText(withAlarm), "늘봄_가족일정_알람.ics");
+    }
+    show("내려받은 파일을 눌러 휴대폰 캘린더에서 ‘추가’를 눌러 주세요.");
+  };
+
+  return (
+    <button
+      type="button"
+      data-ics-button
+      onClick={save}
+      className={`flex min-h-[46px] items-center justify-center gap-1.5 rounded-xl border-2 border-brand/25 bg-white px-3 text-[0.86rem] font-extrabold text-brand-dark shadow-soft active:bg-paper ${className}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** 🔔 오늘의 일정 알림 카드 — 홈 화면과 달력 맨 위에 보인다 */
+export function TodayAlarmCard({ where = "calendar" }: { where?: "home" | "calendar" }) {
+  const due = useDueAlarms();
+  const { show } = useToast();
+
+  if (!due.length) return null;
+
+  const speech = [
+    "오늘 일정 알림입니다.",
+    ...due.map(
+      (d) =>
+        `${d.event.title}, ${dayTitle(d.occurrence)}${d.daysLeft > 0 ? `, ${d.daysLeft}일 뒤` : " 오늘"}입니다.`
+    ),
+    "준비하실 것이 있으면 미리 챙겨 두세요.",
+  ].join(" ");
+
+  return (
+    <section
+      data-today-alarm={where}
+      className="fade-up rounded-[1.6rem] border-2 border-gold bg-gradient-to-br from-gold-light via-[#FFF3CE] to-white p-4 shadow-card"
+    >
+      <div className="flex items-start gap-2">
+        <span aria-hidden className="text-[1.5rem] leading-none">
+          🔔
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[1.08rem] font-black leading-tight text-ink">오늘의 일정 알림</p>
+          <p className="mt-0.5 text-[0.82rem] font-bold text-[#7A5600]">
+            알람 시간이 되었어요 · {due.length}건
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-2.5 space-y-1.5">
+        {due.map((d) => (
+          <div key={`${d.event.id}-${d.occurrence}`} className="rounded-2xl bg-white px-3 py-2 shadow-soft">
+            <p className="text-[0.98rem] font-black leading-snug text-ink">
+              {kindInfo(d.event.kind).emoji} {d.event.title}
+            </p>
+            <p className="mt-0.5 text-[0.8rem] font-bold text-ink/55">
+              {dayTitle(d.occurrence)}
+              {d.daysLeft > 0 ? ` · ${d.daysLeft}일 뒤` : " · 오늘"}
+            </p>
+            <p className="mt-0.5 text-[0.78rem] font-extrabold text-gold-dark">
+              🔔 {alarmLabel(d.event)}에 알려 드려요
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-1 gap-2">
+        <SpeakButton text={speech} label="소리로 듣기" tone="sun" full dataName="alarm" />
+        <IcsButton
+          items={due.map((d) => ({ event: d.event, occurrence: d.occurrence, alarmDate: d.alarmDate }))}
+          label="📅 휴대폰 알람에 넣기"
+          className="!min-h-[52px] !rounded-2xl !text-[0.94rem]"
+        />
+        <AlarmPermissionButton />
+        <BigButton
+          variant="white"
+          full
+          height={52}
+          onClick={() => {
+            ackAlarms(due[0].alarmDate, due.map((d) => d.event.id));
+            show("알림을 확인했어요. 오늘은 다시 띄우지 않을게요.");
+          }}
+        >
+          ✅ 확인했어요
+        </BigButton>
+      </div>
+    </section>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -80,6 +368,8 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
     date: today,
   });
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  /** 방금 저장한 일정 — 저장 직후 휴대폰 알람(.ics)에 바로 넣을 수 있게 */
+  const [justSaved, setJustSaved] = useState<{ event: FamilyEvent; date: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -251,6 +541,46 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
           </header>
 
           <div className="space-y-3 px-4 pt-3">
+            {/* 🔔 오늘 일정 알림 — 알람 시간이 되면 달력 맨 위에 먼저 보인다 */}
+            <TodayAlarmCard where="calendar" />
+
+            {/* 방금 저장한 일정 — 바로 휴대폰 알람에 넣기 */}
+            {justSaved ? (
+              <div data-calendar-saved className="fade-up rounded-[1.4rem] border-2 border-leaf/30 bg-leaf-light/60 p-3.5">
+                <div className="flex items-start gap-2">
+                  <span aria-hidden className="text-[1.2rem] leading-none">✅</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[0.98rem] font-black leading-snug text-ink">
+                      {justSaved.event.title} 저장했어요
+                    </p>
+                    <p className="mt-0.5 text-[0.8rem] font-bold text-leaf-dark">
+                      🔔 {alarmLabel(justSaved.event) || "알람 없음"} · {dayTitle(justSaved.date)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setJustSaved(null)}
+                    aria-label="저장 안내 닫기"
+                    className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[0.76rem] font-extrabold text-ink/55 shadow-soft"
+                  >
+                    닫기
+                  </button>
+                </div>
+                {alarmModeOf(justSaved.event) !== "none" ? (
+                  <div className="mt-2">
+                    <IcsButton
+                      item={{ event: justSaved.event, occurrence: justSaved.date }}
+                      className="w-full !bg-white"
+                    />
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-[0.78rem] font-semibold leading-snug text-ink/55">
+                    알람을 켜 두면 휴대폰 알람(.ics)으로도 넣을 수 있어요.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
             {/* 다음 생일·기념일 — 옆으로 잘리지 않도록 세로로 차곡차곡 */}
             {upcomingEvents(events, today, 120, 3).length > 0 ? (
               <div className="space-y-2" data-calendar-upcoming>
@@ -406,6 +736,16 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                           {ev.memo ? (
                             <p className="mt-1 text-[0.86rem] font-semibold leading-snug text-ink/70">{ev.memo}</p>
                           ) : null}
+                          <p
+                            data-event-alarm={alarmModeOf(ev)}
+                            className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.76rem] font-extrabold ${
+                              alarmModeOf(ev) === "none"
+                                ? "bg-ink/6 text-ink/45"
+                                : "bg-gold-light text-[#7A5600]"
+                            }`}
+                          >
+                            {alarmModeOf(ev) === "none" ? "🔕 알람 없음" : `🔔 ${alarmLabel(ev)}`}
+                          </p>
                         </div>
                         <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[0.74rem] font-black text-coral-dark shadow-soft">
                           {ddayLabel(days)}
@@ -435,26 +775,34 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                           </div>
                         </div>
                       ) : (
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            onClick={() => setForm({ open: true, editing: ev, date: ev.date })}
-                            className="min-h-[44px] flex-1 rounded-xl border-2 border-ink/10 bg-white text-[0.86rem] font-extrabold text-ink"
-                          >
-                            수정
-                          </button>
-                          <button
-                            onClick={() => setConfirmId(ev.id)}
-                            className="min-h-[44px] flex-1 rounded-xl border-2 border-ink/10 bg-white text-[0.86rem] font-extrabold text-ink/60"
-                          >
-                            삭제
-                          </button>
-                          <button
-                            onClick={() => void shareEvent(ev, ev.date)}
-                            className="flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-xl bg-gold text-[0.86rem] font-extrabold text-ink"
-                          >
-                            <IconChat size={16} /> 카톡
-                          </button>
-                        </div>
+                        <>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              onClick={() => setForm({ open: true, editing: ev, date: ev.date })}
+                              className="min-h-[44px] flex-1 rounded-xl border-2 border-ink/10 bg-white text-[0.86rem] font-extrabold text-ink"
+                            >
+                              수정
+                            </button>
+                            <button
+                              onClick={() => setConfirmId(ev.id)}
+                              className="min-h-[44px] flex-1 rounded-xl border-2 border-ink/10 bg-white text-[0.86rem] font-extrabold text-ink/60"
+                            >
+                              삭제
+                            </button>
+                            <button
+                              onClick={() => void shareEvent(ev, ev.date)}
+                              className="flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-xl bg-gold text-[0.86rem] font-extrabold text-ink"
+                            >
+                              <IconChat size={16} /> 카톡
+                            </button>
+                          </div>
+                          {/* 앱을 닫아 두어도 울리게 — 휴대폰 기본 캘린더에 알람까지 넣는다 */}
+                          {alarmModeOf(ev) !== "none" ? (
+                            <div className="mt-2">
+                              <IcsButton item={{ event: ev, occurrence: selected }} className="w-full !bg-white" />
+                            </div>
+                          ) : null}
+                        </>
                       )}
                     </div>
                   );
@@ -650,9 +998,10 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
         editing={form.editing}
         presetDate={form.date}
         onClose={() => setForm({ open: false, editing: null, date: selected })}
-        onSaved={(date, msg) => {
+        onSaved={(date, msg, event) => {
           setYm(monthOf(date));
           setSelected(date);
+          setJustSaved({ event, date });
           show(msg);
         }}
       />
@@ -874,7 +1223,7 @@ function EventFormSheet({
   editing: FamilyEvent | null;
   presetDate: string;
   onClose: () => void;
-  onSaved: (date: string, msg: string) => void;
+  onSaved: (date: string, msg: string, event: FamilyEvent) => void;
 }) {
   const { addFamilyEvent, updateFamilyEvent } = useApp();
   const { show } = useToast();
@@ -883,6 +1232,8 @@ function EventFormSheet({
   const [date, setDate] = useState(presetDate);
   const [repeat, setRepeat] = useState(true);
   const [memo, setMemo] = useState("");
+  const [alarm, setAlarm] = useState<FamilyEventAlarm>(DEFAULT_ALARM);
+  const [alarmTime, setAlarmTime] = useState(DEFAULT_ALARM_TIME);
   const [touched, setTouched] = useState(false);
 
   useEffect(() => {
@@ -894,12 +1245,16 @@ function EventFormSheet({
       setDate(editing.date);
       setRepeat(editing.repeatYearly);
       setMemo(editing.memo ?? "");
+      setAlarm(alarmModeOf(editing));
+      setAlarmTime(alarmTimeOf(editing));
     } else {
       setKind("birthday");
       setTitle("");
       setDate(presetDate);
       setRepeat(true);
       setMemo("");
+      setAlarm(DEFAULT_ALARM);
+      setAlarmTime(DEFAULT_ALARM_TIME);
     }
   }, [open, editing, presetDate]);
 
@@ -909,16 +1264,21 @@ function EventFormSheet({
       show("이름과 날짜를 넣어 주세요.");
       return;
     }
+    const alarmFields = { alarm: normalizeAlarm(alarm), alarmTime: normalizeAlarmTime(alarmTime) };
     if (editing) {
-      updateFamilyEvent(editing.id, { title, date, repeatYearly: repeat, kind, memo });
-      onSaved(date, "일정을 고쳤어요.");
+      updateFamilyEvent(editing.id, { title, date, repeatYearly: repeat, kind, memo, ...alarmFields });
+      onSaved(
+        date,
+        alarmFields.alarm === "none" ? "일정을 고쳤어요." : "일정을 고쳤어요. 알람도 함께 맞춰 두었어요.",
+        { ...editing, title: title.trim(), date, repeatYearly: repeat, kind, memo, ...alarmFields }
+      );
     } else {
-      const ev = addFamilyEvent({ title, date, repeatYearly: repeat, kind, memo });
+      const ev = addFamilyEvent({ title, date, repeatYearly: repeat, kind, memo, ...alarmFields });
       if (!ev) {
         show("일정을 저장하지 못했어요. 날짜를 확인해 주세요.");
         return;
       }
-      onSaved(date, "일정을 저장했어요.");
+      onSaved(date, alarmFields.alarm === "none" ? "일정을 저장했어요." : "일정을 저장했어요. 알람도 맞춰 두었어요.", ev);
     }
     onClose();
   };
@@ -1090,6 +1450,72 @@ function EventFormSheet({
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
           />
+        </div>
+
+        {/* ④ 알람 — 언제 미리 알려 줄지 */}
+        <div data-alarm-box>
+          <p className="mb-1.5 text-[0.95rem] font-extrabold text-ink">④ 미리 알람 받을까요?</p>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="알람 시점">
+            {ALARM_MODES.map((m) => {
+              const active = alarm === m.key;
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  data-alarm-mode={m.key}
+                  aria-pressed={active}
+                  onClick={() => setAlarm(m.key)}
+                  className={`flex min-h-[56px] items-center justify-center gap-1.5 rounded-2xl border-2 text-[0.95rem] font-extrabold transition ${
+                    active ? "border-gold bg-gold-light text-[#7A5600]" : "border-ink/10 bg-white text-ink/65"
+                  }`}
+                >
+                  {m.key === "none" ? "🔕" : "🔔"} {m.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {alarm === "none" ? (
+            <p className="mt-1.5 text-[0.82rem] font-semibold leading-snug text-ink/50">
+              이 일정은 알람 없이 달력에만 남겨 둘게요.
+            </p>
+          ) : (
+            <>
+              <p className="mb-1.5 mt-2.5 text-[0.9rem] font-extrabold text-ink/75">몇 시에 알려 드릴까요?</p>
+              <div className="grid grid-cols-3 gap-2" role="group" aria-label="알람 시각" data-alarm-time-group>
+                {ALARM_TIMES.map((t) => {
+                  const active = alarmTime === t.value;
+                  return (
+                    <button
+                      key={t.value}
+                      type="button"
+                      data-alarm-time={t.value}
+                      aria-pressed={active}
+                      onClick={() => setAlarmTime(t.value)}
+                      className={`flex min-h-[54px] items-center justify-center gap-1 rounded-2xl border-2 text-[0.92rem] font-extrabold transition ${
+                        active ? "border-ink bg-ink text-white" : "border-ink/10 bg-white text-ink/65"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 rounded-2xl bg-gold-light/70 px-3.5 py-2.5">
+                <p className="text-[0.86rem] font-extrabold leading-snug text-[#7A5600]" data-alarm-summary>
+                  🔔 {alarm === "0"
+                    ? `${dayTitle(date)} ${alarmTimeLabel(alarmTime)}에 알려 드려요`
+                    : `${ALARM_MODES.find((m) => m.key === alarm)?.label ?? ""} ${alarmTimeLabel(alarmTime)}에 미리 알려 드려요`}
+                </p>
+                <p className="mt-1 text-[0.8rem] font-semibold leading-snug text-[#7A5600]/85">
+                  앱을 열었을 때 화면으로 알려 드려요. 앱을 닫아 둬도 울리게 하려면 저장 뒤 ‘📅 휴대폰 알람(.ics)에 넣기’를 눌러 주세요.
+                </p>
+              </div>
+              <div className="mt-2">
+                <AlarmPermissionButton full />
+              </div>
+            </>
+          )}
         </div>
 
         <Divider />

@@ -312,13 +312,25 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             ) : null}
           </div>
           {active ? (
-            <button
-              type="button"
-              onClick={() => setSheet("switch")}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-ink/10 bg-white px-3 py-2 text-[0.82rem] font-black text-ink/70 shadow-soft"
-            >
-              모임 바꾸기 <IconChevron size={15} className="rotate-90" />
-            </button>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              {/* 평소에도 한눈에 보이는 초대 버튼 — 누르면 바로 초대 시트가 열린다 */}
+              <button
+                type="button"
+                data-group-invite-top
+                onClick={() => setSheet("invite")}
+                aria-label="우리 모임에 초대하기"
+                className="flex min-h-[50px] items-center gap-1.5 rounded-full bg-sun px-4 text-[0.96rem] font-black text-ink shadow-sun active:bg-sun-dark"
+              >
+                💌 초대
+              </button>
+              <button
+                type="button"
+                onClick={() => setSheet("switch")}
+                className="flex items-center gap-1 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-[0.78rem] font-black text-ink/70 shadow-soft"
+              >
+                모임 바꾸기 <IconChevron size={14} className="rotate-90" />
+              </button>
+            </div>
           ) : null}
         </div>
       </section>
@@ -335,34 +347,52 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             {groups.map((g) => {
               const on = g.id === activeId;
               return (
-                <button
+                <div
                   key={g.id}
-                  type="button"
-                  data-group-row={g.id}
-                  aria-pressed={on}
-                  onClick={() => void switchTo(g.id)}
-                  className={`flex min-h-[56px] w-full items-center gap-2.5 rounded-2xl border-2 px-3 py-2 text-left ${
-                    on ? "border-brand bg-brand-light" : "border-ink/8 bg-paper active:bg-white"
+                  className={`flex min-h-[56px] w-full items-center gap-1.5 rounded-2xl border-2 pl-3 pr-2 ${
+                    on ? "border-brand bg-brand-light" : "border-ink/8 bg-paper"
                   }`}
                 >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand-dark shadow-soft">
-                    <IconUsers size={18} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate text-[0.98rem] font-black text-ink">{g.name}</span>
-                      {g.isDemo ? <Badge tone="gold">체험</Badge> : null}
+                  <button
+                    type="button"
+                    data-group-row={g.id}
+                    aria-pressed={on}
+                    onClick={() => void switchTo(g.id)}
+                    className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded-xl py-2 text-left"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand-dark shadow-soft">
+                      <IconUsers size={18} />
                     </span>
-                    <span className="block truncate text-[0.78rem] font-bold text-ink/45">
-                      멤버 {g.memberCount}명 · 번호 {g.id}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-[0.98rem] font-black text-ink">{g.name}</span>
+                        {g.isDemo ? <Badge tone="gold">체험</Badge> : null}
+                      </span>
+                      <span className="block truncate text-[0.78rem] font-bold text-ink/45">
+                        멤버 {g.memberCount}명 · 번호 {g.id}
+                      </span>
                     </span>
-                  </span>
+                    {on ? (
+                      <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[0.68rem] font-black text-brand-dark shadow-soft">
+                        보는 중
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[0.8rem] font-extrabold text-brand-dark">전환 ›</span>
+                    )}
+                  </button>
+                  {/* 지금 보고 있는 모임은 목록 맨 위에서도 바로 초대할 수 있게 */}
                   {on ? (
-                    <Badge tone="brand">보는 중</Badge>
-                  ) : (
-                    <span className="shrink-0 text-[0.8rem] font-extrabold text-brand-dark">전환 ›</span>
-                  )}
-                </button>
+                    <button
+                      type="button"
+                      data-group-row-invite={g.id}
+                      onClick={() => setSheet("invite")}
+                      aria-label={`${g.name}에 초대하기`}
+                      className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-full bg-sun px-2.5 text-[0.8rem] font-black text-ink shadow-sun active:bg-sun-dark"
+                    >
+                      💌 초대
+                    </button>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -421,6 +451,24 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
         </Card>
       ) : (
         <>
+          {/* 나 혼자인 모임 — 가장 먼저 눈에 들어오게 초대를 크게 안내한다 */}
+          {detail.memberCount <= 1 ? (
+            <Card data-group-solo className="fade-up border-2 border-brand/25 bg-brand-light/70 p-4">
+              <p className="text-[1.08rem] font-black leading-snug text-brand-deep">
+                아직 나 혼자 있어요 · 가족이나 친구를 초대해 보세요
+              </p>
+              <p className="mt-1 text-[0.9rem] font-semibold leading-relaxed text-ink/60">
+                초대 링크를 보내면 가족·친구가 바로 들어와 함께 퀴즈 순위를 겨룰 수 있어요.
+              </p>
+              <BigButton variant="sun" size="lg" full className="mt-3" onClick={() => setSheet("invite")}>
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
+                  TALK
+                </span>
+                카카오톡으로 바로 초대하기
+              </BigButton>
+            </Card>
+          ) : null}
+
           {/* 모임 동작 — 새 모임 추가는 위 ‘내 모임’ 카드에 있고, 여기서는 카톡 초대 */}
           <BigButton variant="sun" full onClick={() => setSheet("invite")}>
             <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
@@ -733,9 +781,10 @@ function GroupSheet({
       show(r.message);
       return;
     }
-    show(r.message);
+    // 만든 모임을 혼자 두지 않는다 — 만들자마자 바로 초대 화면을 띄운다.
+    show("모임을 만들었어요! 바로 가족·친구를 초대해 보세요 🎉");
     setName("");
-    onClose();
+    onChange("invite");
   };
 
   const doJoin = async (target: string) => {
@@ -903,9 +952,9 @@ function GroupSheet({
             <IconPlus size={21} /> {busy ? "모임을 만드는 중이에요…" : "모임 만들기"}
           </BigButton>
           <p className="text-center text-[0.8rem] font-semibold leading-relaxed text-ink/45">
-            만든 뒤 ‘카카오톡으로 초대하기’를 누르면
+            만들면 바로 ‘카카오톡으로 초대’ 화면이 열려요.
             <br />
-            가족에게 링크를 바로 보낼 수 있어요.
+            가족에게 링크를 한 번에 보낼 수 있어요.
           </p>
         </div>
       ) : null}
@@ -948,7 +997,7 @@ function GroupSheet({
       ) : null}
 
       {mode === "invite" && detail ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-group-invite-sheet={detail.id}>
           <div className="rounded-[1.4rem] bg-white p-4 text-center shadow-soft">
             <p className="text-[0.86rem] font-bold text-ink/50">{detail.name}</p>
             <p className="tabular mt-1 text-[2rem] font-black tracking-[0.28em] text-brand-deep">{detail.id}</p>

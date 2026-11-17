@@ -7,6 +7,31 @@
 
 export type FamilyEventKind = "birthday" | "anniversary" | "family" | "hospital";
 
+/* ------------------------------------------------------------------ */
+/* 알람 — 언제 미리 알려 줄지                                              */
+/* ------------------------------------------------------------------ */
+
+/** 알람 시점 — none(끄기) · 0(당일) · 1(1일 전) · 3(3일 전) */
+export type FamilyEventAlarm = "none" | "0" | "1" | "3";
+
+export const ALARM_MODES: { key: FamilyEventAlarm; label: string; offset: number }[] = [
+  { key: "0", label: "당일", offset: 0 },
+  { key: "1", label: "1일 전", offset: 1 },
+  { key: "3", label: "3일 전", offset: 3 },
+  { key: "none", label: "알람 없음", offset: -1 },
+];
+
+/** 알람 시각 — 시니어가 고르기 쉬운 세 가지 */
+export const ALARM_TIMES: { value: string; label: string }[] = [
+  { value: "09:00", label: "오전 9시" },
+  { value: "12:00", label: "낮 12시" },
+  { value: "18:00", label: "오후 6시" },
+];
+
+/** 알람을 정하지 않은 예전 일정은 ‘당일 오전 9시’로 본다 */
+export const DEFAULT_ALARM: FamilyEventAlarm = "0";
+export const DEFAULT_ALARM_TIME = "09:00";
+
 export type FamilyEvent = {
   id: string;
   title: string;
@@ -16,8 +41,103 @@ export type FamilyEvent = {
   kind: FamilyEventKind;
   /** 메모 · 대상 (예: 큰딸, 손주) */
   memo?: string;
+  /** 알람 시점 — 없으면(예전에 저장한 일정) 기본값 */
+  alarm?: FamilyEventAlarm;
+  /** 알람 시각 HH:MM — 없으면 기본값 */
+  alarmTime?: string;
   createdAt: string;
 };
+
+export function normalizeAlarm(value: unknown): FamilyEventAlarm {
+  return value === "none" || value === "0" || value === "1" || value === "3" ? value : DEFAULT_ALARM;
+}
+
+export function normalizeAlarmTime(value: unknown): string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : DEFAULT_ALARM_TIME;
+}
+
+export function alarmModeOf(ev: FamilyEvent): FamilyEventAlarm {
+  return normalizeAlarm(ev.alarm);
+}
+
+export function alarmTimeOf(ev: FamilyEvent): string {
+  return normalizeAlarmTime(ev.alarmTime);
+}
+
+/** "09:00" → "오전 9시" */
+export function alarmTimeLabel(value: string): string {
+  const [h, m] = normalizeAlarmTime(value).split(":").map(Number);
+  const period = h < 12 ? "오전" : "오후";
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${period} ${hour}시` : `${period} ${hour}시 ${m}분`;
+}
+
+/** "당일 오전 9시" · 알람이 없으면 빈 글자 */
+export function alarmLabel(ev: FamilyEvent): string {
+  const mode = alarmModeOf(ev);
+  if (mode === "none") return "";
+  const label = ALARM_MODES.find((m) => m.key === mode)?.label ?? "당일";
+  return `${label} ${alarmTimeLabel(alarmTimeOf(ev))}`;
+}
+
+/** 알람이 울리는 날 — 일정 날짜에서 며칠 앞. 알람이 없으면 null */
+export function alarmDayOf(occurrence: string, ev: FamilyEvent): string | null {
+  const mode = alarmModeOf(ev);
+  if (mode === "none") return null;
+  const offset = Number(mode);
+  return new Date(toUTC(occurrence) - offset * DAY).toISOString().slice(0, 10);
+}
+
+export type DueAlarm = {
+  event: FamilyEvent;
+  /** 일정이 실제로 있는 날 */
+  occurrence: string;
+  /** 알람이 울리는 날 (= 오늘) */
+  alarmDate: string;
+  /** 알람 시각 HH:MM */
+  time: string;
+  /** 일정까지 남은 날 */
+  daysLeft: number;
+};
+
+/**
+ * 오늘 울릴 알람 — 오늘이 알람일이고, 지금 시각이 알람 시각을 지난 일정만.
+ * 앱을 닫아 두었어도 다시 열면 그날 안에는 이 목록으로 안내한다.
+ */
+export function dueAlarms(events: FamilyEvent[], today: string, nowMinutes: number): DueAlarm[] {
+  const out: DueAlarm[] = [];
+  for (const ev of events) {
+    const mode = alarmModeOf(ev);
+    if (mode === "none") continue;
+    const offset = Number(mode);
+    const occurrence = new Date(toUTC(today) + offset * DAY).toISOString().slice(0, 10);
+    if (!occursOn(ev, occurrence)) continue;
+    const time = alarmTimeOf(ev);
+    const [h, m] = time.split(":").map(Number);
+    if (nowMinutes < h * 60 + m) continue; // 아직 알람 시각 전
+    out.push({ event: ev, occurrence, alarmDate: today, time, daysLeft: offset });
+  }
+  // 알람이 임박한(일정이 가까운) 것부터
+  out.sort((a, b) => (a.occurrence === b.occurrence ? a.time.localeCompare(b.time) : a.occurrence < b.occurrence ? -1 : 1));
+  return out;
+}
+
+/** 알람이 걸린 일정의 다가오는 알람 시각 목록 (달력 목록에 🔔 배지로 쓴다) */
+export function upcomingAlarms(events: FamilyEvent[], from: string, limit = 6): DueAlarm[] {
+  const out: DueAlarm[] = [];
+  for (const ev of events) {
+    const mode = alarmModeOf(ev);
+    if (mode === "none") continue;
+    const offset = Number(mode);
+    const next = nextOccurrence(ev, from);
+    if (!next) continue;
+    const alarmDate = new Date(toUTC(next) - offset * DAY).toISOString().slice(0, 10);
+    if (alarmDate < from) continue;
+    out.push({ event: ev, occurrence: next, alarmDate, time: alarmTimeOf(ev), daysLeft: offset });
+  }
+  out.sort((a, b) => (a.alarmDate === b.alarmDate ? a.time.localeCompare(b.time) : a.alarmDate < b.alarmDate ? -1 : 1));
+  return out.slice(0, limit);
+}
 
 export const EVENT_KINDS: {
   key: FamilyEventKind;

@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { AppState, DailyQuiz, HealthChecks, Profile, QuizLog, QuizType } from "./types";
 import { HEALTH_IDS, healthOf, mergeHealth } from "./health";
 import type { FamilyEvent } from "./calendar";
-import { isValidDateKey, newEventId } from "./calendar";
+import { isValidDateKey, newEventId, normalizeAlarm, normalizeAlarmTime } from "./calendar";
 import { kstDate, weekIdOf } from "./week";
 import { makeCode } from "./code";
 
@@ -89,6 +89,10 @@ export type FamilyEventInput = {
   repeatYearly: boolean;
   kind: FamilyEvent["kind"];
   memo?: string;
+  /** 알람 시점 — none(끄기) · 0(당일) · 1(1일 전) · 3(3일 전) */
+  alarm?: FamilyEvent["alarm"];
+  /** 알람 시각 HH:MM */
+  alarmTime?: string;
 };
 
 type Ctx = {
@@ -243,6 +247,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       repeatYearly: Boolean(input.repeatYearly),
       kind: input.kind,
       memo: input.memo?.trim().slice(0, 40) || undefined,
+      alarm: normalizeAlarm(input.alarm),
+      alarmTime: normalizeAlarmTime(input.alarmTime),
       createdAt: new Date().toISOString(),
     };
     setState((s) => ({ ...s, familyEvents: [...s.familyEvents, ev] }));
@@ -257,6 +263,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const next: FamilyEvent = { ...ev, ...patch, memo: patch.memo?.trim() || ev.memo };
         if (patch.title !== undefined) next.title = patch.title.trim().slice(0, 30) || ev.title;
         if (patch.date !== undefined && !isValidDateKey(patch.date)) next.date = ev.date;
+        if (patch.alarm !== undefined) next.alarm = normalizeAlarm(patch.alarm);
+        if (patch.alarmTime !== undefined) next.alarmTime = normalizeAlarmTime(patch.alarmTime);
         return next;
       }),
     }));

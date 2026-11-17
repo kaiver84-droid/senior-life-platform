@@ -17,7 +17,7 @@ import { WelfareTab } from "@/components/welfare";
 import { ToolsTab } from "@/components/tools";
 import { FamilyTab } from "@/components/family";
 import { RankingTab } from "@/components/ranking";
-import { CalendarScreen } from "@/components/calendar";
+import { AlarmWatcher, CalendarScreen } from "@/components/calendar";
 import { InstallBanner, InstallGuide, InstallGuideRow } from "@/components/install-guide";
 import { NeulbomMark } from "@/components/art";
 import { GroupProvider, useGroup } from "@/lib/group-store";
@@ -173,6 +173,8 @@ function Shell() {
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-[460px] bg-paper shadow-[0_0_70px_-24px_rgba(23,59,94,0.4)]">
+      {/* 🔔 일정 알람 — 어느 탭을 보고 있어도 알람 시간이 되면 휴대폰 알림을 보낸다 */}
+      <AlarmWatcher />
       <header className="sticky top-0 z-40 bg-paper/95 pt-safe backdrop-blur-md">
         <div className="flex h-[62px] items-center justify-between px-4">
           <button onClick={() => navigate("home")} className="flex items-center gap-2" aria-label="늘봄 홈">
