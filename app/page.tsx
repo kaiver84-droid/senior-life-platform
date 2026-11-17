@@ -22,6 +22,7 @@ import { InstallBanner, InstallGuide, InstallGuideRow } from "@/components/insta
 import { NeulbomMark } from "@/components/art";
 import { GroupProvider, useGroup } from "@/lib/group-store";
 import { captureInviteFromUrl } from "@/lib/groups";
+import { kakaoConfig, loadKakaoSdk } from "@/lib/share";
 import { GroupTab } from "@/components/groups";
 import {
   IconChevron,
@@ -76,6 +77,16 @@ function Shell() {
       return;
     }
     if (TABS.some((t) => t.key === fromHash)) setTab(fromHash as TabKey);
+  }, []);
+
+  /**
+   * 카카오 공유 SDK 를 앱을 여는 순간 미리 불러 둔다.
+   * iOS Safari 는 사용자 클릭과 **같은 작업** 안에서 kakaolink:// 전환을 요청해야 카카오톡을 열어 주므로,
+   * 공유 버튼을 누를 때는 SDK 가 이미 준비돼 있어야 한다(그 사이에 await 가 끼면 다운로드 안내 화면으로 튕긴다).
+   */
+  useEffect(() => {
+    if (!kakaoConfig().configured) return;
+    void loadKakaoSdk();
   }, []);
 
   // 안드로이드 크롬 ‘앱 설치’ 팝업이 뜨도록 서비스 워커를 조용히 등록한다(실패해도 화면은 그대로).
