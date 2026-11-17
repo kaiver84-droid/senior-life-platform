@@ -18,6 +18,7 @@ import { ToolsTab } from "@/components/tools";
 import { FamilyTab } from "@/components/family";
 import { RankingTab } from "@/components/ranking";
 import { CalendarScreen } from "@/components/calendar";
+import { InstallBanner, InstallGuide, InstallGuideRow } from "@/components/install-guide";
 import { NeulbomMark } from "@/components/art";
 import { GroupProvider, useGroup } from "@/lib/group-store";
 import { captureInviteFromUrl } from "@/lib/groups";
@@ -75,6 +76,15 @@ function Shell() {
       return;
     }
     if (TABS.some((t) => t.key === fromHash)) setTab(fromHash as TabKey);
+  }, []);
+
+  // 안드로이드 크롬 ‘앱 설치’ 팝업이 뜨도록 서비스 워커를 조용히 등록한다(실패해도 화면은 그대로).
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const t = setTimeout(() => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
   }, []);
 
   // 예전 바로가기(도구·가족)도 그대로 열린다 — ‘더보기’ 안에서 이어서 보여 준다.
@@ -187,7 +197,12 @@ function Shell() {
       </header>
 
       <main className="px-4 pb-safe pt-2">
-        {tab === "home" ? <HomeTab onNavigate={navigate} onOpenCalendar={() => setCalendarOpen(true)} /> : null}
+        {tab === "home" ? (
+          <div className="space-y-3">
+            <InstallBanner />
+            <HomeTab onNavigate={navigate} onOpenCalendar={() => setCalendarOpen(true)} />
+          </div>
+        ) : null}
         {tab === "group" ? <GroupTab onNavigate={navigate} /> : null}
         {tab === "quiz" ? <QuizTab onNavigate={navigate} /> : null}
         {tab === "ranking" ? <RankingTab onNavigate={navigate} /> : null}
@@ -231,6 +246,9 @@ function Shell() {
       </nav>
 
       <CalendarScreen open={calendarOpen} onClose={() => setCalendarOpen(false)} />
+
+      {/* ‘주소창 없이 앱처럼 쓰기’ 안내 시트 — 어느 탭에서든 열 수 있게 셸에 둔다 */}
+      <InstallGuide />
 
       <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="내 정보 · 설정">
         <div className="rounded-3xl bg-white p-4 shadow-soft">
@@ -447,6 +465,7 @@ function MoreTab({
           sub="이름 · 지역 · 글씨 크기 · 가족 연결 번호"
           onClick={onOpenSettings}
         />
+        <InstallGuideRow />
       </div>
 
       <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">

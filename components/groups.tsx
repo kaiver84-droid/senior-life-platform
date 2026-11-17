@@ -443,6 +443,19 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
               ))}
             </div>
 
+            {/* 가족이 링크를 받지 않아도 오늘 약 상태·접속 여부를 바로 알 수 있게 */}
+            <div data-group-status className="mt-3 grid grid-cols-2 gap-2">
+              <p className="flex items-center justify-center gap-1 rounded-2xl bg-brand-light/70 px-2 py-2 text-[0.84rem] font-extrabold text-brand-deep">
+                🟢 지금 접속 {detail.onlineCount}명
+              </p>
+              <p
+                data-group-medicine
+                className="flex items-center justify-center gap-1 rounded-2xl bg-leaf-light/60 px-2 py-2 text-[0.84rem] font-extrabold text-leaf-dark"
+              >
+                💊 약 {members.filter((m) => m.medicineDone).length}/{detail.memberCount}명
+              </p>
+            </div>
+
             <div className="mt-4">
               <Gauge percent={detail.weeklyRate} label="이번 주 모임 달성률" />
               <p className="mt-1.5 text-[0.78rem] font-semibold text-ink/45">
@@ -604,10 +617,29 @@ function MemberChip({ member }: { member: GroupMemberInfo }) {
         {member.name}
       </span>
       {member.online ? (
-        <span className="tabular text-[0.66rem] font-extrabold leading-none text-leaf-dark">
-          접속 중
+        <span
+          data-member-online="on"
+          className="whitespace-nowrap rounded-full bg-leaf-light px-1.5 py-0.5 text-[0.62rem] font-extrabold leading-none text-leaf-dark"
+        >
+          🟢 접속 중
         </span>
-      ) : null}
+      ) : (
+        <span
+          data-member-online="off"
+          title={member.lastSeenLabel ? `마지막 접속 ${member.lastSeenLabel}` : "접속 기록 없음"}
+          className="whitespace-nowrap rounded-full bg-ink/5 px-1.5 py-0.5 text-[0.62rem] font-extrabold leading-none text-ink/35"
+        >
+          ⚪ {member.lastSeenLabel && member.lastSeenLabel !== "오프라인" ? member.lastSeenLabel : "오프라인"}
+        </span>
+      )}
+      <span
+        data-member-medicine={member.medicineDone ? "done" : "before"}
+        className={`whitespace-nowrap rounded-full px-1.5 py-0.5 text-[0.62rem] font-extrabold leading-none ${
+          member.medicineDone ? "bg-leaf-light text-leaf-dark" : "bg-ink/6 text-ink/40"
+        }`}
+      >
+        💊 {member.medicineDone ? "복약 완료" : "복약 전"}
+      </span>
       <span className="tabular text-[0.68rem] font-extrabold text-ink/40">{member.points}점</span>
     </div>
   );

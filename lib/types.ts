@@ -142,6 +142,12 @@ export type GroupMemberInfo = {
   /** 이번 주 퀴즈 점수 */
   points: number;
   rank: number;
+  /** 오늘 ‘약 챙기기’를 체크했는지 — 가족이 링크 없이 모임 화면에서 바로 확인 */
+  medicineDone?: boolean;
+  /** 오늘 건강 챌린지 5종 중 완료한 수 */
+  healthDoneCount?: number;
+  /** 마지막 접속을 사람이 읽는 말로 — ‘접속 중’ · ‘3분 전’ · ‘오프라인’ */
+  lastSeenLabel?: string;
 };
 
 export type GroupPostInfo = {

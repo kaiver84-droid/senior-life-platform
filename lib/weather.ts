@@ -13,6 +13,8 @@ export type WeatherInfo = {
   wind: number;
   tips: string[];
   source: "live" | "fallback";
+  /** 어느 날씨 서비스에서 받았는지 (live 일 때만) */
+  provider?: "open-meteo" | "met-no";
   observedAt: string;
 };
 
@@ -77,16 +79,15 @@ function tipsFor(
   return tips.slice(0, 3);
 }
 
-export async function fetchWeather(sido: string, sigungu: string): Promise<WeatherInfo> {
-  const { lat, lon } = regionCoords(sido, sigungu);
-  const now = new Date();
-  const fallback: WeatherInfo = {
+/** 두 날씨 서비스가 모두 막혔을 때 보여 주는 안내 (숫자를 지어내지 않는다) */
+export function fallbackWeather(): WeatherInfo {
+  return {
     ok: false,
-    temp: 18,
-    feels: 18,
-    min: 12,
-    max: 22,
-    label: "날씨 정보를 불러오지 못했어요",
+    temp: 0,
+    feels: 0,
+    min: 0,
+    max: 0,
+    label: "날씨를 불러오지 못했어요",
     emoji: "🌤️",
     rainProb: 0,
     humidity: 0,
@@ -97,59 +98,156 @@ export async function fetchWeather(sido: string, sigungu: string): Promise<Weath
       "외출 후 손 씻기와 따뜻한 물 한 잔을 잊지 마세요.",
     ],
     source: "fallback",
-    observedAt: now.toISOString(),
+    observedAt: new Date().toISOString(),
   };
+}
 
+async function getJson(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<any | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, headers });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** ① Open-Meteo (키 없이 쓸 수 있는 세계 날씨) */
+export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<WeatherInfo | null> {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m" +
     "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code" +
     "&timezone=Asia%2FSeoul&forecast_days=1";
 
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 7000);
-    const res = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(timer);
-    if (!res.ok) return fallback;
-    const json = (await res.json()) as {
-      current?: {
-        temperature_2m: number;
-        relative_humidity_2m: number;
-        apparent_temperature: number;
-        weather_code: number;
-        wind_speed_10m: number;
-      };
-      daily?: {
-        temperature_2m_max: number[];
-        temperature_2m_min: number[];
-        precipitation_probability_max: number[];
-        weather_code: number[];
-      };
-    };
-    if (!json.current || !json.daily) return fallback;
-    const c = json.current;
-    const code = CODE_MAP[c.weather_code] ?? { label: "날씨", emoji: "🌤️" };
-    const min = Math.round(json.daily.temperature_2m_min[0]);
-    const max = Math.round(json.daily.temperature_2m_max[0]);
-    const rainProb = json.daily.precipitation_probability_max?.[0] ?? 0;
-    const temp = Math.round(c.temperature_2m);
-    return {
-      ok: true,
-      temp,
-      feels: Math.round(c.apparent_temperature),
-      min,
-      max,
-      label: code.label,
-      emoji: code.emoji,
-      rainProb,
-      humidity: Math.round(c.relative_humidity_2m),
-      wind: Math.round(c.wind_speed_10m),
-      tips: tipsFor(code.label, temp, min, max, rainProb, c.wind_speed_10m, c.relative_humidity_2m),
-      source: "live",
-      observedAt: new Date().toISOString(),
-    };
-  } catch {
-    return fallback;
-  }
+  const json = await getJson(url, 7000);
+  if (!json?.current || !json?.daily) return null;
+  const c = json.current;
+  const code = CODE_MAP[c.weather_code] ?? { label: "날씨", emoji: "🌤️" };
+  const min = Math.round(json.daily.temperature_2m_min?.[0] ?? c.temperature_2m);
+  const max = Math.round(json.daily.temperature_2m_max?.[0] ?? c.temperature_2m);
+  const rainProb = Math.round(json.daily.precipitation_probability_max?.[0] ?? 0);
+  const temp = Math.round(c.temperature_2m);
+  const humidity = Math.round(c.relative_humidity_2m ?? 0);
+  const wind = Math.round(c.wind_speed_10m ?? 0);
+  return {
+    ok: true,
+    temp,
+    feels: Math.round(c.apparent_temperature ?? c.temperature_2m),
+    min,
+    max,
+    label: code.label,
+    emoji: code.emoji,
+    rainProb,
+    humidity,
+    wind,
+    tips: tipsFor(code.label, temp, min, max, rainProb, wind, humidity),
+    source: "live",
+    provider: "open-meteo",
+    observedAt: new Date().toISOString(),
+  };
 }
+
+/** MET Norway 의 날씨 기호(symbol_code)를 한국어로 */
+function metLabel(symbol: string): { label: string; emoji: string } {
+  const s = symbol.toLowerCase();
+  if (s.includes("thunder")) return { label: "천둥번개", emoji: "⛈️" };
+  if (s.includes("sleet")) return { label: "진눈깨비", emoji: "🌧️" };
+  if (s.includes("snow")) return { label: "눈", emoji: "❄️" };
+  if (s.includes("heavyrain")) return { label: "강한 비", emoji: "⛈️" };
+  if (s.includes("lightrain")) return { label: "약한 비", emoji: "🌦️" };
+  if (s.includes("rain")) return { label: "비", emoji: "🌧️" };
+  if (s.includes("fog")) return { label: "안개", emoji: "🌫️" };
+  if (s.includes("partlycloudy")) return { label: "구름 조금", emoji: "⛅" };
+  if (s.includes("cloudy")) return { label: "흐림", emoji: "☁️" };
+  if (s.includes("fair")) return { label: "대체로 맑음", emoji: "🌤️" };
+  if (s.includes("clear")) return { label: "맑음", emoji: "☀️" };
+  return { label: "날씨", emoji: "🌤️" };
+}
+
+/** ② MET Norway (백업 — Open-Meteo 가 막힌 망에서도 살아 있는 날씨) */
+export async function fetchFromMetNo(lat: number, lon: number): Promise<WeatherInfo | null> {
+  const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`;
+  const json = await getJson(url, 7000, {
+    // MET Norway 는 연락처가 담긴 User-Agent 를 요구한다(브라우저에서는 헤더를 못 넣어 서버에서만 쓴다).
+    "User-Agent": "neulbom-senior-platform/1.0 (https://senior-life-platform.pages.dev)",
+    Accept: "application/json",
+  });
+  const series = json?.properties?.timeseries;
+  if (!Array.isArray(series) || series.length === 0) return null;
+
+  const now = series[0];
+  const details = now?.data?.instant?.details;
+  if (!details || typeof details.air_temperature !== "number") return null;
+
+  const temp = Math.round(details.air_temperature);
+  const humidity = Math.round(details.relative_humidity ?? 0);
+  const wind = Math.round(details.wind_speed ?? 0);
+  const summary = now?.data?.next_1_hours?.summary ?? now?.data?.next_6_hours?.summary;
+  const code = metLabel(summary?.symbol_code ?? "");
+  const rainProb = Math.round(
+    now?.data?.next_1_hours?.details?.probability_of_precipitation ??
+      now?.data?.next_6_hours?.details?.probability_of_precipitation ??
+      0
+  );
+
+  // 앞으로 24시간의 최저·최고
+  const temps: number[] = series
+    .slice(0, 24)
+    .map((t: any) => t?.data?.instant?.details?.air_temperature)
+    .filter((v: any) => typeof v === "number");
+  const min = Math.round(Math.min(...temps, details.air_temperature));
+  const max = Math.round(Math.max(...temps, details.air_temperature));
+
+  return {
+    ok: true,
+    temp,
+    feels: temp,
+    min,
+    max,
+    label: code.label,
+    emoji: code.emoji,
+    rainProb,
+    humidity,
+    wind,
+    tips: tipsFor(code.label, temp, min, max, rainProb, wind, humidity),
+    source: "live",
+    provider: "met-no",
+    observedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * 실제 날씨 조회 (서버·브라우저 공용).
+ * Open-Meteo → MET Norway 순서로 시도하고, 둘 다 안 되면 안내용 기본값을 준다.
+ */
+export async function fetchWeatherLive(sido: string, sigungu: string): Promise<WeatherInfo> {
+  const { lat, lon } = regionCoords(sido, sigungu);
+  const open = await fetchFromOpenMeteo(lat, lon);
+  if (open) return open;
+  const met = await fetchFromMetNo(lat, lon);
+  if (met) return met;
+  return fallbackWeather();
+}
+
+/**
+ * 화면에서 쓰는 날씨 조회.
+ * 먼저 우리 서버(/api/weather)에 물어본다 — 서버가 대신 조회하므로
+ * 아이폰 Safari·카카오톡 안 화면처럼 바깥 주소가 막힌 곳에서도 날씨가 뜬다.
+ * 서버도 안 되면 브라우저에서 직접 한 번 더 시도한다.
+ */
+export async function fetchWeather(sido: string, sigungu: string): Promise<WeatherInfo> {
+  const qs = `sido=${encodeURIComponent(sido || "")}&sigungu=${encodeURIComponent(sigungu || "")}`;
+  const json = await getJson(`/api/weather?${qs}`, 9000);
+  if (json && json.source === "live" && typeof json.temp === "number") return json as WeatherInfo;
+
+  const live = await fetchWeatherLive(sido, sigungu);
+  if (live.ok) return live;
+  return json && typeof json.temp === "number" ? ({ ...(json as WeatherInfo), ok: false } as WeatherInfo) : live;
+}
+
+export { tipsFor };

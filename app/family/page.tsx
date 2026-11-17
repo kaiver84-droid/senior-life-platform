@@ -8,48 +8,102 @@ import { NeulbomLogo } from "@/components/art";
 import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
 import { dayTitle, ddayLabel, kindInfo, upcomingEvents, type FamilyEvent } from "@/lib/calendar";
+import { HEALTH_CHALLENGES, HEALTH_TOTAL } from "@/lib/health";
 import { IconCalendar, IconPhone } from "@/components/icons";
 import type { AppState } from "@/lib/types";
+
+/** 자녀가 한 번 연결한 부모님 번호 — 다음부터는 주소 없이 /family/ 만 열어도 이어진다 */
+const FAMILY_CODE_KEY = "neulbom.familyCode.v1";
 
 type RemoteState = {
   profile: { nickname: string; birthYear: number; sido: string; sigungu: string } | null;
   quizLogs: { date: string; points: number; correct: number; total: number }[];
   med: Record<string, { morning: boolean; evening: boolean }>;
+  /** 날짜별 건강 챌린지 체크인 — { "2026-11-17": ["water","medicine"] } */
+  health: Record<string, string[]>;
   visits: string[];
   familyEvents?: FamilyEvent[];
 };
+
+function hhmm(d: Date | null): string {
+  if (!d) return "-";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 function Dashboard() {
   const { profile, state, today, streak, code, weekPoints, ready } = useApp();
   const { show } = useToast();
   const [remote, setRemote] = useState<RemoteState | null>(null);
   const [lookupCode, setLookupCode] = useState("");
+  const [linkedCode, setLinkedCode] = useState(" ".trim());
   const [loading, setLoading] = useState(false);
+  const [tick, setTick] = useState(0);
+  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
 
   const queryCode = useMemo(() => {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("code") || "";
   }, []);
 
+  /** 주소의 번호가 있으면 그것, 없으면 지난번에 연결한 번호 */
+  const activeCode = (queryCode || linkedCode || "").trim().toUpperCase();
+
+  // 지난번에 연결한 부모님 번호를 불러온다(한 번 연결하면 계속 기억)
   useEffect(() => {
-    if (!ready || !queryCode || queryCode === code) return;
+    try {
+      setLinkedCode(localStorage.getItem(FAMILY_CODE_KEY) || "");
+    } catch {
+      /* 저장소를 막아 둔 브라우저도 있다 */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !activeCode || activeCode === code) return;
+    // 한 번 연결하면 기억해 두고, 주소창의 ?code= 는 지워 다음부터 번호 없이 열리게 한다.
+    try {
+      if (localStorage.getItem(FAMILY_CODE_KEY) !== activeCode) {
+        localStorage.setItem(FAMILY_CODE_KEY, activeCode);
+        setLinkedCode(activeCode);
+      }
+    } catch {
+      /* 무시 */
+    }
+    if (queryCode) {
+      window.history.replaceState({}, "", "/family/");
+    }
+    let alive = true;
     setLoading(true);
-    fetch(`/api/state?code=${encodeURIComponent(queryCode)}`)
+    fetch(`/api/state?code=${encodeURIComponent(activeCode)}`)
       .then((r) => r.json())
       .then((j) => {
+        if (!alive) return;
         if (j?.ok && j.state) {
           setRemote({
             profile: j.state.profile,
             quizLogs: j.state.quizLogs || [],
             med: j.state.med || {},
+            health: j.state.health && typeof j.state.health === "object" ? j.state.health : {},
             visits: j.state.visits || [],
             familyEvents: Array.isArray(j.state.familyEvents) ? j.state.familyEvents : [],
           });
+          setCheckedAt(new Date());
         }
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [ready, queryCode, code]);
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [ready, activeCode, code, queryCode, tick]);
+
+  // 1분마다 저절로 새로 고칩니다 — 자녀가 화면을 켜 두면 늘 최신 상태
+  useEffect(() => {
+    if (!activeCode) return;
+    const t = setInterval(() => setTick((n) => n + 1), 60000);
+    return () => clearInterval(t);
+  }, [activeCode]);
 
   const useRemote = Boolean(remote) && !profile;
   const data: {
@@ -58,6 +112,7 @@ function Dashboard() {
     region: string;
     quizLogs: AppState["quizLogs"];
     med: AppState["med"];
+    health: Record<string, string[]>;
     visits: string[];
     familyEvents: FamilyEvent[];
   } =
@@ -68,6 +123,7 @@ function Dashboard() {
           region: `${shortSido(remote.profile?.sido || "")} ${remote.profile?.sigungu || ""}`.trim(),
           quizLogs: remote.quizLogs as AppState["quizLogs"],
           med: remote.med,
+          health: remote.health,
           visits: remote.visits,
           familyEvents: remote.familyEvents || [],
         }
@@ -77,11 +133,15 @@ function Dashboard() {
           region: `${shortSido(profile?.sido || "")} ${profile?.sigungu || ""}`.trim(),
           quizLogs: state.quizLogs,
           med: state.med,
+          health: state.health,
           visits: state.visits,
           familyEvents: state.familyEvents,
         };
 
   const todayMed = data.med[today] ?? { morning: false, evening: false };
+  /** 오늘 부모님이 직접 찍은 건강 도장 5종 (복약·물·걷기·체조·안부전화) */
+  const todayHealth = Array.isArray(data.health?.[today]) ? data.health[today] : [];
+  const medicineDone = todayHealth.includes("medicine");
   const todayLogs = data.quizLogs.filter((q) => q.date === today);
   const todayPoints = todayLogs.reduce((a, b) => a + b.points, 0);
   const visitedToday = data.visits.includes(today);
@@ -98,7 +158,7 @@ function Dashboard() {
     return <div className="p-8 text-center font-bold text-ink/45">불러오는 중…</div>;
   }
 
-  if (!profile && !remote && !queryCode) {
+  if (!profile && !remote && !activeCode) {
     return (
       <div className="mx-auto max-w-[460px] px-4 py-8">
         <div className="mb-5 flex justify-center">
@@ -126,12 +186,22 @@ function Dashboard() {
                   show("6자리 코드를 넣어 주세요.");
                   return;
                 }
-                window.location.href = `/family/?code=${lookupCode}`;
+                const c = lookupCode.toUpperCase();
+                try {
+                  localStorage.setItem(FAMILY_CODE_KEY, c);
+                } catch {
+                  /* 무시 */
+                }
+                window.location.href = `/family/?code=${c}`;
               }}
             >
               부모님 안부 확인하기
             </BigButton>
           </div>
+          <p className="mt-3 text-center text-[0.84rem] font-semibold leading-relaxed text-ink/50">
+            한 번만 연결하면 이 휴대폰에 기억해 두어, 다음부터는 번호 없이 <b className="text-ink">/family/</b> 만 열어도
+            부모님의 오늘 약·건강 상태가 보여요.
+          </p>
         </Card>
         <Link href="/" className="mt-4 block text-center text-[0.92rem] font-bold text-brand">
           ← 처음 화면으로
@@ -161,6 +231,68 @@ function Dashboard() {
       </div>
 
       {loading ? <p className="mb-2 text-center text-[0.85rem] font-bold text-ink/45">불러오는 중…</p> : null}
+
+      {/* 💊 오늘 약 복용 상태 — 자녀가 가장 먼저 보는 카드 */}
+      <Card
+        className={`mb-3 rounded-[1.6rem] border-2 p-4 ${
+          medicineDone ? "border-leaf/35 bg-leaf-light/40" : "border-coral/25 bg-coral-light/25"
+        }`}
+      >
+        <div data-family-medicine className="flex items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-[1.06rem] font-black text-ink">💊 오늘 약 복용 상태</p>
+          <button
+            type="button"
+            data-family-refresh
+            onClick={() => setTick((n) => n + 1)}
+            className="flex min-h-[40px] shrink-0 items-center gap-1 rounded-full border-2 border-ink/10 bg-white px-3 text-[0.8rem] font-extrabold text-ink/70 active:bg-paper"
+          >
+            🔄 새로고침
+          </button>
+        </div>
+        <p
+          className={`mt-2 text-[1.5rem] font-black leading-tight ${
+            medicineDone ? "text-leaf-dark" : "text-coral-dark"
+          }`}
+        >
+          {medicineDone ? "약 챙기기 완료 ✓" : "아직 약을 챙기지 않았어요"}
+        </p>
+        <p className="mt-1 text-[0.86rem] font-semibold text-ink/55">
+          오늘 건강 도장 {todayHealth.length}/{HEALTH_TOTAL}개 · 최근 확인 {hhmm(checkedAt)}
+          {loading ? " (불러오는 중…)" : ""}
+        </p>
+
+        <div className="mt-3 grid grid-cols-5 gap-1.5">
+          {HEALTH_CHALLENGES.map((c) => {
+            const done = todayHealth.includes(c.id);
+            return (
+              <div
+                key={c.id}
+                data-health-chip={c.id}
+                data-done={done ? "1" : "0"}
+                className={`rounded-2xl px-1 py-2 text-center ${done ? "bg-white shadow-soft" : "bg-white/45"}`}
+              >
+                <span className={`block text-[1.12rem] leading-none ${done ? "" : "opacity-30 grayscale"}`}>
+                  {c.emoji}
+                </span>
+                <span
+                  className={`mt-1 block text-[0.64rem] font-extrabold leading-tight ${
+                    done ? "text-leaf-dark" : "text-ink/35"
+                  }`}
+                >
+                  {c.title.split(" ")[0]}
+                </span>
+                <span className={`mt-0.5 block text-[0.62rem] font-black ${done ? "text-leaf-dark" : "text-ink/25"}`}>
+                  {done ? "✓" : "·"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="mt-2 text-[0.78rem] font-semibold leading-relaxed text-ink/45">
+          부모님이 홈에서 ‘복약 챙기기’를 누르면 여기에 바로 나타나요. 1분마다 저절로 새로 고쳐요.
+        </p>
+      </Card>
 
       <Card className="mb-3 rounded-[1.6rem] bg-gradient-to-br from-white to-brand-light/50 p-4">
         <div className="flex items-center gap-3">
@@ -274,8 +406,32 @@ function Dashboard() {
       </Card>
 
       <p className="mt-2 rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.78rem] font-semibold leading-relaxed text-ink/45">
-        이 화면은 부모님이 보낸 가족 연결 번호로 열렸어요. 부모님 정보는 안부 확인 목적으로만 보여 드려요.
+        {activeCode ? (
+          <>
+            가족 연결 번호 <b className="tabular text-ink/70">{activeCode}</b> 로 연결되었어요. 이 휴대폰에 기억해 두어
+            다음부터는 번호 없이 열려요. 부모님 정보는 안부 확인 목적으로만 보여 드려요.
+          </>
+        ) : (
+          <>이 화면은 부모님이 보낸 가족 연결 번호로 열렸어요. 부모님 정보는 안부 확인 목적으로만 보여 드려요.</>
+        )}
       </p>
+      {activeCode ? (
+        <button
+          type="button"
+          data-family-unlink
+          onClick={() => {
+            try {
+              localStorage.removeItem(FAMILY_CODE_KEY);
+            } catch {
+              /* 무시 */
+            }
+            window.location.href = "/family/";
+          }}
+          className="mt-2 w-full py-2 text-center text-[0.84rem] font-bold text-ink/40 underline"
+        >
+          다른 부모님 연결하기
+        </button>
+      ) : null}
     </div>
   );
 }

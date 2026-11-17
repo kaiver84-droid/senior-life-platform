@@ -118,10 +118,34 @@ export function sigunguList(sido: string): string[] {
   return REGIONS.find((r) => r.name === sido)?.sigungu ?? [];
 }
 
-export function regionCoords(sido: string, _sigungu: string): { lat: number; lon: number } {
+export function regionCoords(sido: string, sigungu: string): { lat: number; lon: number } {
+  const exact = SIGUNGU_COORDS[sigungu];
+  if (exact) return exact;
   const r = REGIONS.find((x) => x.name === sido);
   return r ? { lat: r.lat, lon: r.lon } : { lat: 36.5, lon: 127.8 };
 }
+
+/**
+ * 시·군·구 단위 좌표 (날씨를 그 동네 기준으로 조회하기 위해).
+ * 여기에 없는 시·군·구는 시·도 대표 좌표를 쓴다 — 같은 시·도 안이라 날씨 차이가 작다.
+ */
+const SIGUNGU_COORDS: Record<string, { lat: number; lon: number }> = {
+  // 충청북도
+  청주시: { lat: 36.6424, lon: 127.489 },
+  충주시: { lat: 36.991, lon: 127.9259 },
+  제천시: { lat: 37.1326, lon: 128.191 },
+  보은군: { lat: 36.4894, lon: 127.7296 },
+  옥천군: { lat: 36.3064, lon: 127.5713 },
+  영동군: { lat: 36.175, lon: 127.7834 },
+  증평군: { lat: 36.7853, lon: 127.5815 },
+  진천군: { lat: 36.855, lon: 127.4357 },
+  괴산군: { lat: 36.8154, lon: 127.7867 },
+  음성군: { lat: 36.94, lon: 127.6903 },
+  단양군: { lat: 36.9845, lon: 128.3657 },
+  // 제주특별자치도 (섬이라 시·도 대표 좌표와 차이가 크다)
+  제주시: { lat: 33.4996, lon: 126.5312 },
+  서귀포시: { lat: 33.2541, lon: 126.5601 },
+};
 
 const SHORT: Record<string, string> = {
   서울특별시: "서울",

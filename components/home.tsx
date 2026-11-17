@@ -70,6 +70,7 @@ export function HomeTab({
   const { profile, streak, today, todayDaily, weekPoints } = useApp();
   const { show } = useToast();
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [weatherBusy, setWeatherBusy] = useState(false);
   const [fortuneOpen, setFortuneOpen] = useState(false);
   const [weatherOpen, setWeatherOpen] = useState(false);
   const [studio, setStudio] = useState<{ open: boolean; autoShare: boolean }>({ open: false, autoShare: false });
@@ -85,13 +86,26 @@ export function HomeTab({
   useEffect(() => {
     if (!profile) return;
     let alive = true;
+    setWeatherBusy(true);
     fetchWeather(profile.sido, profile.sigungu).then((w) => {
-      if (alive) setWeather(w);
+      if (alive) {
+        setWeather(w);
+        setWeatherBusy(false);
+      }
     });
     return () => {
       alive = false;
     };
   }, [profile]);
+
+  /** 날씨 ‘다시 확인’ — 서버(/api/weather)에 한 번 더 물어본다 */
+  const retryWeather = useCallback(async () => {
+    if (!profile || weatherBusy) return;
+    setWeatherBusy(true);
+    const w = await fetchWeather(profile.sido, profile.sigungu);
+    setWeather(w);
+    setWeatherBusy(false);
+  }, [profile, weatherBusy]);
 
   const tiles: { key: string; label: string; sub: string; icon: Icon3DName; go: () => void }[] = [
     {
@@ -276,7 +290,11 @@ export function HomeTab({
         <span className="min-w-0 flex-1">
           <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 날씨와 생활팁</span>
           <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
-            {weather ? `${weather.temp}° ${weather.label} · ${weather.tips[0]}` : "날씨를 확인하고 있어요…"}
+            {!weather
+              ? "날씨를 확인하고 있어요…"
+              : weather.source === "live"
+                ? `${weather.temp}° ${weather.label} · ${weather.tips[0]}`
+                : "눌러서 오늘 날씨를 다시 확인해요"}
           </span>
         </span>
         <IconChevron size={22} className="shrink-0 text-ink/30" />
@@ -344,7 +362,7 @@ export function HomeTab({
         title="오늘의 날씨와 생활팁"
         subtitle={`${shortSido(profile?.sido || "")} ${profile?.sigungu}`}
       >
-        <WeatherDetail weather={weather} />
+        <WeatherDetail weather={weather} onRetry={retryWeather} busy={weatherBusy} />
       </Sheet>
 
       {studio.open ? (
@@ -452,27 +470,57 @@ function LuckyBox({ label, value, swatch }: { label: string; value: string; swat
   );
 }
 
-function WeatherDetail({ weather }: { weather: WeatherInfo | null }) {
+function WeatherDetail({
+  weather,
+  onRetry,
+  busy,
+}: {
+  weather: WeatherInfo | null;
+  onRetry?: () => void;
+  busy?: boolean;
+}) {
   if (!weather) {
     return <p className="py-8 text-center text-[1rem] font-semibold text-ink/55">날씨를 불러오는 중이에요…</p>;
   }
+  const live = weather.source === "live";
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-4 rounded-[1.5rem] bg-white p-5 shadow-soft">
-        <WeatherArt label={weather.label} size={62} />
-        <div>
-          <p className="tabular text-[2rem] font-black leading-none text-ink">
-            {weather.temp}
-            <span className="text-[1.1rem] font-bold">°C</span>
-          </p>
-          <p className="mt-1 text-[0.95rem] font-bold text-ink/60">
-            {weather.label} · 최저 {weather.min}° / 최고 {weather.max}°
-          </p>
-          <p className="text-[0.82rem] font-semibold text-ink/45">
-            체감 {weather.feels}° · 습도 {weather.humidity}% · 바람 {weather.wind}m/s
-          </p>
+      {live ? (
+        <div className="flex items-center gap-4 rounded-[1.5rem] bg-white p-5 shadow-soft">
+          <WeatherArt label={weather.label} size={62} />
+          <div>
+            <p className="tabular text-[2rem] font-black leading-none text-ink">
+              {weather.temp}
+              <span className="text-[1.1rem] font-bold">°C</span>
+            </p>
+            <p className="mt-1 text-[0.95rem] font-bold text-ink/60">
+              {weather.label} · 최저 {weather.min}° / 최고 {weather.max}°
+            </p>
+            <p className="text-[0.82rem] font-semibold text-ink/45">
+              체감 {weather.feels}° · 습도 {weather.humidity}% · 바람 {weather.wind}m/s
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-[1.5rem] bg-white p-5 text-center shadow-soft">
+          <div className="mx-auto mb-2 grid h-14 w-14 place-items-center rounded-full bg-sun-light text-[1.7rem]">
+            🌤️
+          </div>
+          <p className="text-[1.08rem] font-black leading-snug text-ink">지금은 날씨를 불러오지 못했어요</p>
+          <p className="mt-1 text-[0.92rem] font-semibold leading-relaxed text-ink/55">
+            잠시 뒤 &lsquo;다시 확인&rsquo;을 눌러 주세요.
+            <br />
+            그동안에도 아래 생활팁은 그대로 도움이 돼요.
+          </p>
+          {onRetry ? (
+            <div className="mt-3">
+              <BigButton variant="teal" full height={56} onClick={onRetry} disabled={busy}>
+                {busy ? "다시 확인하는 중…" : "🔄 날씨 다시 확인하기"}
+              </BigButton>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
         <p className="mb-2 flex items-center gap-1.5 text-[0.95rem] font-black text-ink">
@@ -489,8 +537,8 @@ function WeatherDetail({ weather }: { weather: WeatherInfo | null }) {
       </div>
 
       <p className="text-center text-[0.76rem] font-medium text-ink/40">
-        {weather.source === "live"
-          ? "실시간 날씨(Open-Meteo) 기준 · 외출 전 한 번 더 확인하세요"
+        {live
+          ? `실시간 날씨(${weather.provider === "met-no" ? "MET Norway" : "Open-Meteo"}) 기준 · 외출 전 한 번 더 확인하세요`
           : "날씨를 불러오지 못해 기본 안내를 보여 드려요"}
       </p>
     </div>

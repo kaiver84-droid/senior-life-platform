@@ -138,6 +138,14 @@ export function SharePreviewSheet({
       onClose={onClose}
       title={data.sheetTitle || "카카오톡으로 보내기"}
       subtitle={data.sheetSubtitle || "단톡방에 이렇게 보여요"}
+      hideBottomClose
+      footer={
+        <div data-share-close>
+          <BigButton variant="white" full onClick={onClose} height={56} className="rounded-[1.1rem]">
+            <IconClose size={20} /> 닫기
+          </BigButton>
+        </div>
+      }
     >
       <div data-share-sheet className="space-y-3">
         {/* 카카오톡 대화방 미리보기 */}
@@ -214,12 +222,6 @@ export function SharePreviewSheet({
                 💬
               </span>
               카카오톡으로 바로 보내기
-            </BigButton>
-          </div>
-
-          <div data-share-close>
-            <BigButton variant="white" full onClick={onClose} height={56} className="rounded-[1.1rem]">
-              <IconClose size={20} /> 닫기
             </BigButton>
           </div>
         </div>

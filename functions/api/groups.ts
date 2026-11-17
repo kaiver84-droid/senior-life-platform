@@ -114,6 +114,19 @@ function onlineFrom(iso?: string | null): boolean {
   return Number.isFinite(t) && Date.now() - t <= ONLINE_WINDOW_MS && t - Date.now() < 60_000;
 }
 
+/** 마지막 접속을 사람이 읽는 말로 — 목록에서 ‘🟢 접속 중 / 3분 전’ 처럼 보여 준다 */
+function lastSeenLabel(iso?: string | null): string {
+  if (!iso) return "오프라인";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "오프라인";
+  const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (min < 1) return "방금 전";
+  if (min < 60) return `${min}분 전`;
+  const hour = Math.round(min / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  return `${Math.round(hour / 24)}일 전`;
+}
+
 /** 체험 모임원 — 시각에 따라 그럴듯하게 접속 중인 사람을 만든다(실제 사람이 아니다) */
 function demoOnline(code: string): boolean {
   const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCHours();
@@ -224,6 +237,9 @@ async function buildDetail(
         weekDays: demoWeekDays(m.user_code, week),
         points: demoPoints(m.user_code, week),
         rank: 0,
+        medicineDone: demoHealth.includes("medicine"),
+        healthDoneCount: demoHealth.length,
+        lastSeenLabel: demoOnline(m.user_code) ? "접속 중" : "오프라인",
       };
     }
     const myDays = daysBy.get(m.user_code) ?? new Set<string>();
@@ -254,6 +270,10 @@ async function buildDetail(
       weekDays,
       points,
       rank: 0,
+      // 가족이 링크 없이도 모임 화면에서 오늘 약 상태를 바로 본다.
+      medicineDone: healthIds.includes("medicine"),
+      healthDoneCount: healthIds.length,
+      lastSeenLabel: isMe ? "지금 접속 중" : onlineFrom(m.last_seen_at) ? "접속 중" : lastSeenLabel(m.last_seen_at),
     };
   });
 

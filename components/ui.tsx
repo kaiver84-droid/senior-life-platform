@@ -242,6 +242,7 @@ export function Sheet({
   subtitle,
   children,
   footer,
+  hideBottomClose,
 }: {
   open: boolean;
   onClose: () => void;
@@ -249,6 +250,8 @@ export function Sheet({
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** 시트 안에 이미 큰 닫기 버튼이 있으면(공유 시트 등) 아래 고정 닫기를 겹쳐 그리지 않는다 */
+  hideBottomClose?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -267,33 +270,57 @@ export function Sheet({
   if (!open) return null;
   return (
     <Portal>
-      <div className="fixed inset-0 z-[80] flex items-end justify-center">
+      {/* 아이폰 상태바·노치 아래로는 절대 올라가지 않게 위쪽 여백을 강제로 비운다
+          (여백 = 최소 64px, 세이프에어리어가 더 크면 그만큼 더) */}
+      <div
+        className="fixed inset-0 z-[80] flex items-end justify-center"
+        style={{ paddingTop: "max(64px, calc(env(safe-area-inset-top, 0px) + 20px))" }}
+      >
         <button aria-label="닫기" onClick={onClose} className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]" />
-        <div className="fade-up relative w-full max-w-[460px] rounded-t-[2rem] bg-paper px-5 pb-[calc(env(safe-area-inset-bottom,0px)+22px)] pt-2 shadow-2xl">
-          {/* 손잡이(드래그 바) + 늘 보이는 ‘✕ 닫기’ — 어느 시트든 같은 자리에서 닫을 수 있다 */}
-          <div className="mb-1.5 flex min-h-[44px] items-center justify-end">
-            <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
-              <div className="h-1.5 w-12 rounded-full bg-ink/15" />
+        <div className="fade-up relative flex max-h-full w-full max-w-[460px] flex-col overflow-hidden rounded-t-[28px] bg-paper shadow-2xl">
+          {/* 고정 헤더 — 스크롤해도 제목과 ‘✕ 닫기’가 늘 같은 자리에 있다 */}
+          <div className="shrink-0 rounded-t-[28px] border-b border-ink/8 bg-white px-4 pb-2.5 pt-2">
+            <div aria-hidden className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-ink/15" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                {title ? (
+                  <h3 className="truncate text-[1.16rem] font-black leading-tight text-ink">{title}</h3>
+                ) : null}
+                {subtitle ? (
+                  <p className="mt-0.5 truncate text-[0.84rem] font-semibold text-ink/55">{subtitle}</p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                data-sheet-close
+                onClick={onClose}
+                aria-label="닫기"
+                className="flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-[1rem] font-extrabold text-white shadow-soft active:bg-[#0F2C48]"
+              >
+                <IconClose size={20} />
+                닫기
+              </button>
             </div>
-            <button
-              type="button"
-              data-sheet-close
-              onClick={onClose}
-              aria-label="닫기"
-              className="relative flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1 rounded-full border-2 border-ink/12 bg-white px-3.5 text-[0.94rem] font-extrabold text-ink/70 shadow-soft active:bg-paper"
-            >
-              <IconClose size={18} />
-              닫기
-            </button>
           </div>
-          {title ? (
-            <div className="mb-3 text-center">
-              <h3 className="text-[1.2rem] font-black leading-snug">{title}</h3>
-              {subtitle ? <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">{subtitle}</p> : null}
+
+          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-5 pb-4 pt-3.5">{children}</div>
+
+          {/* 고정 하단 — 위를 보든 아래를 보든 큰 ‘닫기’가 늘 보인다 */}
+          {footer || !hideBottomClose ? (
+            <div
+              className="shrink-0 border-t border-ink/8 bg-white/95 px-4 pt-2.5"
+              style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+            >
+              {footer}
+              {hideBottomClose ? null : (
+                <div className={footer ? "mt-2" : ""}>
+                  <BigButton variant="white" full height={54} onClick={onClose}>
+                    <IconClose size={20} /> 닫기
+                  </BigButton>
+                </div>
+              )}
             </div>
           ) : null}
-          <div className="max-h-[74vh] overflow-y-auto no-scrollbar">{children}</div>
-          {footer ? <div className="mt-4">{footer}</div> : null}
         </div>
       </div>
     </Portal>
