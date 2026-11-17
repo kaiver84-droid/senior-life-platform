@@ -221,9 +221,8 @@ export function Onboarding() {
       setKakaoStarting(false);
       window.location.href = "/api/auth/kakao?start=1";
     };
-    // 1) 카카오 JS SDK: Safari 안에서 카카오 웹 로그인 화면(kauth.kakao.com)으로 이동해
-    //    동의를 마치면 redirectUri 로 ?code= 가 바로 돌아온다(카톡 앱 전환·중간 안내 화면 없음).
-    //    정상 호출이면 페이지가 카카오 인가 화면으로 떠난다.
+    // 1) 카카오 JS SDK 간편로그인: 모바일에서 카카오톡 앱이 바로 열려 아이디·비밀번호 없이 인증한다.
+    //    동의를 마치면 redirectUri 로 ?code= 가 돌아온다. (정상 호출이면 페이지가 떠난다)
     if (kakao.jsConfigured) {
       setKakaoStarting(true);
       // 이미 로드된 SDK 라면 클릭(사용자 제스처) 안에서 곧바로 호출한다
@@ -392,11 +391,11 @@ export function Onboarding() {
           </section>
 
           <Card className="rounded-[1.75rem] p-5">
-            <p className="text-center text-[1.06rem] font-black leading-snug text-ink">카카오 계정으로 시작해요</p>
+            <p className="text-center text-[1.06rem] font-black leading-snug text-ink">카카오톡으로 바로 시작해요</p>
             <p className="mt-1 text-center text-[0.9rem] font-semibold leading-relaxed text-ink/55">
-              카카오 계정으로 한 번만 로그인하면 끝나요.
+              아이디와 비밀번호를 새로 만들거나 입력할 필요 없이
               <br />
-              새로 가입하거나 비밀번호를 만들지 않아도 돼요.
+              카카오톡 버튼만 누르면 바로 인증돼요.
             </p>
 
             <button
@@ -417,7 +416,7 @@ export function Onboarding() {
               </p>
             ) : (
               <p className="mt-2.5 text-center text-[0.82rem] font-semibold leading-relaxed text-ink/45">
-                버튼을 누르면 카카오 로그인 화면이 열려요. 쓰던 카카오 계정으로 로그인해 주세요.
+                버튼을 누르면 카카오톡이 열려요. 화면에 나오는 대로 [확인]만 눌러 주세요.
                 <br />
                 처음 한 번만 이름·태어난 시간·사는 곳을 여쭤봐요.
               </p>

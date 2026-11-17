@@ -52,7 +52,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
       ok: true,
       ...dbStatus(env),
       kakaoLoginConfigured: Boolean(env.KAKAO_CLIENT_ID),
-      // JS 키가 있으면 클라이언트가 Kakao.Auth.authorize(throughTalk: false) 로 카카오 웹 인가를 바로 띄울 수 있다
+      // JS 키가 있으면 클라이언트가 Kakao.Auth.authorize(throughTalk: true) 로 카카오톡 앱 원터치 인증을 띄울 수 있다
       kakaoJsConfigured: Boolean(env.NEXT_PUBLIC_KAKAO_JS_KEY),
       redirectUri: redirectFor(env, url),
     });
