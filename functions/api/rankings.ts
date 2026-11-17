@@ -1,11 +1,19 @@
-import { buildGroupRanking, buildInviteRanking, buildRanking } from "../../lib/rankings";
-import type { InviterInput, MyGroupInput } from "../../lib/rankings";
+import { buildAreaRanking, buildGroupRanking } from "../../lib/rankings";
+import type { RankParticipant } from "../../lib/rankings";
 import { demoAttendedSet, demoPoints } from "../../lib/group-demo";
 import { normalizeAvatarUrl } from "../../lib/avatar";
 import { sbRequest, supabaseConfig } from "../../lib/db";
 import type { DbEnv } from "../../lib/db";
 import { kstDate, weekIdOf } from "../../lib/week";
-import type { RankingScope } from "../../lib/types";
+import {
+  LEAGUE_DAILY_CAP,
+  LEAGUE_POINTS,
+  ageBandOf,
+  isLeagueArea,
+  weekDatesOf,
+  type LeagueArea,
+} from "../../lib/league";
+import type { RankingRange } from "../../lib/types";
 
 type Ctx = { request: Request; env: DbEnv };
 
@@ -24,33 +32,271 @@ async function sbGet<T>(env: DbEnv, path: string): Promise<T[]> {
   return Array.isArray(data) ? (data as T[]) : [];
 }
 
+/* ------------------------------------------------------------------ */
+/* 7개 영역 — 실제 참여자 집계                                          */
+/* ------------------------------------------------------------------ */
+
+type UserRow = {
+  code: string;
+  nickname: string;
+  sido?: string | null;
+  sigungu?: string | null;
+  birth_year?: number | null;
+  avatar_url?: string | null;
+  external_id?: string | null;
+  ranking_visible?: boolean | null;
+  created_at?: string | null;
+  invited_by?: string | null;
+};
+
+/** ISO 시각 → 한국 날짜(YYYY-MM-DD) */
+function kstDayOf(iso?: string | null): string {
+  if (!iso) return "";
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return "";
+  return new Date(t.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+function parseArea(raw: string | null, scope: string): LeagueArea {
+  if (isLeagueArea(raw)) return raw as LeagueArea;
+  if (scope === "invite") return "share";
+  if (scope === "streak") return "attend";
+  return "all";
+}
+
+function parseRange(raw: string | null, scope: string): RankingRange {
+  const v = raw || scope;
+  if (v === "region" || v === "national" || v === "age" || v === "group") return v;
+  if (v === "zodiac") return "age";
+  if (v === "group" || v === "groups") return "group";
+  return "national";
+}
+
+/** 클라이언트가 보낸 ‘내 날짜별 값’ — 서버 저장값과 큰 쪽을 쓴다(방금 한 활동도 바로 반영) */
+function parseMyDaily(raw: string | null, area: LeagueArea): number[] | null {
+  if (!raw) return null;
+  const nums = raw
+    .split(",")
+    .slice(0, 7)
+    .map((x) => Number(x));
+  if (!nums.length) return null;
+  const cap = area === "all" ? LEAGUE_DAILY_CAP : 2000;
+  return weekDatesOf().map((_, i) => Math.max(0, Math.min(cap, Math.round(nums[i] || 0))));
+}
+
+type LeagueAggregate = {
+  others: RankParticipant[];
+  me: RankParticipant | null;
+  invitesByDay: Record<string, number>;
+};
+
+/**
+ * 이번 주 실제 참여자를 영역별 날짜 점수로 만든다.
+ * 출석(＋10) · 퀴즈(＋30) · 건강(＋20) · 복지 확인(＋10) · 모임 미션(＋20) · 초대(＋50/명)를
+ * 하루 최대 140점으로 자른 뒤 합산한다 — 화면과 같은 규칙(lib/league.ts)을 쓴다.
+ * 랭킹 참여를 끈 사람(users.ranking_visible = false)은 순위표에서 빠진다.
+ */
+async function leagueAggregate(
+  env: DbEnv,
+  opts: {
+    area: LeagueArea;
+    range: RankingRange;
+    weekId: string;
+    today: string;
+    sido: string;
+    sigungu: string;
+    band: number;
+    code: string;
+    myDaily: number[] | null;
+    visible: boolean;
+  }
+): Promise<LeagueAggregate> {
+  const empty: LeagueAggregate = { others: [], me: null, invitesByDay: {} };
+  if (!supabaseConfig(env).configured) return empty;
+
+  const dates = weekDatesOf(opts.today);
+  const start = dates[0];
+  const end = dates[6];
+
+  const [users, visits, quiz, health, acts] = await Promise.all([
+    sbGet<UserRow>(
+      env,
+      `users?select=code,nickname,sido,sigungu,birth_year,avatar_url,external_id,ranking_visible,created_at,invited_by&limit=1000`
+    ),
+    sbGet<{ user_code: string; visit_date: string }>(
+      env,
+      `daily_visits?visit_date=gte.${start}&visit_date=lte.${end}&select=user_code,visit_date&limit=8000`
+    ).catch(() => [] as { user_code: string; visit_date: string }[]),
+    sbGet<{ user_code: string; quiz_date: string; points: number; correct: number; total: number }>(
+      env,
+      `quiz_logs?week_id=eq.${enc(opts.weekId)}&select=user_code,quiz_date,points,correct,total&limit=8000`
+    ).catch(() => [] as { user_code: string; quiz_date: string; points: number; correct: number; total: number }[]),
+    sbGet<{ user_code: string; check_date: string; challenges: string[] }>(
+      env,
+      `health_checks?check_date=gte.${start}&check_date=lte.${end}&select=user_code,check_date,challenges&limit=8000`
+    ).catch(() => [] as { user_code: string; check_date: string; challenges: string[] }[]),
+    sbGet<{ user_code: string; activity_date: string; kind: string }>(
+      env,
+      `activity_logs?activity_date=gte.${start}&activity_date=lte.${end}&select=user_code,activity_date,kind&limit=8000`
+    ).catch(() => [] as { user_code: string; activity_date: string; kind: string }[]),
+  ]);
+
+  if (!users.length) return empty;
+
+  const idToCode = new Map<string, string>();
+  users.forEach((u) => {
+    if (u.external_id) idToCode.set(u.external_id, u.code);
+  });
+
+  type Flags = { attend: boolean[]; quiz: number[]; done: boolean[]; health: number[]; welfare: boolean[]; group: boolean[]; invites: number[] };
+  const blank = (): Flags => ({
+    attend: new Array(7).fill(false),
+    quiz: new Array(7).fill(0),
+    done: new Array(7).fill(false),
+    health: new Array(7).fill(0),
+    welfare: new Array(7).fill(false),
+    group: new Array(7).fill(false),
+    invites: new Array(7).fill(0),
+  });
+  const flags = new Map<string, Flags>();
+  const of = (code: string) => {
+    if (!flags.has(code)) flags.set(code, blank());
+    return flags.get(code)!;
+  };
+
+  visits.forEach((v) => {
+    const i = dates.indexOf(v.visit_date);
+    if (i >= 0) of(v.user_code).attend[i] = true;
+  });
+  const accuracy = new Map<string, { correct: number; total: number }>();
+  quiz.forEach((q) => {
+    const i = dates.indexOf(q.quiz_date);
+    if (i < 0) return;
+    const f = of(q.user_code);
+    f.quiz[i] += Number(q.points || 0);
+    f.done[i] = true;
+    const acc = accuracy.get(q.user_code) || { correct: 0, total: 0 };
+    acc.correct += Number(q.correct || 0);
+    acc.total += Number(q.total || 0);
+    accuracy.set(q.user_code, acc);
+  });
+  health.forEach((h) => {
+    const i = dates.indexOf(h.check_date);
+    if (i < 0) return;
+    of(h.user_code).health[i] = Array.isArray(h.challenges) ? h.challenges.length : 0;
+  });
+  acts.forEach((a) => {
+    const i = dates.indexOf(a.activity_date);
+    if (i < 0) return;
+    if (a.kind === "welfare") of(a.user_code).welfare[i] = true;
+    else if (a.kind === "group") of(a.user_code).group[i] = true;
+  });
+  users.forEach((u) => {
+    const inviter = (u.invited_by || "").trim();
+    if (!inviter) return;
+    const inviterCode = idToCode.get(inviter);
+    if (!inviterCode || inviterCode === u.code) return;
+    const day = kstDayOf(u.created_at);
+    const i = dates.indexOf(day);
+    if (i >= 0) of(inviterCode).invites[i] += 1;
+  });
+
+  const dailyOf = (f: Flags | undefined, area: LeagueArea): number[] =>
+    dates.map((_, i) => {
+      const g = f ?? blank();
+      const inv = g.invites[i] || 0;
+      switch (area) {
+        case "brain":
+          return g.quiz[i] || 0;
+        case "health":
+          return g.health[i] || 0;
+        case "attend":
+          return g.attend[i] ? 1 : 0;
+        case "save":
+          return g.welfare[i] ? 1 : 0;
+        case "share":
+          return inv;
+        default: {
+          const raw =
+            (g.attend[i] ? LEAGUE_POINTS.attend : 0) +
+            (g.done[i] ? LEAGUE_POINTS.quiz : 0) +
+            ((g.health[i] || 0) > 0 ? LEAGUE_POINTS.health : 0) +
+            (g.welfare[i] ? LEAGUE_POINTS.welfare : 0) +
+            (g.group[i] ? LEAGUE_POINTS.group : 0) +
+            inv * LEAGUE_POINTS.invite;
+          return Math.min(LEAGUE_DAILY_CAP, raw);
+        }
+      }
+    });
+
+  const scoreOf = (daily: number[]) => daily.reduce((s, v) => s + Math.max(0, v), 0);
+
+  const persons: RankParticipant[] = [];
+  let me: RankParticipant | null = null;
+  const myFlags = flags.get(opts.code);
+
+  users.forEach((u) => {
+    if (u.ranking_visible === false) return; // 랭킹 참여 OFF — 공개 순위표에서 빠진다
+    if (opts.range === "region" && (u.sido !== opts.sido || u.sigungu !== opts.sigungu)) return;
+    if (opts.range === "age" && ageBandOf(u.birth_year) !== opts.band) return;
+
+    let daily = dailyOf(flags.get(u.code), opts.area);
+    if (u.code === opts.code && opts.myDaily) {
+      // 방금 이 기기에서 한 활동까지 반영(서버 저장값과 큰 쪽)
+      daily = daily.map((v, i) => Math.max(v, opts.myDaily![i] || 0));
+    }
+    const total = scoreOf(daily);
+    if (u.code === opts.code) {
+      if (!opts.visible || total <= 0) return;
+      const acc = accuracy.get(u.code);
+      me = {
+        name: u.nickname || "나",
+        avatarUrl: normalizeAvatarUrl(u.avatar_url),
+        isMe: true,
+        daily,
+        note:
+          opts.area === "brain" && acc && acc.total > 0
+            ? `정답률 ${Math.round((acc.correct / acc.total) * 100)}%`
+            : undefined,
+      };
+      return;
+    }
+    if (total <= 0) return; // 이번 주에 참여하지 않은 사람은 순위표에 올리지 않는다
+    const acc = accuracy.get(u.code);
+    persons.push({
+      name: u.nickname,
+      avatarUrl: normalizeAvatarUrl(u.avatar_url),
+      daily,
+      note:
+        opts.area === "brain" && acc && acc.total > 0
+          ? `정답률 ${Math.round((acc.correct / acc.total) * 100)}%`
+          : undefined,
+    });
+  });
+
+  persons.sort((a, b) => scoreOf(b.daily) - scoreOf(a.daily));
+  const myInvites = dailyOf(myFlags, "share");
+  const invitesByDay: Record<string, number> = {};
+  dates.forEach((d, i) => {
+    if (myInvites[i] > 0) invitesByDay[d] = myInvites[i];
+  });
+
+  return { others: persons.slice(0, 200), me, invitesByDay };
+}
+
+/* ------------------------------------------------------------------ */
+/* 단체(모임)별 순위                                                    */
+/* ------------------------------------------------------------------ */
+
 type GroupRow = { id: string; name: string; is_demo: boolean };
 type MemberRow = { group_id: string; user_code: string; name: string; role: string };
 
-/** 내 카카오톡 프로필 사진 — 순위표 '나' 칸에 원형 사진으로 보여 준다. */
-async function myAvatar(env: DbEnv, code: string): Promise<string | undefined> {
-  if (!code || !supabaseConfig(env).configured) return undefined;
-  try {
-    const rows = await sbGet<{ avatar_url?: string | null }>(
-      env,
-      `users?code=eq.${enc(code)}&select=avatar_url&limit=1`
-    );
-    return normalizeAvatarUrl(rows[0]?.avatar_url);
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * 실제 모임(groups · group_members) + 이번 주 퀴즈 점수 + 오늘 출석으로
- * 모임별 합산·평균 점수와 오늘 출석률을 만든다. 실패하면 null(화면은 예시 순위로 채운다).
- */
 async function groupsFromDb(
   env: DbEnv,
   weekId: string,
   code: string,
   myPoints: number
-): Promise<{ myGroups: MyGroupInput[]; total: number } | null> {
+): Promise<{ myGroups: { id: string; name: string; memberCount: number; points: number; attendedToday: number }[]; total: number } | null> {
   if (!supabaseConfig(env).configured) return null;
   const today = kstDate();
 
@@ -74,7 +320,7 @@ async function groupsFromDb(
   const attended = new Set(visits.map((v) => v.user_code));
   const demoToday = demoAttendedSet(today);
 
-  const mine: MyGroupInput[] = [];
+  const mine: { id: string; name: string; memberCount: number; points: number; attendedToday: number }[] = [];
   groups.forEach((g) => {
     const list = members.filter((m) => m.group_id === g.id);
     if (!list.length) return;
@@ -90,7 +336,6 @@ async function groupsFromDb(
       }
     });
     if (list.some((m) => m.user_code === code)) {
-      // 방금 퀴즈를 풀고 서버 저장 전인 내 점수까지 반영(모자라지 않게 큰 쪽)
       points = Math.max(points, myPoints);
       mine.push({ id: g.id, name: g.name, memberCount: list.length, points, attendedToday });
     }
@@ -99,95 +344,18 @@ async function groupsFromDb(
   return { myGroups: mine, total: groups.length };
 }
 
-/** 초대왕 재료 — users.invited_by 를 세어 초대한 사람별 성공 건수를 만든다. */
-async function invitersFromDb(
-  env: DbEnv,
-  code: string
-): Promise<{ inviters: InviterInput[]; myId: string; myName?: string; myInvites: number } | null> {
-  if (!supabaseConfig(env).configured) return null;
-
-  const meRows = code
-    ? await sbGet<{ external_id?: string | null; nickname?: string }>(
-        env,
-        `users?code=eq.${enc(code)}&select=external_id,nickname&limit=1`
-      )
-    : [];
-  const myId = meRows[0]?.external_id || "";
-  const myName = meRows[0]?.nickname || undefined;
-
-  const invited = await sbGet<{ invited_by: string }>(
-    env,
-    `users?invited_by=not.is.null&select=invited_by&limit=5000`
-  );
-  if (!invited.length) return { inviters: [], myId, myName, myInvites: 0 };
-
-  const counts = new Map<string, number>();
-  invited.forEach((r) => {
-    const id = (r.invited_by || "").trim();
-    if (!id) return;
-    counts.set(id, (counts.get(id) || 0) + 1);
-  });
-
-  const topIds = Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(([id]) => id);
-  if (!topIds.length) return { inviters: [], myId, myName, myInvites: counts.get(myId) || 0 };
-
-  const profiles = await sbGet<{ external_id?: string | null; nickname?: string; avatar_url?: string | null }>(
-    env,
-    `users?external_id=in.(${topIds.map(enc).join(",")})&select=external_id,nickname,avatar_url&limit=50`
-  ).catch(() => [] as { external_id?: string | null; nickname?: string; avatar_url?: string | null }[]);
-
-  const profileBy = new Map<string, { nickname?: string; avatar_url?: string | null }>();
-  profiles.forEach((p) => {
-    if (p.external_id) profileBy.set(p.external_id, p);
-  });
-
-  const inviters: InviterInput[] = topIds.map((id) => {
-    const prof = profileBy.get(id);
-    return {
-      name: prof?.nickname || "늘봄 친구",
-      invites: counts.get(id) || 0,
-      avatarUrl: normalizeAvatarUrl(prof?.avatar_url),
-      isMe: Boolean(myId) && id === myId,
-    };
-  });
-
-  return { inviters, myId, myName, myInvites: counts.get(myId) || 0 };
-}
-
 export const onRequestGet = async ({ request, env }: Ctx) => {
   const p = new URL(request.url).searchParams;
-  const scopeParam = p.get("scope") || "region";
+  const scopeParam = p.get("scope") || "";
   const weekId = p.get("weekId") || weekIdOf();
-
-  // 초대왕 — 초대 링크로 새로 가입한 사람이 많은 순서
-  if (scopeParam === "invite") {
-    const code = p.get("code") || "";
-    let real: Awaited<ReturnType<typeof invitersFromDb>> = null;
-    let myAvatarUrl: string | undefined;
-    try {
-      real = await invitersFromDb(env, code);
-      myAvatarUrl = await myAvatar(env, code);
-    } catch {
-      real = null;
-    }
-    const result = buildInviteRanking({
-      weekId,
-      myName: real?.myName || p.get("name") || "나",
-      myInvites: real?.myInvites ?? 0,
-      myAvatarUrl,
-      inviters: real?.inviters || [],
-    });
-    return json({ ok: true, ...result });
-  }
+  const todayParam = p.get("today") || "";
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(todayParam) ? todayParam : kstDate();
 
   // 단체(모임)별 순위 — 모임 하나가 한 줄
   if (scopeParam === "groups") {
     const code = p.get("code") || "";
     const myPoints = Number(p.get("points") || 0);
-    let real: { myGroups: MyGroupInput[]; total: number } | null = null;
+    let real: Awaited<ReturnType<typeof groupsFromDb>> = null;
     try {
       real = await groupsFromDb(env, weekId, code, myPoints);
     } catch {
@@ -201,27 +369,61 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
     return json({ ok: true, ...result });
   }
 
-  const scope: RankingScope =
-    scopeParam === "zodiac" || scopeParam === "streak" || scopeParam === "national"
-      ? (scopeParam as RankingScope)
-      : "region";
+  const area = parseArea(p.get("area"), scopeParam);
+  const range = parseRange(p.get("range") || p.get("scope"), scopeParam);
+  const code = p.get("code") || "";
+  const visible = p.get("visible") !== "0";
+  const sido = p.get("sido") || "";
+  const sigungu = p.get("sigungu") || "";
+  const band = Number(p.get("band") || 0) || ageBandOf(Number(p.get("birthYear") || 1955));
 
-  const result = buildRanking({
-    scope,
+  // 모임왕·우리 모임 범위는 모임 자료로 그린다(화면이 모임 상세·단체별 순위를 직접 쓴다)
+  if (area === "group" || range === "group") {
+    return json({
+      ok: true,
+      area,
+      range,
+      scope: "group",
+      weekId,
+      periodLabel: "",
+      rows: [],
+      total: 0,
+      myRank: null,
+      myPercentile: null,
+      sample: false,
+      delegate: "group",
+    });
+  }
+
+  let agg: LeagueAggregate = { others: [], me: null, invitesByDay: {} };
+  try {
+    agg = await leagueAggregate(env, {
+      area,
+      range,
+      weekId,
+      today,
+      sido,
+      sigungu,
+      band,
+      code,
+      myDaily: parseMyDaily(p.get("myd"), area),
+      visible,
+    });
+  } catch {
+    agg = { others: [], me: null, invitesByDay: {} };
+  }
+
+  const result = buildAreaRanking({
+    area,
+    range,
     weekId,
-    sido: p.get("sido") || "",
-    sigungu: p.get("sigungu") || "",
-    birthYear: Number(p.get("birthYear") || 1955),
-    myName: p.get("name") || "나",
-    myPoints: Number(p.get("points") || 0),
-    myStreak: Number(p.get("streak") || 0),
+    today,
+    sido,
+    sigungu,
+    band,
+    others: agg.others,
+    me: agg.me,
   });
 
-  // 순위표에 내가 보이면 그 줄에 카톡 사진을 붙여 준다(다른 줄은 예시 이름이라 사진이 없다).
-  const avatarUrl = await myAvatar(env, p.get("code") || "");
-  const rows = avatarUrl
-    ? result.rows.map((r) => (r.isMe ? { ...r, avatarUrl } : r))
-    : result.rows;
-
-  return json({ ok: true, ...result, rows });
+  return json({ ok: true, ...result, invitesByDay: agg.invitesByDay });
 };

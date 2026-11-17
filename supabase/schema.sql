@@ -293,3 +293,27 @@ create index if not exists health_date_idx on public.health_checks (check_date);
 create index if not exists health_user_idx on public.health_checks (user_code, check_date desc);
 
 alter table public.health_checks enable row level security;
+
+/* ------------------------------------------------------------------ */
+/* 13. 랭킹 고도화 1차 — 7개 영역 · 주간 종합 리그(늘봄왕)               */
+/*    늘봄왕 점수: 출석 ＋10 · 퀴즈 ＋30 · 건강 ＋20 · 복지 확인 ＋10      */
+/*                · 모임 미션 ＋20 · 친구 초대 ＋50(명당), 하루 최대 140점 */
+/* ------------------------------------------------------------------ */
+-- 랭킹 참여 ON/OFF — false 면 내 점수는 개인 기록으로만 남고 공개 순위표에서 빠진다.
+alter table public.users add column if not exists ranking_visible boolean not null default true;
+
+-- 복지·생활정보 확인(welfare) · 모임 공동 미션 참여(group) — 사람 × 날짜 × 종류 한 줄
+create table if not exists public.activity_logs (
+  id            bigserial primary key,
+  user_code     text not null references public.users(code) on delete cascade,
+  activity_date date not null default ((now() at time zone 'Asia/Seoul')::date),
+  kind          text not null check (kind in ('welfare','group')),
+  created_at    timestamptz not null default now(),
+  unique (user_code, activity_date, kind)
+);
+
+create index if not exists activity_date_idx on public.activity_logs (activity_date);
+create index if not exists activity_user_idx on public.activity_logs (user_code, activity_date desc);
+
+alter table public.activity_logs enable row level security;
+-- 앱은 /api/state · /api/rankings(service_role)로만 읽고 쓰므로 별도 정책이 필요 없습니다.

@@ -1,115 +1,375 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { buildGroupRanking, buildInviteRanking, buildRanking } from "@/lib/rankings";
+import { buildAreaRanking, buildGroupRanking } from "@/lib/rankings";
 import type {
+  AppState,
   GroupRankingResult,
   GroupRankingRow,
+  RankingChange,
+  RankingRange,
   RankingResult,
-  RankingScope,
   RankingRow,
 } from "@/lib/types";
 import { periodLabel, resetCountdown, weekIdOf } from "@/lib/week";
 import { useApp } from "@/lib/storage";
 import { useGroup } from "@/lib/group-store";
+import {
+  AGE_BANDS,
+  LEAGUE_AREAS,
+  LEAGUE_DAILY_CAP,
+  LEAGUE_MISSIONS,
+  LEAGUE_POINTS,
+  ageBandLabel,
+  ageBandOf,
+  areaInfo,
+  formatAreaValue,
+  gapMessage,
+  leagueWeek,
+  myAreaValue,
+  weekDatesOf,
+  type LeagueArea,
+} from "@/lib/league";
 import { Avatar, Badge, BigButton, Card, SectionTitle } from "./ui";
-import { IconChevron, IconCrown, IconQuiz, IconSparkle, IconTrophy, IconUsers } from "./icons";
+import { IconChevron, IconQuiz, IconSparkle, IconTrophy, IconUsers } from "./icons";
 import { GroupRankingBanner } from "./groups";
 
-const TABS: { key: RankingScope; label: string; emoji: string; desc: string }[] = [
-  { key: "group", label: "우리 모임", emoji: "👥", desc: "가족·친구와 함께 겨루는 순위" },
-  { key: "groups", label: "단체별", emoji: "🏆", desc: "모임끼리 겨루는 순위 — 우리 모임은 어디쯤일까요" },
-  { key: "invite", label: "초대왕", emoji: "💌", desc: "친구·가족을 많이 초대한 사람 순위" },
-  { key: "national", label: "전국", emoji: "🇰🇷", desc: "전국 어르신 순위" },
-  { key: "region", label: "지역별", emoji: "🏘️", desc: "같은 시·군·구 어르신" },
-  { key: "streak", label: "개근왕", emoji: "📅", desc: "연속 출석 일수" },
+/* ------------------------------------------------------------------ */
+/* 공통                                                                */
+/* ------------------------------------------------------------------ */
+
+const RANGES: { key: RankingRange; label: string; emoji: string }[] = [
+  { key: "group", label: "우리 모임", emoji: "👥" },
+  { key: "region", label: "지역별", emoji: "🏘️" },
+  { key: "national", label: "전국", emoji: "🇰🇷" },
+  { key: "age", label: "연령대", emoji: "🎂" },
 ];
 
-/** 순위 한 칸에 보여 줄 값 — 초대왕은 점수 대신 ‘N명 초대’ */
-function rowValue(row: RankingResult["rows"][number], scope: RankingScope): string {
-  if (scope === "invite") return `${row.invites ?? 0}명 초대`;
-  return scope === "streak" ? `${row.streak}일` : `${row.points}점`;
+/** 미션 화면으로 넘어가며 그 카드가 보이게 내려 준다(잠깐 노란 테두리) */
+function revealLater(selector: string, tries = 0) {
+  if (typeof document === "undefined") return;
+  const el = document.querySelector(selector) as HTMLElement | null;
+  if (!el) {
+    if (tries < 8) window.setTimeout(() => revealLater(selector, tries + 1), 160);
+    return;
+  }
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("ring-4", "ring-gold/70");
+  window.setTimeout(() => el.classList.remove("ring-4", "ring-gold/70"), 1600);
 }
 
-function useRanking(scope: RankingScope) {
-  const { profile, weekPoints, streak, code } = useApp();
-  const weekId = weekIdOf();
-  const [data, setData] = useState<RankingResult | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fallback = useMemo(
-    () =>
-      scope === "invite"
-        ? buildInviteRanking({ weekId, myName: profile?.nickname, myAvatarUrl: profile?.avatarUrl || profile?.avatar })
-        : buildRanking({
-            scope,
-            weekId,
-            sido: profile?.sido,
-            sigungu: profile?.sigungu,
-            birthYear: profile?.birthYear,
-            myName: profile?.nickname,
-            myPoints: weekPoints,
-            myStreak: streak,
-          }),
-    [scope, weekId, profile, weekPoints, streak]
+/** 순위 변동 배지 — ▲2 · ▼1 · 신규 · － */
+function ChangeBadge({ change }: { change?: RankingChange }) {
+  if (change === undefined) return null;
+  const text = change === null ? "신규" : change > 0 ? `▲${change}` : change < 0 ? `▼${Math.abs(change)}` : "－";
+  const tone =
+    change === null
+      ? "bg-brand-light text-brand-deep"
+      : change > 0
+        ? "bg-leaf-light text-leaf-dark"
+        : change < 0
+          ? "bg-coral-light text-coral-dark"
+          : "bg-ink/8 text-ink/45";
+  return (
+    <span
+      data-change={change === null ? "new" : String(change)}
+      className={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[0.78rem] font-black leading-none ${tone}`}
+    >
+      {text}
+    </span>
   );
-
-  useEffect(() => {
-    if (scope === "group" || scope === "groups") {
-      setLoading(false);
-      return;
-    }
-    const params = new URLSearchParams({
-      scope,
-      weekId,
-      code: code || "",
-      sido: profile?.sido || "",
-      sigungu: profile?.sigungu || "",
-      birthYear: String(profile?.birthYear || 1955),
-      name: profile?.nickname || "나",
-      points: String(weekPoints),
-      streak: String(streak),
-    });
-    let alive = true;
-    setLoading(true);
-    // 탭을 바꾸면 이전 탭의 순위가 잠시 보이지 않도록 비운다.
-    setData(null);
-    fetch(`/api/rankings?${params.toString()}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad"))))
-      .then((j) => {
-        if (!alive) return;
-        if (j?.ok && Array.isArray(j.rows)) setData(j as RankingResult);
-        else setData(fallback);
-      })
-      .catch(() => {
-        if (alive) setData(fallback);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [scope, weekId, profile, weekPoints, streak, code, fallback]);
-
-  return { view: data ?? fallback, loading };
 }
 
-/* ---------------------------------------------------------------- */
-/* 시상대                                                             */
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/* 영역 · 범위 고르기                                                   */
+/* ------------------------------------------------------------------ */
 
-function Podium({
-  rows,
-  scope,
+function AreaTabs({
+  value,
+  onChange,
+  myTotal,
 }: {
-  rows: RankingResult["rows"];
-  scope: RankingScope;
+  value: LeagueArea;
+  onChange: (v: LeagueArea) => void;
+  myTotal: number;
 }) {
+  const [main, ...rest] = LEAGUE_AREAS;
+  const on = value === main.key;
+  return (
+    <div className="space-y-2" role="tablist" aria-label="랭킹 영역">
+      <button
+        role="tab"
+        aria-selected={on}
+        data-rank-tab={main.key}
+        data-area-tab={main.key}
+        onClick={() => onChange(main.key)}
+        className={`flex w-full items-center justify-between gap-2 rounded-2xl px-4 py-3 text-left transition ${
+          on ? "bg-ink text-white shadow-cta" : "bg-white text-ink shadow-soft active:bg-paper"
+        }`}
+      >
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span aria-hidden className="text-[1.5rem] leading-none">
+            {main.emoji}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[1.05rem] font-black leading-tight">{main.label}</span>
+            <span className={`block text-[0.82rem] font-bold ${on ? "text-white/75" : "text-ink/45"}`}>
+              주간 종합 리그
+            </span>
+          </span>
+        </span>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[0.82rem] font-black ${
+            on ? "bg-white/15 text-white" : "bg-brand-light text-brand-deep"
+          }`}
+        >
+          내 {myTotal}점
+        </span>
+      </button>
+
+      <div className="grid grid-cols-3 gap-2">
+        {rest.map((a) => {
+          const selected = a.key === value;
+          return (
+            <button
+              key={a.key}
+              role="tab"
+              aria-selected={selected}
+              data-rank-tab={a.key}
+              data-area-tab={a.key}
+              onClick={() => onChange(a.key)}
+              className={`flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 transition ${
+                selected ? "bg-ink text-white shadow-cta" : "bg-white text-ink/65 shadow-soft active:bg-paper"
+              }`}
+            >
+              <span aria-hidden className="text-[1.05rem] leading-none">
+                {a.emoji}
+              </span>
+              <span className="whitespace-nowrap text-[0.94rem] font-extrabold leading-tight">{a.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RangeTabs({
+  value,
+  onChange,
+  band,
+  onBand,
+}: {
+  value: RankingRange;
+  onChange: (v: RankingRange) => void;
+  band: number;
+  onBand: (v: number) => void;
+}) {
+  return (
+    <div className="space-y-2" data-range-tabs>
+      <div className="grid grid-cols-2 gap-2">
+        {RANGES.map((r) => {
+          const on = r.key === value;
+          return (
+            <button
+              key={r.key}
+              data-range-tab={r.key}
+              aria-pressed={on}
+              onClick={() => onChange(r.key)}
+              className={`flex min-h-[52px] items-center justify-center gap-1.5 rounded-2xl px-2 text-[0.96rem] font-extrabold transition ${
+                on ? "bg-brand text-white shadow-soft" : "bg-white text-ink/60 shadow-soft active:bg-paper"
+              }`}
+            >
+              <span aria-hidden>{r.emoji}</span>
+              <span className="whitespace-nowrap">{r.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {value === "age" ? (
+        <div className="grid grid-cols-4 gap-2" data-age-bands>
+          {AGE_BANDS.map((b) => {
+            const on = b === band;
+            return (
+              <button
+                key={b}
+                data-age-band={b}
+                aria-pressed={on}
+                onClick={() => onBand(b)}
+                className={`min-h-[48px] rounded-xl px-1 text-[0.9rem] font-extrabold transition ${
+                  on ? "bg-ink text-white" : "bg-white text-ink/55 shadow-soft"
+                }`}
+              >
+                {ageBandLabel(b)}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OptInCard() {
+  const { rankingVisible, setRankingVisible } = useApp();
+  return (
+    <div
+      data-ranking-optin={rankingVisible ? "on" : "off"}
+      className="flex items-center gap-3 rounded-2xl bg-white px-3.5 py-3 shadow-soft"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.98rem] font-black leading-tight text-ink">랭킹 참여</p>
+        <p className="mt-0.5 text-[0.82rem] font-semibold leading-snug text-ink/55">
+          {rankingVisible
+            ? "순위표에 내 이름이 보여요. 끄면 나만 볼 수 있어요."
+            : "지금은 순위표에 나오지 않아요. 내 점수는 그대로 남아요."}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={rankingVisible}
+        aria-label="랭킹 참여"
+        onClick={() => setRankingVisible(!rankingVisible)}
+        className={`relative h-[44px] w-[78px] shrink-0 rounded-full transition ${
+          rankingVisible ? "bg-leaf" : "bg-ink/25"
+        }`}
+      >
+        <span
+          className={`absolute top-[4px] grid h-[36px] w-[36px] place-items-center rounded-full bg-white text-[0.74rem] font-black text-ink shadow transition-all ${
+            rankingVisible ? "left-[38px]" : "left-[4px]"
+          }`}
+        >
+          {rankingVisible ? "ON" : "OFF"}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 오늘의 종합 미션 (늘봄왕)                                           */
+/* ------------------------------------------------------------------ */
+
+function LeagueMissionCard({
+  invitesByDay,
+  onGo,
+}: {
+  invitesByDay?: Record<string, number>;
+  onGo: (area: LeagueArea) => void;
+}) {
+  const { state, today, missionsToday, healthToday, todayDaily } = useApp();
+  const week = leagueWeek(state, { today, invitesByDay });
+  const score = week.today;
+  const percent = Math.min(100, Math.round((score.total / LEAGUE_DAILY_CAP) * 100));
+  const invitesToday = Math.max(0, Math.round(invitesByDay?.[today] ?? 0));
+
+  const doneOf = (id: string) =>
+    id === "attend"
+      ? state.visits.includes(today)
+      : id === "quiz"
+        ? Boolean(todayDaily?.done)
+        : id === "health"
+          ? healthToday.length > 0
+          : missionsToday.includes(id);
+
+  return (
+    <Card
+      className="p-4"
+      data-league-missions
+      data-league-today={score.total}
+      data-league-week={week.total}
+      data-league-cap={LEAGUE_DAILY_CAP}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-[1.02rem] font-black text-ink">
+            <span aria-hidden>🌟</span> 오늘의 종합 미션
+          </p>
+          <p className="mt-0.5 text-[0.82rem] font-semibold text-ink/50">
+            하나씩 해 볼수록 늘봄왕 점수가 쌓여요
+          </p>
+        </div>
+        <span
+          data-league-score={`${score.total}/${LEAGUE_DAILY_CAP}`}
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[0.82rem] font-black ${
+            score.total >= LEAGUE_DAILY_CAP ? "bg-gold text-ink" : "bg-brand-light text-brand-deep"
+          }`}
+        >
+          오늘 {score.total}점
+        </span>
+      </div>
+
+      <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-ink/8">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-brand to-leaf transition-all duration-500"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <p className="mt-1 text-right text-[0.78rem] font-bold text-ink/40">하루 최대 {LEAGUE_DAILY_CAP}점</p>
+
+      <div className="mt-1 space-y-1.5">
+        {LEAGUE_MISSIONS.map((m) => {
+          const done = doneOf(m.id);
+          return (
+            <button
+              key={m.id}
+              type="button"
+              data-league-mission={m.id}
+              data-league-done={done ? "1" : "0"}
+              aria-pressed={done}
+              onClick={() => onGo(m.area)}
+              className={`flex min-h-[56px] w-full items-center gap-2.5 rounded-2xl border-2 px-3 py-2 text-left transition active:scale-[0.995] ${
+                done ? "border-leaf bg-leaf-light" : "border-ink/8 bg-paper"
+              }`}
+            >
+              <span aria-hidden className="text-[1.2rem] leading-none">
+                {m.emoji}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={`block text-[0.98rem] font-black leading-tight ${done ? "text-leaf-dark" : "text-ink"}`}>
+                  {m.label}
+                </span>
+                <span className="mt-0.5 block text-[0.78rem] font-semibold text-ink/45">{m.note}</span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block text-[0.86rem] font-black text-brand-dark">+{m.points}점</span>
+                <span className="block text-[0.74rem] font-extrabold text-ink/40">
+                  {done ? "완료 ✅" : "눌러서 가기"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+        <div
+          data-league-mission="invite"
+          className="flex min-h-[52px] items-center gap-2.5 rounded-2xl border-2 border-ink/8 bg-paper px-3 py-2"
+        >
+          <span aria-hidden className="text-[1.2rem] leading-none">
+            🎁
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.98rem] font-black leading-tight text-ink">친구 초대 성공</span>
+            <span className="mt-0.5 block text-[0.78rem] font-semibold text-ink/45">
+              한 명마다 · 오늘 {invitesToday}명 초대
+            </span>
+          </span>
+          <span className="shrink-0 text-[0.86rem] font-black text-brand-dark">+{LEAGUE_POINTS.invite}점</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 시상대 · 4위 이하 목록                                              */
+/* ------------------------------------------------------------------ */
+
+function Podium({ rows, area }: { rows: RankingResult["rows"]; area: LeagueArea }) {
   const first = rows[0];
   const second = rows[1];
   const third = rows[2];
-  const value = (r?: RankingResult["rows"][number]) => (!r ? "" : rowValue(r, scope));
+  const value = (r?: RankingRow) => (!r ? "" : r.display || formatAreaValue(area, r.points));
 
   const Column = ({
     row,
@@ -118,14 +378,13 @@ function Podium({
     bar,
     tone,
   }: {
-    row?: RankingResult["rows"][number];
+    row?: RankingRow;
     place: number;
     height: number;
     bar: string;
-    /** 사진이 없을 때 원의 배경색 */
     tone: string;
   }) => (
-    <div className="flex flex-1 flex-col items-center">
+    <div className="flex min-w-0 flex-1 flex-col items-center">
       <div className="relative mb-1 flex h-[34px] items-end justify-center">
         {place === 1 ? <span className="text-[1.7rem] leading-none drop-shadow">👑</span> : null}
       </div>
@@ -138,10 +397,15 @@ function Podium({
         className="text-white shadow-soft"
         alt={row ? `${row.name} 님 프로필 사진` : undefined}
       />
-      <p className={`mt-1.5 max-w-full truncate text-center ${place === 1 ? "text-[0.98rem]" : "text-[0.88rem]"} font-black text-ink`}>
+      <p
+        className={`mt-1.5 max-w-full truncate text-center ${
+          place === 1 ? "text-[0.98rem]" : "text-[0.88rem]"
+        } font-black text-ink`}
+      >
         {row ? row.name : "-"}
       </p>
-      <p className={`tabular text-center text-[0.82rem] font-extrabold ${place === 1 ? "text-gold-dark" : "text-ink/55"}`}>
+      {row ? <ChangeBadge change={row.change} /> : null}
+      <p className={`tabular mt-0.5 text-center text-[0.82rem] font-extrabold ${place === 1 ? "text-gold-dark" : "text-ink/55"}`}>
         {value(row)}
       </p>
       <div
@@ -156,22 +420,25 @@ function Podium({
   return (
     <div className="flex items-end gap-2">
       <Column row={second} place={2} height={62} bar="bg-[#9FB3C8]" tone="bg-[#9FB3C8]" />
-      <Column row={first} place={1} height={92} bar="bg-gradient-to-b from-gold to-[#E9AE20]" tone="bg-gradient-to-br from-[#F7C346] to-[#E09A12]" />
+      <Column
+        row={first}
+        place={1}
+        height={92}
+        bar="bg-gradient-to-b from-gold to-[#E9AE20]"
+        tone="bg-gradient-to-br from-[#F7C346] to-[#E09A12]"
+      />
       <Column row={third} place={3} height={46} bar="bg-[#D8A583]" tone="bg-[#D8A583]" />
     </div>
   );
 }
 
-/** 4위부터의 목록 */
-function RestList({ rows, scope }: { rows: RankingResult["rows"]; scope: RankingScope }) {
+function RestList({ rows, area }: { rows: RankingResult["rows"]; area: LeagueArea }) {
   if (!rows.length) return null;
   return (
     <Card className="p-3.5" data-rest-list>
       <div className="mb-1.5 flex items-center justify-between">
         <p className="text-[0.86rem] font-black text-ink/60">4위 ~ {3 + rows.length}위</p>
-        <p className="text-[0.76rem] font-bold text-ink/35">
-          {scope === "streak" ? "연속 출석" : scope === "invite" ? "초대 성공" : "이번 주 점수"}
-        </p>
+        <p className="text-[0.76rem] font-bold text-ink/35">어제 대비</p>
       </div>
       <div className="space-y-1">
         {rows.map((row) => (
@@ -188,11 +455,23 @@ function RestList({ rows, scope }: { rows: RankingResult["rows"]; scope: Ranking
               className="text-brand-dark shadow-soft"
               alt={row.name ? `${row.name} 님 프로필 사진` : undefined}
             />
-            <span className={`flex-1 truncate text-[0.96rem] ${row.isMe ? "font-black text-brand-deep" : "font-bold text-ink/85"}`}>
-              {row.name}
-              {row.isMe ? <span className="ml-1 text-[0.74rem] font-extrabold text-brand">(나)</span> : null}
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`truncate text-[0.96rem] ${
+                    row.isMe ? "font-black text-brand-deep" : "font-bold text-ink/85"
+                  }`}
+                >
+                  {row.name}
+                  {row.isMe ? <span className="ml-1 text-[0.74rem] font-extrabold text-brand">(나)</span> : null}
+                </span>
+                <ChangeBadge change={row.change} />
+              </span>
+              {row.note ? <span className="block text-[0.76rem] font-semibold text-ink/40">{row.note}</span> : null}
             </span>
-            <span className="tabular text-[0.92rem] font-extrabold text-ink/70">{rowValue(row, scope)}</span>
+            <span className="shrink-0 tabular text-[0.92rem] font-extrabold text-ink/70">
+              {row.display || formatAreaValue(area, row.points)}
+            </span>
           </div>
         ))}
       </div>
@@ -200,11 +479,95 @@ function RestList({ rows, scope }: { rows: RankingResult["rows"]; scope: Ranking
   );
 }
 
-/* ---------------------------------------------------------------- */
-/* 우리 모임 순위 (실제 모임 회원 데이터)                              */
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/* 내 순위 · 격차 안내                                                 */
+/* ------------------------------------------------------------------ */
 
-function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+function MyRankCard({
+  view,
+  area,
+  localValue,
+  localNote,
+}: {
+  view: RankingResult;
+  area: LeagueArea;
+  localValue: number;
+  localNote?: string;
+}) {
+  const { rankingVisible, setRankingVisible } = useApp();
+  const info = areaInfo(area);
+
+  if (!rankingVisible) {
+    return (
+      <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4" data-rank-me="off">
+        <p className="text-[1rem] font-black text-ink">랭킹 참여를 꺼 두었어요</p>
+        <p className="mt-1 text-[0.86rem] font-semibold leading-relaxed text-ink/60">
+          내 점수는 나만 볼 수 있고, 공개 순위표에는 나오지 않아요.
+        </p>
+        <div className="mt-2.5">
+          <BigButton variant="teal" full onClick={() => setRankingVisible(true)}>
+            랭킹 참여 켜기
+          </BigButton>
+        </div>
+      </Card>
+    );
+  }
+
+  const gap = view.myGap;
+  const rank = view.myRank;
+  const display = view.myDisplay ?? formatAreaValue(area, localValue);
+  const note = view.myNote ?? localNote;
+
+  return (
+    <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4" data-rank-me="on">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[0.8rem] font-bold text-ink/50">내 순위</p>
+          <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
+            {rank ? (
+              <>
+                {rank}
+                <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {view.total}명</span>
+              </>
+            ) : (
+              <span className="text-[1.05rem] text-ink/45">아직 기록이 없어요</span>
+            )}
+          </p>
+        </div>
+        <div className="min-w-0 text-right">
+          <p className="text-[0.8rem] font-bold text-ink/50">내 {info.label.replace("왕", "")} 기록</p>
+          <p className="t-num tabular text-brand-dark" data-rank-my-value={display}>
+            {display}
+          </p>
+          <p className="text-[0.82rem] font-extrabold text-leaf-dark">
+            {rank ? <ChangeBadge change={view.myChange} /> : note || ""}
+          </p>
+        </div>
+      </div>
+      <p
+        data-rank-gap
+        className="mt-2 rounded-xl bg-white/85 px-3 py-2 text-center text-[0.92rem] font-bold leading-snug text-brand-deep"
+      >
+        {gapMessage({ rank, aheadDiff: gap?.aheadDiff, top10Diff: gap?.top10Diff, total: view.total })}
+      </p>
+      {note && rank ? (
+        <p className="mt-1 text-center text-[0.78rem] font-semibold text-ink/45">{note}</p>
+      ) : null}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 우리 모임 순위 (모임 회원 자료)                                      */
+/* ------------------------------------------------------------------ */
+
+function GroupRankingBoard({
+  onNavigate,
+  compact = false,
+}: {
+  onNavigate?: (tab: string) => void;
+  compact?: boolean;
+}) {
   const { detail, active } = useGroup();
   const { weekPoints, streak } = useApp();
 
@@ -229,24 +592,31 @@ function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void 
     );
   }
 
-  const rows: RankingRow[] = detail.members.map((m) => ({
-    rank: m.rank,
-    name: m.name,
-    points: m.points,
-    streak: m.weekDays,
-    isMe: m.isMe,
-    avatarUrl: m.avatarUrl,
-  }));
+  const rows: RankingRow[] = detail.members
+    .slice()
+    .sort((a, b) => a.rank - b.rank)
+    .map((m) => ({
+      rank: m.rank,
+      name: m.name,
+      points: m.points,
+      streak: m.weekDays,
+      isMe: m.isMe,
+      avatarUrl: m.avatarUrl,
+      display: `${m.points}점`,
+    }));
   const rest = rows.slice(3, 10);
   const me = rows.find((r) => r.isMe);
 
   return (
     <div className="space-y-3">
-      <div data-podium className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card">
+      <div
+        data-podium
+        className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card"
+      >
         <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
           <IconTrophy size={16} /> {active.name} · {periodLabel()}
         </div>
-        <Podium rows={rows.slice(0, 10)} scope="group" />
+        <Podium rows={rows.slice(0, 10)} area="brain" />
 
         <div className="mt-3 rounded-2xl bg-gradient-to-r from-plum to-[#5B4FA8] px-3.5 py-2.5 text-center">
           <p className="flex items-center justify-center gap-1.5 text-[0.9rem] font-black text-white">
@@ -260,7 +630,7 @@ function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void 
         오늘 {detail.todayAttended}명 참여 · 모임 회원 {detail.memberCount}명
       </p>
 
-      <RestList rows={rest} scope="group" />
+      <RestList rows={rest} area="brain" />
 
       <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
         <div className="flex items-center justify-between gap-2">
@@ -294,7 +664,7 @@ function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void 
         )}
       </Card>
 
-      <GroupRankingBanner onNavigate={onNavigate} />
+      {compact ? null : <GroupRankingBanner onNavigate={onNavigate} />}
 
       <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
         매주 월요일 0시에 우리 모임 순위도 새로 시작해요 (앞으로 {resetCountdown()}).
@@ -303,9 +673,9 @@ function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void 
   );
 }
 
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 /* 단체별 순위 (모임 vs 모임)                                          */
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 
 function useGroupRanking() {
   const { code, weekId } = useApp();
@@ -417,13 +787,7 @@ function GroupPodium({ rows }: { rows: GroupRankingRow[] }) {
   );
 }
 
-function GroupsBoard({
-  onNavigate,
-  loading,
-}: {
-  onNavigate?: (tab: string) => void;
-  loading: boolean;
-}) {
+function GroupsBoard({ onNavigate, loading }: { onNavigate?: (tab: string) => void; loading: boolean }) {
   const { view } = useGroupRanking();
   const rows = view.rows;
   const mine = rows.find((r) => r.isMine) ?? null;
@@ -431,7 +795,10 @@ function GroupsBoard({
 
   return (
     <div className="space-y-3" data-group-rank>
-      <div data-podium className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card">
+      <div
+        data-podium
+        className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card"
+      >
         <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
           <IconTrophy size={16} /> {periodLabel()} 단체 명예의 전당
         </div>
@@ -446,26 +813,26 @@ function GroupsBoard({
 
       {mine ? (
         <div data-my-group-rank>
-        <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[0.8rem] font-bold text-ink/50">내 모임 순위</p>
-              <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
-                {mine.rank}
-                <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {rows.length}개 모임</span>
-              </p>
+          <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[0.8rem] font-bold text-ink/50">내 모임 순위</p>
+                <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
+                  {mine.rank}
+                  <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {rows.length}개 모임</span>
+                </p>
+              </div>
+              <div className="min-w-0 text-right">
+                <p className="truncate text-[0.86rem] font-black text-ink">{mine.name}</p>
+                <p className="tabular text-[0.86rem] font-extrabold text-brand-dark">
+                  평균 {mine.average}점 · 총 {mine.points}점
+                </p>
+                <p className="text-[0.8rem] font-extrabold text-leaf-dark">
+                  {mine.memberCount}명 · 오늘 출석 {mine.attendance}%
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 text-right">
-              <p className="truncate text-[0.86rem] font-black text-ink">{mine.name}</p>
-              <p className="tabular text-[0.86rem] font-extrabold text-brand-dark">
-                평균 {mine.average}점 · 총 {mine.points}점
-              </p>
-              <p className="text-[0.8rem] font-extrabold text-leaf-dark">
-                {mine.memberCount}명 · 오늘 출석 {mine.attendance}%
-              </p>
-            </div>
-          </div>
-        </Card>
+          </Card>
         </div>
       ) : (
         <Card className="p-4 text-center">
@@ -496,7 +863,9 @@ function GroupsBoard({
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1">
                   <span
-                    className={`truncate text-[0.94rem] ${r.isMine ? "font-black text-brand-deep" : "font-bold text-ink/85"}`}
+                    className={`truncate text-[0.94rem] ${
+                      r.isMine ? "font-black text-brand-deep" : "font-bold text-ink/85"
+                    }`}
                   >
                     {r.name}
                   </span>
@@ -524,180 +893,297 @@ function GroupsBoard({
   );
 }
 
-/** 랭킹 종류 탭 — 작은 화면에서도 글씨가 잘리지 않게 3열 · 2열 큰 버튼으로 나눈다 */
-function RankingTabs({ value, onChange }: { value: RankingScope; onChange: (v: RankingScope) => void }) {
-  const rows = [TABS.slice(0, 3), TABS.slice(3)];
+/* ------------------------------------------------------------------ */
+/* 영역 순위표 + 내 순위                                                */
+/* ------------------------------------------------------------------ */
+
+/** 이 기기 기록으로 만든 내 날짜별 값 — 서버 집계에 함께 보내 바로 반영한다 */
+function localDaily(area: LeagueArea, state: AppState, today: string): number[] {
+  const dates = weekDatesOf(today);
+  const missions = state.missions ?? {};
+  const health = state.health ?? {};
+  const quizLogs = state.quizLogs ?? [];
+  const visits = state.visits ?? [];
+  if (area === "all") {
+    const week = leagueWeek({ ...state, missions }, { today });
+    return week.scores.map((s) => s.total);
+  }
+  return dates.map((d) => {
+    if (d > today) return 0;
+    switch (area) {
+      case "brain":
+        return quizLogs.filter((q) => q.date === d).reduce((sum, q) => sum + (Number(q.points) || 0), 0);
+      case "health":
+        return (health[d] ?? []).length;
+      case "attend":
+        return visits.includes(d) ? 1 : 0;
+      case "save":
+        return (missions[d] ?? []).includes("welfare") ? 1 : 0;
+      default:
+        return 0;
+    }
+  });
+}
+
+function useAreaRanking(area: LeagueArea, range: RankingRange, band: number) {
+  const { profile, streak, weekPoints, code, today, state, rankingVisible } = useApp();
+  const weekId = weekIdOf(today);
+  const [data, setData] = useState<RankingResult | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const myDaily = useMutableDaily(area, state, today);
+
+  const fallback = useMemo(
+    () =>
+      buildAreaRanking({
+        area,
+        range,
+        weekId,
+        today,
+        sido: profile?.sido,
+        sigungu: profile?.sigungu,
+        band,
+        me: rankingVisible
+          ? {
+              name: profile?.nickname || "나",
+              avatarUrl: profile?.avatarUrl || profile?.avatar,
+              isMe: true,
+              daily: myDaily,
+            }
+          : null,
+      }),
+    [area, range, weekId, today, profile?.sido, profile?.sigungu, profile?.nickname, profile?.avatarUrl, profile?.avatar, band, rankingVisible, myDaily]
+  );
+
+  useEffect(() => {
+    if (range === "group" || area === "group") {
+      setLoading(false);
+      setData(null);
+      return;
+    }
+    const params = new URLSearchParams({
+      area,
+      range,
+      weekId,
+      today,
+      code: code || "",
+      sido: profile?.sido || "",
+      sigungu: profile?.sigungu || "",
+      birthYear: String(profile?.birthYear || 1955),
+      band: String(band),
+      visible: rankingVisible ? "1" : "0",
+      myd: myDaily.join(","),
+    });
+    let alive = true;
+    setLoading(true);
+    setData(null);
+    fetch(`/api/rankings?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad"))))
+      .then((j) => {
+        if (!alive) return;
+        if (j?.ok && Array.isArray(j.rows) && !j.delegate) setData(j as RankingResult);
+        else setData(fallback);
+      })
+      .catch(() => {
+        if (alive) setData(fallback);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [area, range, weekId, today, code, profile?.sido, profile?.sigungu, profile?.birthYear, band, rankingVisible, myDaily, fallback]);
+
+  return { view: data ?? fallback, loading, streak, weekPoints };
+}
+
+/** 배열이 매번 새로 만들어지지 않도록 문자열로 비교한다(불필요한 재요청 방지) */
+function useMutableDaily(area: LeagueArea, state: AppState, today: string) {
+  const key = `${area}|${today}|${(state.visits ?? []).join(",")}|${(state.quizLogs ?? [])
+    .map((q) => `${q.date}:${q.points}`)
+    .join(",")}|${JSON.stringify(state.health ?? {})}|${JSON.stringify(state.missions ?? {})}`;
+  return useMemo(() => localDaily(area, state, today), [key]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+function AreaBoard({
+  area,
+  range,
+  band,
+  onNavigate,
+}: {
+  area: LeagueArea;
+  range: RankingRange;
+  band: number;
+  onNavigate?: (tab: string) => void;
+}) {
+  const { view, loading } = useAreaRanking(area, range, band);
+  const { state, today, rankingVisible, streak } = useApp();
+  const info = areaInfo(area);
+  const rest = view.rows.slice(3, 10);
+  const localValue =
+    area === "all"
+      ? leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay: view.invitesByDay }).total
+      : myAreaValue(area, { ...state, missions: state.missions ?? {} }, { today, invites: view.myInvites });
+
   return (
-    <div className="space-y-2" role="tablist" aria-label="랭킹 종류">
-      {rows.map((group, rowIndex) => (
-        <div
-          key={rowIndex}
-          className={`grid gap-2 ${group.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
-        >
-          {group.map((t) => {
-            const on = t.key === value;
-            return (
-              <button
-                key={t.key}
-                role="tab"
-                aria-selected={on}
-                data-rank-tab={t.key}
-                onClick={() => onChange(t.key)}
-                className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[0.94rem] font-extrabold transition ${
-                  on ? "bg-ink text-white shadow-cta" : "bg-white text-ink/60 shadow-soft active:bg-paper"
-                }`}
-              >
-                <span aria-hidden className="text-[1.02rem] leading-none">
-                  {t.emoji}
-                </span>
-                <span className="whitespace-nowrap leading-tight">{t.label}</span>
-              </button>
-            );
-          })}
+    <div className="space-y-3" data-area-board={area}>
+      <div
+        data-podium
+        className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card"
+      >
+        <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
+          <IconTrophy size={16} /> {periodLabel()} {info.label} 명예의 전당
         </div>
-      ))}
+        <Podium rows={view.rows} area={area} />
+        <div className="mt-3 rounded-2xl bg-gradient-to-r from-plum to-[#5B4FA8] px-3.5 py-2.5 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-[0.9rem] font-black text-white">
+            <IconSparkle size={16} className="text-[#FFE28A]" />
+            {view.rows[0]
+              ? `${view.rows[0].name} 님, 이번 주 ${info.label} 1위를 축하합니다!`
+              : `이번 주 ${info.label} 1위를 기다리고 있어요`}
+          </p>
+        </div>
+      </div>
+
+      <RestList rows={rest} area={area} />
+
+      <MyRankCard view={view} area={area} localValue={localValue} />
+
+      <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
+        공개 순위표에는 10위까지만 보여 드려요. 매주 월요일 0시에 새로 시작해요 (앞으로 {resetCountdown()}).
+        <br />
+        {rankingVisible
+          ? `이름은 뒤 글자를 가려서 보여 드려요.${view.sample ? " 지금은 예시 순위가 함께 있어요." : ""}`
+          : "랭킹 참여를 끄면 내 이름은 다른 사람에게 보이지 않아요."}
+        {loading ? " 순위를 새로 불러오는 중…" : ""}
+        {streak >= 3 ? ` 🔥 ${streak}일 연속 출석 중이에요.` : ""}
+      </p>
     </div>
   );
 }
 
-/* ---------------------------------------------------------------- */
-/* 랭킹 보드 (탭 포함)                                                */
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/* 랭킹 보드 (영역 + 범위)                                             */
+/* ------------------------------------------------------------------ */
 
 export function RankingBoard({
-  initialScope = "group",
+  initialScope = "all",
   onNavigate,
 }: {
-  initialScope?: RankingScope;
+  initialScope?: "all" | LeagueArea;
   onNavigate?: (tab: string) => void;
 }) {
-  const [scope, setScope] = useState<RankingScope>(initialScope);
-  const { view, loading } = useRanking(scope);
-  const { streak, weekPoints, state, weekId } = useApp();
-  const hasRecord =
-    scope === "invite"
-      ? (view.myInvites ?? 0) > 0
-      : weekPoints > 0 || state.quizLogs.some((q) => q.weekId === weekId) || streak >= 2;
-  const tab = TABS.find((t) => t.key === scope)!;
-  const rest = view.rows.slice(3, 10);
-  const meInList = view.rows.some((r) => r.isMe);
-  const me = view.rows.find((r) => r.isMe);
+  const { profile, state, today } = useApp();
+  const [area, setArea] = useState<LeagueArea>(initialScope);
+  const [range, setRange] = useState<RankingRange>("region");
+  const [band, setBand] = useState<number>(() => ageBandOf(profile?.birthYear));
+  const [groupView, setGroupView] = useState<"my" | "all">("my");
+
+  const myTotal = leagueWeek({ ...state, missions: state.missions ?? {} }, { today }).total;
+
+  const go = (target: LeagueArea) => {
+    if (target === "all") {
+      revealLater("[data-league-missions]");
+      return;
+    }
+    if (!onNavigate) return;
+    if (target === "brain") onNavigate("quiz");
+    else if (target === "health") {
+      onNavigate("home");
+      revealLater("[data-health-card]");
+    } else if (target === "attend") {
+      onNavigate("home");
+      revealLater("[data-home-hero]");
+    } else if (target === "group") {
+      onNavigate("group");
+      revealLater("[data-group-mission]");
+    } else if (target === "share") {
+      onNavigate("group");
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("neulbom:invite")), 260);
+    } else if (target === "save") {
+      onNavigate("welfare");
+      revealLater("[data-welfare-filters]");
+    }
+  };
 
   return (
     <div className="space-y-3">
-      <RankingTabs value={scope} onChange={setScope} />
-      <p className="text-center text-[0.8rem] font-semibold text-ink/45">{tab.desc}</p>
+      <AreaTabs value={area} onChange={setArea} myTotal={myTotal} />
 
-      {scope === "group" ? (
-        <GroupRankingBoard onNavigate={onNavigate} />
-      ) : scope === "groups" ? (
-        <GroupsBoard onNavigate={onNavigate} loading={loading} />
+      <p className="text-center text-[0.8rem] font-semibold text-ink/45">{areaInfo(area).desc}</p>
+
+      {area === "group" ? (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            data-group-view="my"
+            aria-pressed={groupView === "my"}
+            onClick={() => setGroupView("my")}
+            className={`min-h-[52px] rounded-2xl text-[0.96rem] font-extrabold ${
+              groupView === "my" ? "bg-ink text-white shadow-cta" : "bg-white text-ink/60 shadow-soft"
+            }`}
+          >
+            우리 모임
+          </button>
+          <button
+            data-group-view="all"
+            aria-pressed={groupView === "all"}
+            onClick={() => setGroupView("all")}
+            className={`min-h-[52px] rounded-2xl text-[0.96rem] font-extrabold ${
+              groupView === "all" ? "bg-ink text-white shadow-cta" : "bg-white text-ink/60 shadow-soft"
+            }`}
+          >
+            단체별
+          </button>
+        </div>
       ) : (
-        <>
-          {/* 시상대 */}
-          <div data-podium className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card">
-            <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
-              <IconTrophy size={16} /> {periodLabel()} 명예의 전당
-            </div>
-            <Podium rows={view.rows} scope={scope} />
-
-            <div className="mt-3 rounded-2xl bg-gradient-to-r from-plum to-[#5B4FA8] px-3.5 py-2.5 text-center">
-              <p className="flex items-center justify-center gap-1.5 text-[0.9rem] font-black text-white">
-                <IconSparkle size={16} className="text-[#FFE28A]" />
-                {view.rows[0] ? `${view.rows[0].name} 님, 이번 주 1위를 축하합니다!` : "이번 주 1위를 기다리고 있어요"}
-              </p>
-            </div>
-          </div>
-
-          <RestList rows={rest} scope={scope} />
-
-          {/* 내 순위 */}
-          <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-[0.8rem] font-bold text-ink/50">내 순위</p>
-                <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
-                  {hasRecord && view.myRank ? (
-                    <>
-                      {view.myRank}
-                      <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {view.total}명</span>
-                    </>
-                  ) : (
-                    <span className="text-[1.05rem] text-ink/45">아직 기록이 없어요</span>
-                  )}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[0.8rem] font-bold text-ink/50">
-                  {scope === "invite" ? "내가 초대한 사람" : scope === "streak" ? "연속 출석" : "이번 주 점수"}
-                </p>
-                <p className="t-num tabular text-brand-dark">
-                  {scope === "invite"
-                    ? `${view.myInvites ?? 0}명`
-                    : scope === "streak"
-                      ? `${streak}일`
-                      : `${weekPoints}점`}
-                </p>
-                <p className="text-[0.82rem] font-extrabold text-leaf-dark">
-                  {hasRecord && view.myPercentile && (scope === "invite" || weekPoints > 0)
-                    ? view.myPercentile <= 50
-                      ? `상위 ${view.myPercentile}% · 잘하고 있어요!`
-                      : `상위 ${view.myPercentile}% · 더 풀면 올라가요`
-                    : scope === "invite"
-                      ? "초대장을 보내면 순위가 생겨요"
-                      : "퀴즈를 풀면 순위가 생겨요"}
-                </p>
-              </div>
-            </div>
-            {me && me.rank > 10 && (scope === "invite" ? (view.myInvites ?? 0) > 0 : weekPoints > 0) ? (
-              <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-center text-[0.86rem] font-bold text-ink/60">
-                {me.name} 님은 {me.rank}위예요. <span className="text-leaf-dark">상위 {view.myPercentile}%</span> 안에 들어요!
-              </p>
-            ) : null}
-            {!meInList && hasRecord ? (
-              <p className="mt-2 text-center text-[0.82rem] font-semibold text-ink/50">
-                10위 안에 들면 이름이 여기에 보여요.
-              </p>
-            ) : null}
-          </Card>
-
-          <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
-            {scope === "invite" ? (
-              <>
-                초대장을 보내 새로 가입한 사람이 많을수록 위로 올라가요.
-                <br />
-                이름은 뒤 글자를 가려서 보여 드려요.
-              </>
-            ) : (
-              <>
-                매주 월요일 0시에 새로 시작해요 (앞으로 {resetCountdown()}).
-                <br />
-                이름은 뒤 글자를 가려서 보여 드려요.
-              </>
-            )}
-            {view.sample ? " 지금은 예시 순위이며, 참여자가 쌓이면 실제 순위로 바뀝니다." : ""}
-            {loading ? " 순위를 새로 불러오는 중…" : ""}
-          </p>
-        </>
+        <RangeTabs value={range} onChange={setRange} band={band} onBand={setBand} />
       )}
+
+      <OptInCard />
+
+      {area === "all" ? <LeagueMissionCard onGo={go} /> : null}
+
+      {area === "group" ? (
+        groupView === "my" ? (
+          <GroupRankingBoard onNavigate={onNavigate} compact />
+        ) : (
+          <GroupsBoard onNavigate={onNavigate} loading={false} />
+        )
+      ) : range === "group" ? (
+        <GroupRankingBoard onNavigate={onNavigate} compact />
+      ) : (
+        <AreaBoard area={area} range={range} band={band} onNavigate={onNavigate} />
+      )}
+
+      <div data-area-mission={area}>
+        <BigButton variant="teal" size="lg" full onClick={() => go(area)}>
+          <IconSparkle size={20} /> {area === "all" ? areaInfo("all").action : areaInfo(area).action}
+        </BigButton>
+      </div>
     </div>
   );
 }
 
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 /* 퀴즈 탭 안의 요약                                                  */
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 
 export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   return (
     <section className="fade-up">
-      <SectionTitle emoji="🏆" right={<span className="text-[0.78rem] font-bold text-ink/40">{periodLabel()}</span>}>
+      <SectionTitle
+        emoji="🏆"
+        right={<span className="text-[0.78rem] font-bold text-ink/40">{periodLabel()}</span>}
+      >
         명예의 전당
       </SectionTitle>
       <Card className="flex items-center justify-between gap-2 p-4">
         <div className="min-w-0 flex-1">
           <p className="text-[0.98rem] font-black leading-snug text-ink">우리 모임과 이웃 순위가 궁금하세요?</p>
-          <p className="mt-0.5 text-[0.85rem] font-semibold text-ink/55">우리 모임 · 단체별 · 초대왕 · 전국 · 지역별 · 개근왕</p>
+          <p className="mt-0.5 text-[0.85rem] font-semibold text-ink/55">
+            늘봄왕 · 두뇌왕 · 건강왕 · 출석왕 · 모임왕 · 나눔왕 · 알뜰왕
+          </p>
         </div>
         <button
           onClick={() => onNavigate?.("ranking")}
@@ -711,13 +1197,15 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
   );
 }
 
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 /* 전용 랭킹 화면                                                     */
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 
 export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { profile, streak, weekPoints, todayDaily } = useApp();
+  const { profile, streak, state, today, todayDaily, rankingVisible } = useApp();
   const { active } = useGroup();
+  const week = leagueWeek({ ...state, missions: state.missions ?? {} }, { today });
+
   return (
     <div className="space-y-4">
       <section className="fade-up pt-1">
@@ -727,10 +1215,17 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
         </div>
         <h1 className="t-title mt-1.5 text-ink">{profile?.nickname} 님의 이번 주 순위</h1>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="t-sub font-semibold text-ink/60">🔥 {streak}일 연속 출석 · 이번 주</span>
-          <span className="t-num text-brand-deep">{weekPoints}점</span>
+          <span className="t-sub font-semibold text-ink/60">🔥 {streak}일 연속 출석 · 이번 주 늘봄왕</span>
+          <span className="t-num text-brand-deep" data-league-total={week.total}>
+            {week.total}점
+          </span>
           {active ? <span className="t-sub text-ink/60">· {active.name}</span> : null}
         </div>
+        {!rankingVisible ? (
+          <p className="mt-1.5 rounded-xl bg-white/80 px-3 py-2 text-[0.82rem] font-bold text-ink/55">
+            랭킹 참여를 꺼 두었어요 — 내 점수는 나만 볼 수 있어요.
+          </p>
+        ) : null}
       </section>
 
       <RankingBoard onNavigate={onNavigate} />

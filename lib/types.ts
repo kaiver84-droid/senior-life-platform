@@ -60,11 +60,21 @@ export type AppState = {
   familyEvents: FamilyEvent[];
   /** 날짜별 건강생활 챌린지 체크인(완료 도장) */
   health: HealthChecks;
+  /** 날짜별 확인 미션 기록 — { "2026-11-17": ["welfare","group"] } */
+  missions: Record<string, string[]>;
+  /** 랭킹 참여 — 끄면 내 점수는 개인 기록으로만 남고 공개 순위표에서 빠진다 */
+  rankingVisible: boolean;
   fontSize: 18 | 21 | 24;
   lastVisit: string;
 };
 
 export type RankingScope = "region" | "zodiac" | "streak" | "national" | "group" | "groups" | "invite";
+
+/** 순위표에서 고르는 범위 — 우리 모임 · 지역별 · 전국 · 연령대 */
+export type RankingRange = "group" | "region" | "national" | "age";
+
+/** 어제 대비 순위 변동 — +2(▲2) · -1(▼1) · 0(그대로) · null(신규) */
+export type RankingChange = number | null;
 
 export type RankingRow = {
   rank: number;
@@ -76,6 +86,12 @@ export type RankingRow = {
   avatarUrl?: string;
   /** 초대왕 순위에서 초대에 성공한 사람 수 */
   invites?: number;
+  /** 영역별 표시값 — ‘120점’ · ‘5일 출석’ · ‘3명 초대’ */
+  display?: string;
+  /** 어제 대비 순위 변동 배지 */
+  change?: RankingChange;
+  /** 정답률 같은 덧붙임 */
+  note?: string;
 };
 
 export type RankingResult = {
@@ -89,6 +105,22 @@ export type RankingResult = {
   sample: boolean;
   /** 초대왕 순위에서 내가 초대한 사람 수 */
   myInvites?: number;
+  /** 이 순위표가 보여 주는 영역(늘봄왕·두뇌왕 …) */
+  area?: string;
+  /** 내 순위 격차 안내에 쓰는 값 */
+  myGap?: {
+    rank: number | null;
+    aheadName?: string;
+    aheadDiff?: number;
+    top10Diff?: number;
+    total?: number;
+  };
+  /** 내 영역 값과 변동(카드에 그대로 보여 준다) */
+  myDisplay?: string;
+  myChange?: RankingChange;
+  myNote?: string;
+  /** 날짜별 내 초대 성공 수 — 늘봄왕 점수의 초대 점수에 쓴다 */
+  invitesByDay?: Record<string, number>;
 };
 
 /** 단체(모임)끼리 겨루는 순위 한 칸 — 모임 하나가 한 줄 */

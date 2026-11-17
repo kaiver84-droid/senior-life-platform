@@ -42,7 +42,7 @@ function stepsSpeech(program: WelfareProgram, limit?: number): string {
 }
 
 export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
-  const { profile, updateProfile } = useApp();
+  const { profile, updateProfile, recordMission } = useApp();
   const { show } = useToast();
   const [category, setCategory] = useState<string>("전체");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -60,6 +60,12 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
   const hero = filtered.find((p) => p.id === heroId) ?? filtered[0];
   const others = filtered.filter((p) => p.id !== hero?.id);
   const openProgram = matched.find((p) => p.id === openId) ?? null;
+
+  /** 혜택을 자세히 열어 보면 ‘복지·생활정보 확인’ 미션이 자동으로 기록된다(늘봄왕 +10점) */
+  const openDetail = (id: string) => {
+    setOpenId(id);
+    recordMission("welfare");
+  };
 
   const shareAnbu = async () => {
     const result = await shareText({
@@ -191,7 +197,7 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
             </div>
 
             <div className="mt-3">
-              <BigButton variant="ink" size="lg" full onClick={() => setOpenId(hero.id)}>
+              <BigButton variant="ink" size="lg" full onClick={() => openDetail(hero.id)}>
                 신청 방법 자세히 보기 <IconChevron size={20} />
               </BigButton>
             </div>
@@ -216,7 +222,7 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
           {others.map((p) => (
             <button
               key={p.id}
-              onClick={() => setOpenId(p.id)}
+              onClick={() => openDetail(p.id)}
               className="card flex w-full items-center gap-3 p-3.5 text-left active:scale-[0.99]"
             >
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[0.9rem] bg-sky text-[1.2rem]">

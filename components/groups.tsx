@@ -216,12 +216,18 @@ export function TodayGroupCard() {
 
 export function GroupMissionBanner({ onJoin }: { onJoin: () => void }) {
   const { detail, todayDone } = useGroup();
+  const { recordMission } = useApp();
   const badge = missionBadge(todayDone);
 
   return (
     <button
       type="button"
-      onClick={onJoin}
+      data-group-mission={todayDone ? "done" : "open"}
+      onClick={() => {
+        // 모임 공동 미션에 참여한 것으로 기록한다(늘봄왕 +20점 · 하루 1번)
+        recordMission("group");
+        onJoin();
+      }}
       className="fade-up w-full rounded-[1.4rem] bg-gradient-to-br from-sun-light via-[#FFF0C9] to-[#FFE2A0] p-4 text-left shadow-soft active:scale-[0.995]"
     >
       <div className="flex items-center justify-between gap-2">
@@ -263,6 +269,21 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // 랭킹 ‘나눔왕 → 친구 초대하기’에서 넘어오면 초대 시트를 바로 연다.
+  // 아직 모임이 없으면 초대할 대상이 없으니 모임 만들기 시트를 열고 안내한다.
+  useEffect(() => {
+    const openInvite = () => {
+      if (detail) {
+        setSheet("invite");
+      } else {
+        setSheet("create");
+        show("모임을 먼저 만들면 친구를 초대할 수 있어요.");
+      }
+    };
+    window.addEventListener("neulbom:invite", openInvite as EventListener);
+    return () => window.removeEventListener("neulbom:invite", openInvite as EventListener);
+  }, [detail, show]);
 
   /** 모임 전환 — 이미 보던 모임이면 그대로, 아니면 서버에서 그 모임 자료를 불러온다 */
   const switchTo = async (id: string) => {
@@ -490,6 +511,9 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             </span>
             카카오톡으로 우리 모임 초대하기
           </BigButton>
+
+          {/* 오늘의 모임 미션 — 홈과 같은 카드. 랭킹 ‘모임왕 → 우리 모임 미션’이 여기로 온다 */}
+          <GroupMissionBanner onJoin={() => onNavigate("quiz")} />
 
           {/* 오늘의 건강 챌린지 — 모임원과 함께 원터치 체크인 */}
           <HealthChallengeCard where="group" />

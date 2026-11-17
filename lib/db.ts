@@ -76,6 +76,10 @@ export type StoredState = {
   familyEvents: StoredFamilyEvent[];
   /** 건강생활 챌린지 체크인 (날짜별) */
   health: StoredHealth;
+  /** 날짜별 확인 미션 — { "2026-11-17": ["welfare","group"] } */
+  missions: Record<string, string[]>;
+  /** 랭킹 참여 — false 면 공개 순위표에서 뺄다 */
+  rankingVisible: boolean;
   updatedAt: string;
 };
 
@@ -93,6 +97,7 @@ const TABLE = {
   rankings: "rankings_weekly",
   family: "family_events",
   health: "health_checks",
+  activity: "activity_logs",
 };
 
 /** PostgREST 호출 (모임 API 등 다른 모듈에서도 같은 키·헤더로 쓴다) */
@@ -132,6 +137,8 @@ function memoryMerge(code: string, patch: Partial<StoredState>): StoredState {
       visits: [],
       familyEvents: [],
       health: {},
+      missions: {},
+      rankingVisible: true,
       updatedAt: new Date().toISOString(),
     };
   const next: StoredState = {
@@ -143,6 +150,8 @@ function memoryMerge(code: string, patch: Partial<StoredState>): StoredState {
     visits: patch.visits ?? cur.visits,
     familyEvents: patch.familyEvents ?? cur.familyEvents,
     health: patch.health ?? cur.health ?? {},
+    missions: patch.missions ?? cur.missions ?? {},
+    rankingVisible: patch.rankingVisible ?? cur.rankingVisible ?? true,
     updatedAt: new Date().toISOString(),
   };
   store.set(code, next);
@@ -313,6 +322,52 @@ export async function saveHealth(env: DbEnv, code: string, date: string, ids: st
   return { ok: true, mode: "supabase" as const };
 }
 
+/**
+ * 날짜별 확인 미션(복지·생활정보 확인 welfare, 모임 공동 미션 참여 group) —
+ * 그날 한 줄씩 저장하고, 해제한 항목은 지운다.
+ */
+export async function saveMissions(env: DbEnv, code: string, date: string, ids: string[]) {
+  const clean = Array.from(new Set(ids.filter((x) => x === "welfare" || x === "group")));
+  const { configured } = supabaseConfig(env);
+  if (!configured) {
+    const cur = memoryGet(code);
+    const missions: Record<string, string[]> = { ...(cur?.missions ?? {}) };
+    if (clean.length) missions[date] = clean;
+    else delete missions[date];
+    memoryMerge(code, { missions });
+    return { ok: true, mode: "demo" as const };
+  }
+  const del = await sbRequest(
+    env,
+    `${TABLE.activity}?user_code=eq.${encodeURIComponent(code)}&activity_date=eq.${date}`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!del.ok) throw new Error(`supabase activity delete ${del.status}: ${await del.text()}`);
+  if (!clean.length) return { ok: true, mode: "supabase" as const };
+  const res = await sbRequest(env, `${TABLE.activity}?on_conflict=user_code,activity_date,kind`, {
+    method: "POST",
+    body: JSON.stringify(clean.map((kind) => ({ user_code: code, activity_date: date, kind }))),
+  });
+  if (!res.ok) throw new Error(`supabase activity ${res.status}: ${await res.text()}`);
+  return { ok: true, mode: "supabase" as const };
+}
+
+/** 랭킹 참여 ON/OFF — 끄면 공개 순위표(다른 사람 화면)에서도 빠진다 */
+export async function saveRankingVisible(env: DbEnv, code: string, visible: boolean) {
+  const { configured } = supabaseConfig(env);
+  if (!configured) {
+    memoryMerge(code, { rankingVisible: visible });
+    return { ok: true, mode: "demo" as const };
+  }
+  const res = await sbRequest(env, `${TABLE.users}?code=eq.${encodeURIComponent(code)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ ranking_visible: Boolean(visible) }),
+    headers: { Prefer: "return=minimal" },
+  });
+  if (!res.ok) throw new Error(`supabase ranking_visible ${res.status}: ${await res.text()}`);
+  return { ok: true, mode: "supabase" as const };
+}
+
 export async function saveVisit(env: DbEnv, code: string, date: string) {
   const { configured } = supabaseConfig(env);
   if (!configured) {
@@ -333,7 +388,7 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
   const { configured } = supabaseConfig(env);
   if (!configured) return memoryGet(code);
 
-  const [users, quiz, med, visits, family, health] = await Promise.all([
+  const [users, quiz, med, visits, family, health, activity] = await Promise.all([
     sbRequest(env, `${TABLE.users}?code=eq.${encodeURIComponent(code)}&limit=1`).then((r) => (r.ok ? r.json() : [])),
     sbRequest(
       env,
@@ -352,6 +407,10 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
       env,
       `${TABLE.health}?user_code=eq.${encodeURIComponent(code)}&order=check_date.desc&limit=30`
     ).then((r) => (r.ok ? r.json() : [])),
+    sbRequest(
+      env,
+      `${TABLE.activity}?user_code=eq.${encodeURIComponent(code)}&order=activity_date.desc&limit=60`
+    ).then((r) => (r.ok ? r.json() : [])),
   ]);
 
   const u = Array.isArray(users) ? users[0] : null;
@@ -367,6 +426,15 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
     if (!h?.check_date) return;
     const ids = Array.isArray(h.challenges) ? h.challenges.filter((x) => typeof x === "string") : [];
     if (ids.length) healthMap[h.check_date] = ids;
+  });
+
+  // 날짜별 확인 미션(복지·모임) — 같은 날 여러 줄이면 한 줄로 모은다.
+  const missionMap: Record<string, string[]> = {};
+  (Array.isArray(activity) ? activity : []).forEach((a: { activity_date: string; kind: string }) => {
+    if (!a?.activity_date || (a.kind !== "welfare" && a.kind !== "group")) return;
+    const list = missionMap[a.activity_date] ?? [];
+    if (!list.includes(a.kind)) list.push(a.kind);
+    missionMap[a.activity_date] = list;
   });
 
   return {
@@ -411,6 +479,8 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
       ? family[0].events
       : []) as StoredFamilyEvent[],
     health: healthMap,
+    missions: missionMap,
+    rankingVisible: u?.ranking_visible !== false,
     updatedAt: new Date().toISOString(),
   };
 }

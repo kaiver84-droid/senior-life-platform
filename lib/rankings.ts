@@ -1,4 +1,14 @@
-import type { GroupRankingResult, GroupRankingRow, RankingResult, RankingScope } from "./types";
+import type {
+  GroupRankingResult,
+  GroupRankingRow,
+  RankingChange,
+  RankingRange,
+  RankingResult,
+  RankingRow,
+  RankingScope,
+} from "./types";
+import type { LeagueArea } from "./league";
+import { LEAGUE_DAILY_CAP, LEAGUE_POINTS, formatAreaValue, weekDatesOf } from "./league";
 import { periodLabel, weekIdOf } from "./week";
 
 const SURNAMES = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "전", "홍"];
@@ -317,4 +327,230 @@ export function buildGroupRanking(input: {
     myPercentile: mine ? Math.max(1, Math.round((mine.rank / ranked.length) * 100)) : null,
     sample: ranked.some((r) => !r.isMine) || !mine,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* 7개 영역 순위표                                                     */
+/*   늘봄왕(종합) · 두뇌왕 · 건강왕 · 출석왕 · 모임왕 · 나눔왕 · 알뜰왕 */
+/* ------------------------------------------------------------------ */
+
+export type RankParticipant = {
+  name: string;
+  avatarUrl?: string;
+  isMe?: boolean;
+  /** 월요일부터 날짜별 값(그 영역 기준 점수·개수) */
+  daily: number[];
+  /** 정답률 같은 덧붙임 */
+  note?: string;
+  /** 화면에서 채워 넣은 예시 참여자인지 */
+  sample?: boolean;
+};
+
+export type AreaRankingInput = {
+  area: LeagueArea;
+  range: RankingRange;
+  weekId: string;
+  today: string;
+  sido?: string;
+  sigungu?: string;
+  band?: number;
+  /** 실제 참여자(나 제외) */
+  others?: RankParticipant[];
+  /** 나 — 랭킹 참여를 꺼 두었으면 null */
+  me?: RankParticipant | null;
+  /** 공개 순위표에 보여 줄 최대 인원 (기본 10명) */
+  limit?: number;
+};
+
+const sumOf = (arr: number[], upto = arr.length - 1) =>
+  arr.reduce((s, v, i) => (i <= upto ? s + Math.max(0, Math.floor(Number(v) || 0)) : s), 0);
+
+/**
+ * 영역별 순위표를 만든다.
+ * - 실제 참여자(others·me)를 먼저 넣고, 모자란 자리는 주차·범위로만 정해지는 예시 참여자로 채운다.
+ * - 순위 변동(▲/▼/신규)은 ‘어제까지의 점수’로 한 번 더 줄을 세워 비교한다(같은 자료라 새로 고쳐도 흔들리지 않는다).
+ */
+export function buildAreaRanking(input: AreaRankingInput): RankingResult {
+  const limit = Math.max(1, input.limit ?? 10);
+  const dates = weekDatesOf(input.today);
+  const todayIndex = Math.max(0, Math.min(dates.length - 1, dates.indexOf(input.today)));
+
+  const pool: RankParticipant[] = [];
+  const seen = new Set<string>();
+  const push = (p: RankParticipant) => {
+    const key = (p.name || "").trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    pool.push(p);
+  };
+  (input.others || []).forEach(push);
+  sampleParticipants({
+    area: input.area,
+    range: input.range,
+    weekId: input.weekId,
+    sido: input.sido,
+    sigungu: input.sigungu,
+    band: input.band,
+    todayIndex,
+    length: dates.length,
+  }).forEach(push);
+  if (input.me) push(input.me);
+
+  const total = (p: RankParticipant) => sumOf(p.daily);
+  const asOf = (p: RankParticipant, k: number) => (k < 0 ? 0 : sumOf(p.daily, k));
+  const byName = (a: RankParticipant, b: RankParticipant) => a.name.localeCompare(b.name);
+
+  const nowSorted = [...pool].sort((a, b) => total(b) - total(a) || byName(a, b));
+  // 어제까지의 점수로 같은 사람들을 한 번 더 줄 세운다(모두 같은 인원으로 비교해야 변동이 크게 흔들리지 않는다).
+  const prevSorted =
+    todayIndex > 0
+      ? [...pool].sort((a, b) => asOf(b, todayIndex - 1) - asOf(a, todayIndex - 1) || byName(a, b))
+      : [];
+  const nowRank = new Map<RankParticipant, number>();
+  nowSorted.forEach((p, i) => nowRank.set(p, i + 1));
+  const prevRank = new Map<RankParticipant, number>();
+  prevSorted.forEach((p, i) => prevRank.set(p, i + 1));
+
+  const rows: RankingRow[] = nowSorted.slice(0, limit).map((p) => {
+    const rank = nowRank.get(p)!;
+    const prev = prevRank.get(p);
+    // 어제 점수가 0이면 ‘신규’, 어제 순위가 있으면 그 차이, 비교할 자료가 없으면 변동 없음(0)
+    const yesterday = asOf(p, todayIndex - 1);
+    const change: RankingChange =
+      todayIndex === 0 ? 0 : yesterday <= 0 ? null : prev === undefined ? 0 : prev - rank;
+    const value = total(p);
+    return {
+      rank,
+      name: p.name,
+      points: value,
+      streak: p.daily.filter((v) => v > 0).length,
+      isMe: Boolean(p.isMe),
+      avatarUrl: p.avatarUrl,
+      display: formatAreaValue(input.area, value),
+      change,
+      note: p.note,
+    };
+  });
+
+  const mine = input.me ?? null;
+  const myRank = mine ? nowRank.get(mine) ?? null : null;
+  const myValue = mine ? total(mine) : 0;
+
+  let myGap: RankingResult["myGap"] = undefined;
+  if (mine && myRank) {
+    const ahead = myRank > 1 ? nowSorted[myRank - 2] : null;
+    const top10 = myRank > limit ? nowSorted[limit - 1] : null;
+    myGap = {
+      rank: myRank,
+      aheadName: ahead?.name,
+      aheadDiff: ahead ? total(ahead) - myValue : 0,
+      top10Diff: top10 ? total(top10) - myValue : 0,
+      total: pool.length,
+    };
+  }
+
+  const scope: RankingScope = input.range === "age" ? "zodiac" : input.range;
+
+  return {
+    weekId: input.weekId,
+    scope,
+    periodLabel: periodLabel(),
+    rows,
+    total: pool.length,
+    myRank,
+    myPercentile: myRank ? Math.max(1, Math.round((myRank / pool.length) * 100)) : null,
+    sample: rows.some((r) => (pool.find((p) => p.name === r.name)?.sample ?? false)),
+    area: input.area,
+    myGap,
+    myDisplay: mine ? formatAreaValue(input.area, myValue) : undefined,
+    myChange:
+      mine && myRank
+        ? todayIndex === 0 || sumOf(mine.daily, todayIndex - 1) <= 0
+          ? null
+          : (prevRank.get(mine) ?? myRank) - myRank
+        : undefined,
+    myNote: mine?.note,
+  };
+}
+
+/** 예시 참여자 — 주차·범위(지역·연령대)로만 값이 정해져 새로 고쳐도 같은 순위가 나온다 */
+function sampleParticipants(input: {
+  area: LeagueArea;
+  range: RankingRange;
+  weekId: string;
+  sido?: string;
+  sigungu?: string;
+  band?: number;
+  todayIndex: number;
+  length: number;
+}): RankParticipant[] {
+  const seedBase = `${input.weekId}|${input.area}|${input.range}|${input.sido || ""}|${input.sigungu || ""}|${
+    input.band ?? ""
+  }`;
+  const head = mulberry32(hashStr(`${seedBase}|count`));
+  const count = input.range === "national" ? 120 + Math.floor(head() * 30) : 46 + Math.floor(head() * 14);
+  const used = new Set<string>();
+  const out: RankParticipant[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const rnd = mulberry32(hashStr(`${seedBase}|${i}`));
+    let name = "";
+    do {
+      name = `${SURNAMES[Math.floor(rnd() * SURNAMES.length)]}○${LAST[Math.floor(rnd() * LAST.length)]}`;
+    } while (used.has(name));
+    used.add(name);
+
+    const loyalty = 0.15 + rnd() * 0.72;
+    // 사람마다 ‘늘 하던 만큼’이 비슷하도록 기준값을 두고 날마다 조금씩만 흔든다
+    // (날마다 크게 튀면 순위 변동 배지가 ▲14처럼 과장되어 보인다)
+    const baseAll = 20 + loyalty * 60;
+    const baseBrain = 20 + loyalty * 70;
+    const daily: number[] = [];
+    for (let d = 0; d < input.length; d++) {
+      if (d > input.todayIndex) {
+        daily.push(0);
+        continue;
+      }
+      const engaged = rnd() < 0.72 + loyalty * 0.24;
+      switch (input.area) {
+        case "brain": {
+          daily.push(engaged ? Math.round(baseBrain * (0.9 + rnd() * 0.2)) : 0);
+          break;
+        }
+        case "health": {
+          daily.push(engaged ? 1 + Math.floor(loyalty * 3) : 0);
+          break;
+        }
+        case "attend": {
+          daily.push(engaged ? 1 : 0);
+          break;
+        }
+        case "save": {
+          daily.push(rnd() < 0.3 + loyalty * 0.4 ? 1 : 0);
+          break;
+        }
+        case "share": {
+          daily.push(rnd() < 0.05 ? 1 : 0);
+          break;
+        }
+        default: {
+          if (!engaged) {
+            daily.push(0);
+            break;
+          }
+          let v = Math.round(baseAll * (0.92 + rnd() * 0.16));
+          if (rnd() < 0.05) v += LEAGUE_POINTS.invite;
+          daily.push(Math.min(LEAGUE_DAILY_CAP, v));
+        }
+      }
+    }
+
+    out.push({
+      name,
+      daily,
+      sample: true,
+      note: input.area === "brain" ? `정답률 ${50 + Math.floor(rnd() * 50)}%` : undefined,
+    });
+  }
+  return out;
 }

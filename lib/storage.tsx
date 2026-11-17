@@ -23,6 +23,8 @@ function emptyState(): AppState {
     visits: [],
     familyEvents: [],
     health: {},
+    missions: {},
+    rankingVisible: true,
     fontSize: 18,
     lastVisit: "",
   };
@@ -39,6 +41,8 @@ function read(): AppState {
     // 예전에 저장된 기록에는 가족 일정·건강 체크가 없으므로 빈 값으로 채운다.
     if (!Array.isArray(merged.familyEvents)) merged.familyEvents = [];
     if (!merged.health || typeof merged.health !== "object" || Array.isArray(merged.health)) merged.health = {};
+    if (!merged.missions || typeof merged.missions !== "object" || Array.isArray(merged.missions)) merged.missions = {};
+    if (typeof merged.rankingVisible !== "boolean") merged.rankingVisible = true;
     return merged;
   } catch {
     return emptyState();
@@ -114,6 +118,13 @@ type Ctx = {
   healthToday: string[];
   /** 건강 챌린지를 찍거나 풀 때 — 이제 체크되어 있으면 true */
   toggleHealth: (id: string) => boolean;
+  /** 오늘 확인한 미션 id 목록(복지·모임) */
+  missionsToday: string[];
+  /** 복지·생활정보 확인(welfare)·모임 공동 미션(group) 기록 — 새로 기록됐으면 true */
+  recordMission: (id: "welfare" | "group") => boolean;
+  /** 랭킹 참여 ON/OFF */
+  rankingVisible: boolean;
+  setRankingVisible: (on: boolean) => void;
   /** 서버에 저장된 기록을 이 기기 기록과 합친다(다른 기기에서 찍은 도장 포함) */
   syncFromServer: () => Promise<void>;
   saveProfile: (p: Omit<Profile, "id" | "createdAt"> & { id?: string }) => Profile;
@@ -167,12 +178,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           visits: state.visits.slice(-30),
           familyEvents: state.familyEvents,
           health: state.health,
+          missions: state.missions,
+          rankingVisible: state.rankingVisible,
           today: kstDate(),
         }),
       }).catch(() => {});
     }, 1200);
     return () => clearTimeout(t);
-  }, [ready, state.profile, state.quizLogs, state.med, state.visits, state.familyEvents, state.health]);
+  }, [
+    ready,
+    state.profile,
+    state.quizLogs,
+    state.med,
+    state.visits,
+    state.familyEvents,
+    state.health,
+    state.missions,
+    state.rankingVisible,
+  ]);
 
   // 앱을 열 때 서버에 남아 있는 기록(다른 기기에서 찍은 도장 포함)을 한 번 합쳐 온다.
   const syncedRef = useRef(false);
@@ -287,6 +310,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, familyEvents: s.familyEvents.filter((ev) => ev.id !== id) }));
   }, []);
 
+  /** 복지·생활정보 확인(welfare)·모임 공동 미션 참여(group) — 하루 한 번, 늘봄왕 점수에 들어간다 */
+  const recordMission = useCallback((id: "welfare" | "group") => {
+    const today = kstDate();
+    const list = state.missions?.[today] ?? [];
+    if (list.includes(id)) return false;
+    setState((s) => {
+      const cur = s.missions?.[today] ?? [];
+      if (cur.includes(id)) return s;
+      return { ...s, missions: { ...s.missions, [today]: [...cur, id] } };
+    });
+    return true;
+  }, [state.missions]);
+
+  const setRankingVisible = useCallback((on: boolean) => {
+    setState((s) => ({ ...s, rankingVisible: Boolean(on) }));
+  }, []);
+
   const toggleHealth = useCallback((id: string) => {
     if (!HEALTH_IDS.includes(id)) return false;
     const today = kstDate();
@@ -335,11 +375,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           s.profile && remoteAvatar && !s.profile.avatarUrl
             ? { ...s.profile, avatarUrl: remoteAvatar, avatar: remoteAvatar }
             : s.profile;
+        // 다른 기기에서 확인한 미션(복지·모임)도 합친다 — 오늘 점수가 기기마다 달라지지 않게
+        const missions: Record<string, string[]> = { ...(s.missions ?? {}) };
+        Object.entries(remote.missions ?? {}).forEach(([d, ids]) => {
+          if (!Array.isArray(ids) || !ids.length) return;
+          missions[d] = Array.from(new Set([...(missions[d] ?? []), ...ids]));
+        });
         return {
           ...s,
           profile,
           health,
           med,
+          missions,
+          rankingVisible:
+            typeof remote.rankingVisible === "boolean" ? remote.rankingVisible : s.rankingVisible,
           quizLogs: [...s.quizLogs, ...extra].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-120),
           familyEvents,
         };
@@ -364,6 +413,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
   const todayDaily = state.daily && state.daily.date === today ? state.daily : null;
   const healthToday = healthOf(state.health, today);
+  const missionsToday = state.missions?.[today] ?? [];
   const code = state.profile ? makeCode(state.profile.id) : "";
 
   const value: Ctx = {
@@ -378,6 +428,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     weekPoints,
     todayDaily,
     healthToday,
+    missionsToday,
+    recordMission,
+    rankingVisible: state.rankingVisible !== false,
+    setRankingVisible,
     toggleHealth,
     syncFromServer,
     saveProfile,

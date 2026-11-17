@@ -1,4 +1,16 @@
-import { dbStatus, getState, rememberInviter, saveFamilyEvents, saveHealth, saveMed, saveQuizLog, saveVisit, upsertUser } from "../../lib/db";
+import {
+  dbStatus,
+  getState,
+  rememberInviter,
+  saveFamilyEvents,
+  saveHealth,
+  saveMed,
+  saveMissions,
+  saveQuizLog,
+  saveRankingVisible,
+  saveVisit,
+  upsertUser,
+} from "../../lib/db";
 import type { DbEnv, StoredFamilyEvent } from "../../lib/db";
 
 type Ctx = { request: Request; env: DbEnv };
@@ -55,6 +67,10 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     familyEvents?: StoredFamilyEvent[];
     /** 날짜별 건강 챌린지 체크인 — { "2026-11-16": ["water","walk"] } */
     health?: Record<string, string[]>;
+    /** 날짜별 확인 미션(복지·생활정보, 모임 공동 미션) — { "2026-11-17": ["welfare","group"] } */
+    missions?: Record<string, string[]>;
+    /** 랭킹 참여 ON/OFF — 끄면 공개 순위표에서 뺀다 */
+    rankingVisible?: boolean;
     /** 초대 링크(?ref=)로 처음 가입했을 때 — 초대한 사람의 내부 id(초대왕 순위) */
     invitedBy?: string;
     today?: string;
@@ -96,6 +112,20 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
       for (const [d, ids] of others) {
         if (Array.isArray(ids)) await saveHealth(env, body.code, d, ids);
       }
+    }
+    if (body.missions && typeof body.missions === "object") {
+      const todayIds = Array.isArray(body.missions[today]) ? body.missions[today] : [];
+      await saveMissions(env, body.code, today, todayIds);
+      const others = Object.entries(body.missions)
+        .filter(([d]) => d !== today && /^\d{4}-\d{2}-\d{2}$/.test(d))
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+        .slice(0, 6);
+      for (const [d, ids] of others) {
+        if (Array.isArray(ids)) await saveMissions(env, body.code, d, ids);
+      }
+    }
+    if (typeof body.rankingVisible === "boolean") {
+      await saveRankingVisible(env, body.code, body.rankingVisible);
     }
     await saveVisit(env, body.code, today);
     return json({ ok: true, mode, savedAt: new Date().toISOString() });
