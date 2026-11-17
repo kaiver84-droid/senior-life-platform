@@ -349,7 +349,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
               return (
                 <div
                   key={g.id}
-                  className={`flex min-h-[56px] w-full items-center gap-1.5 rounded-2xl border-2 pl-3 pr-2 ${
+                  className={`relative w-full rounded-2xl border-2 ${
                     on ? "border-brand bg-brand-light" : "border-ink/8 bg-paper"
                   }`}
                 >
@@ -358,7 +358,9 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                     data-group-row={g.id}
                     aria-pressed={on}
                     onClick={() => void switchTo(g.id)}
-                    className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded-xl py-2 text-left"
+                    className={`flex min-h-[56px] w-full items-center gap-2.5 rounded-2xl py-2 pl-3 text-left ${
+                      on ? "pr-[92px]" : "pr-3"
+                    }`}
                   >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand-dark shadow-soft">
                       <IconUsers size={18} />
@@ -369,14 +371,10 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                         {g.isDemo ? <Badge tone="gold">체험</Badge> : null}
                       </span>
                       <span className="block truncate text-[0.78rem] font-bold text-ink/45">
-                        멤버 {g.memberCount}명 · 번호 {g.id}
+                        {on ? `보는 중 · 번호 ${g.id}` : `멤버 ${g.memberCount}명 · 번호 ${g.id}`}
                       </span>
                     </span>
-                    {on ? (
-                      <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[0.68rem] font-black text-brand-dark shadow-soft">
-                        보는 중
-                      </span>
-                    ) : (
+                    {on ? null : (
                       <span className="shrink-0 text-[0.8rem] font-extrabold text-brand-dark">전환 ›</span>
                     )}
                   </button>
@@ -387,7 +385,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                       data-group-row-invite={g.id}
                       onClick={() => setSheet("invite")}
                       aria-label={`${g.name}에 초대하기`}
-                      className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-full bg-sun px-2.5 text-[0.8rem] font-black text-ink shadow-sun active:bg-sun-dark"
+                      className="absolute right-2 top-1/2 flex min-h-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-sun px-3 text-[0.84rem] font-black text-ink shadow-sun active:bg-sun-dark"
                     >
                       💌 초대
                     </button>

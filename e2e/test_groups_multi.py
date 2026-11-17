@@ -78,7 +78,12 @@ def make_group(page, name):
         arg=name,
         timeout=20000,
     )
-    page.wait_for_timeout(900)
+    # 만든 직후에는 초대 시트가 스스로 열린다(2026-11-17 개선) — 다음 동작을 가로막지 않게 닫는다
+    page.wait_for_timeout(500)
+    if page.locator("[data-group-invite-sheet]").count():
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(600)
+    page.wait_for_timeout(400)
 
 
 def main():
