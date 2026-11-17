@@ -274,13 +274,12 @@ def main():
             kb = kakao.bounding_box()
             check(kb["height"] >= 64, "카카오톡 보내기 버튼이 가장 크다(64px+)", f"{kb['height']}px")
             check("카카오톡으로 바로 보내기" in kakao.inner_text(), "1번 버튼 이름", kakao.inner_text())
-            check(page.locator("[data-share-copy]").count() == 0, "보조 버튼은 처음엔 접혀 있다")
+            check(page.get_by_text("다른 방법으로 보내기").count() == 0, "‘다른 방법으로 보내기’ 삭제됨")
+            check(page.locator("[data-share-more]").count() == 0, "접이식 보조 버튼 없음")
+            close_btn = page.locator("[data-share-close] button").first
+            check(close_btn.is_visible(), "공유 시트 아래 큰 닫기 버튼")
+            check(close_btn.bounding_box()["height"] >= 52, "닫기 버튼 높이 52px 이상", f"{close_btn.bounding_box()['height']}px")
             page.screenshot(path=f"{TMP}/share_sheet.png")
-            page.get_by_role("button", name="다른 방법으로 보내기").click()
-            page.wait_for_timeout(900)
-            check(page.locator("[data-share-copy]").count() == 1, "‘다른 방법으로 보내기’를 누르면 보조 버튼이 나온다")
-            check(page.locator("[data-share-device]").count() == 1, "휴대폰 공유 버튼 있음")
-            page.screenshot(path=f"{TMP}/share_sheet_open.png")
 
             # ---------- 9) 오류 ----------
             real_errors = [

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { GUIDES, type Guide } from "@/lib/guides";
 import { useApp } from "@/lib/storage";
 import { Badge, BigButton, Card, PillTabs, Portal, ProgressDots, SectionTitle, Sheet } from "./ui";
-import { IconBulb, IconCamera, IconChevron, IconMinus, IconPlus, IconSun, IconTools } from "./icons";
+import { IconBulb, IconCamera, IconChevron, IconClose, IconMinus, IconPlus, IconSun, IconTools } from "./icons";
 
 type Segment = "magnifier" | "flash" | "guide";
 
@@ -344,22 +344,33 @@ function FlashOverlay({ onClose }: { onClose: () => void }) {
 
   return (
     <Portal>
-      <button
-        onClick={onClose}
-        className="fixed inset-0 z-[95] flex flex-col items-center justify-center gap-4 bg-white px-6 text-center"
-        aria-label="화면 밝게 보기 끄기"
-      >
-        <span className="floaty grid h-24 w-24 place-items-center rounded-full bg-sun-light text-[#F5B82E]">
-          <IconSun size={56} />
-        </span>
-        <p className="text-[1.15rem] font-black text-ink">화면을 가장 밝게 켰어요</p>
-        <p className="text-[0.96rem] font-semibold leading-relaxed text-ink/60">
-          글씨나 물건을 비춰 보세요.
-          <br />
-          화면을 한 번 누르면 꺼져요.
-        </p>
-        <div className="mt-4 h-20 w-20 rounded-full border-4 border-ink/12" />
-      </button>
+      <div className="fixed inset-0 z-[95] bg-white">
+        <button
+          onClick={onClose}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white px-6 text-center"
+          aria-label="화면 밝게 보기 끄기"
+        >
+          <span className="floaty grid h-24 w-24 place-items-center rounded-full bg-sun-light text-[#F5B82E]">
+            <IconSun size={56} />
+          </span>
+          <p className="text-[1.15rem] font-black text-ink">화면을 가장 밝게 켰어요</p>
+          <p className="text-[0.96rem] font-semibold leading-relaxed text-ink/60">
+            글씨나 물건을 비춰 보세요.
+            <br />
+            화면을 한 번 누르면 꺼져요.
+          </p>
+          <div className="mt-4 h-20 w-20 rounded-full border-4 border-ink/12" />
+        </button>
+        {/* 화면 어디를 눌러도 꺼지지만, 눈에 보이는 ‘✕ 닫기’도 함께 둔다 */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="닫기"
+          className="absolute right-3 top-[calc(env(safe-area-inset-top,0px)+12px)] flex min-h-[48px] items-center gap-1.5 rounded-full border-2 border-ink/12 bg-white px-4 text-[0.95rem] font-extrabold text-ink/70 shadow-soft active:bg-paper"
+        >
+          <IconClose size={20} /> 닫기
+        </button>
+      </div>
     </Portal>
   );
 }

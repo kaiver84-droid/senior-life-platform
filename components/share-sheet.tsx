@@ -4,17 +4,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ShareCardInput, ShareCardKind } from "@/lib/canvas";
 import { renderShareCard } from "@/lib/canvas";
 import {
-  copyText,
   isKakaoInAppBrowser,
   kakaoConfig,
-  saveImage,
   shareOutcomeMessage,
-  shareViaDevice,
   smartShare,
   type ShareReason,
 } from "@/lib/share";
 import { Badge, BigButton, Sheet, useToast } from "./ui";
-import { IconChevron, IconDownload, IconShare } from "./icons";
+import { IconClose } from "./icons";
 
 export type ShareSheetData = {
   /** 공유 카드 종류 — 색과 장식이 달라진다 */
@@ -44,19 +41,19 @@ export type ShareSheetData = {
 function hintFor(reason: ShareReason, outcomeKind: string): string {
   if (outcomeKind === "kakao") return "카카오톡이 열렸어요. 보낼 사람(단톡방)을 골라 주세요.";
   if (outcomeKind === "share") return "휴대폰 공유창이 열렸어요. 목록에서 카카오톡을 골라 주세요.";
-  if (outcomeKind === "saved") return "이미지를 저장하고 글을 복사했어요. 카카오톡 대화창에 붙여넣어 보내세요.";
+  if (outcomeKind === "saved") return "카드 사진과 글을 준비했어요. 카카오톡 대화창에서 붙여넣어 보내 주세요.";
   if (outcomeKind === "copied") return "링크와 글을 복사했어요. 카카오톡 대화창에 붙여넣어 보내세요.";
   switch (reason) {
     case "domain_not_registered":
-      return "카카오톡 공유 카드가 이 주소에서 아직 열리지 않아요. 아래 ‘다른 방법으로 보내기’를 누르면 카카오톡에 그대로 보낼 수 있어요.";
+      return "카카오톡 공유 카드가 이 주소에서는 아직 열리지 않아요. 아래 버튼을 누르면 사진·글을 준비해 드려요.";
     case "sdk_absent":
-      return "카카오톡 공유 카드가 아직 준비되지 않아 공유창으로 보내요. ‘다른 방법으로 보내기’에서 ‘휴대폰 공유창’을 누르면 카카오톡이 목록에 나와요.";
+      return "카카오톡 공유 카드가 준비 중이에요. 아래 버튼을 누르면 보낼 사진과 글을 대신 준비해 드려요.";
     case "inapp_browser":
-      return "카카오톡 안에서 열린 화면이라 공유창이 막힐 수 있어요. ‘이미지 저장’ 뒤 카카오톡 대화창에서 사진을 골라 보내 주세요.";
+      return "카카오톡 안에서 열린 화면이라 공유창이 막힐 수 있어요. 아래 버튼을 누르면 사진·글을 준비해 드려요.";
     case "share_absent":
-      return "이 브라우저에서는 공유창이 열리지 않아요. ‘이미지 저장’과 ‘링크 복사’로 보내 주세요.";
+      return "이 브라우저에서는 공유창이 열리지 않아요. 아래 버튼을 누르면 사진과 글을 대신 준비해 드려요.";
     default:
-      return "공유가 막혔어요. ‘이미지 저장’을 누른 뒤 카카오톡에서 사진을 골라 보내 주세요.";
+      return "공유가 막혔어요. 아래 버튼을 다시 누르면 사진과 글을 준비해 드려요.";
   }
 }
 
@@ -79,12 +76,8 @@ export function SharePreviewSheet({
 }) {
   const { show } = useToast();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const moreRef = useRef<HTMLDivElement | null>(null);
-  const [busy, setBusy] = useState<"kakao" | "device" | "save" | "copy" | null>(null);
+  const [busy, setBusy] = useState<"kakao" | null>(null);
   const [hint, setHint] = useState<string>("");
-  const [copied, setCopied] = useState(false);
-  /** 다른 방법(휴대폰 공유·이미지 저장·링크 복사)은 접어 두었다가 필요할 때만 펼친다 */
-  const [moreOpen, setMoreOpen] = useState(false);
   const inApp = typeof navigator !== "undefined" ? isKakaoInAppBrowser() : false;
 
   const card = useMemo<ShareCardInput>(
@@ -124,48 +117,9 @@ export function SharePreviewSheet({
     setBusy(null);
     setHint(hintFor(outcome.reason, outcome.kind));
     show(shareOutcomeMessage(outcome));
-  }, [busy, data, link, show]);
-
-  const runDevice = useCallback(async () => {
-    if (busy) return;
-    setBusy("device");
-    const outcome = await shareViaDevice({
-      title: data.title || data.headline,
-      text: data.text,
-      link: link(),
-      canvas: canvasRef.current ?? undefined,
-      filename: data.filename,
-    });
-    setBusy(null);
-    setHint(hintFor(outcome.reason, outcome.kind));
-    show(shareOutcomeMessage(outcome));
-  }, [busy, data, link, show]);
-
-  const runSave = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      show("카드를 아직 그리고 있어요. 잠시 뒤 다시 눌러 주세요.");
-      return;
-    }
-    const ok = saveImage(canvas, data.filename);
-    setHint(
-      ok
-        ? "이미지를 저장했어요. 사진첩에서 카카오톡으로 보낼 수 있어요."
-        : "이미지를 저장하지 못했어요. 화면을 길게 눌러 저장해 보세요."
-    );
-    show(ok ? "카드 이미지를 저장했어요." : "저장하지 못했어요. 다시 눌러 주세요.");
-  }, [data.filename, show]);
-
-  const runCopy = useCallback(async () => {
-    const ok = await copyText(`${data.text}\n${link()}`);
-    setCopied(ok);
-    setHint(
-      ok
-        ? "링크와 글을 복사했어요. 카카오톡 대화창에 붙여넣어 보내세요."
-        : "복사하지 못했어요. 아래 링크를 길게 눌러 복사해 주세요."
-    );
-    show(ok ? "복사했어요!" : "복사하지 못했어요.");
-  }, [data.text, link, show]);
+    // 보내기를 누르면 안내 박스에만 머물지 않고 시트를 깔끔히 닫는다(결과는 위 토스트로 알려 준다)
+    onClose();
+  }, [busy, data, link, onClose, show]);
 
   useEffect(() => {
     if (!open) return;
@@ -244,7 +198,7 @@ export function SharePreviewSheet({
           {hint}
         </p>
 
-        {/* 보내기 — 가장 큰 1번 버튼만 눈에 들어오게 하고, 나머지는 접어 둔다 */}
+        {/* 보내기 — 이 버튼 하나만 눈에 들어오게 하고, 바로 아래에 큰 닫기 버튼 */}
         <div className="space-y-2">
           <div data-share-kakao>
             <BigButton
@@ -263,56 +217,11 @@ export function SharePreviewSheet({
             </BigButton>
           </div>
 
-          <button
-            type="button"
-            data-share-more
-            onClick={() => {
-              const next = !moreOpen;
-              setMoreOpen(next);
-              // 펼친 보조 버튼이 화면 아래로 숨어 버리지 않게 그 자리로 내려 준다
-              if (next) {
-                window.setTimeout(() => {
-                  moreRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-                }, 90);
-              }
-            }}
-            aria-expanded={moreOpen}
-            className="flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-ink/10 bg-white text-[0.95rem] font-extrabold text-ink/65"
-          >
-            {moreOpen ? "접어 두기" : "다른 방법으로 보내기"}
-            <IconChevron size={17} className={`transition ${moreOpen ? "-rotate-90" : "rotate-90"}`} />
-          </button>
-
-          {moreOpen ? (
-            <div ref={moreRef} className="fade-up space-y-2 rounded-2xl bg-white/70 p-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                <div data-share-device>
-                  <BigButton
-                    variant="white"
-                    full
-                    onClick={() => void runDevice()}
-                    disabled={busy === "device"}
-                    className="gap-1.5 !text-[0.95rem]"
-                  >
-                    <IconShare size={20} /> 휴대폰 공유
-                  </BigButton>
-                </div>
-                <div data-share-save>
-                  <BigButton variant="white" full onClick={runSave} className="gap-1.5 !text-[0.95rem]">
-                    <IconDownload size={20} /> 사진으로 저장
-                  </BigButton>
-                </div>
-              </div>
-              <button
-                type="button"
-                data-share-copy
-                onClick={() => void runCopy()}
-                className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-full border-2 border-ink/10 bg-paper text-[0.9rem] font-extrabold text-ink/70"
-              >
-                {copied ? "복사했어요!" : "링크 · 글 복사"} <IconChevron size={16} />
-              </button>
-            </div>
-          ) : null}
+          <div data-share-close>
+            <BigButton variant="white" full onClick={onClose} height={56} className="rounded-[1.1rem]">
+              <IconClose size={20} /> 닫기
+            </BigButton>
+          </div>
         </div>
 
         <div className="rounded-2xl bg-white px-3.5 py-3 shadow-soft">
@@ -320,8 +229,9 @@ export function SharePreviewSheet({
             <Badge tone="brand">TIP</Badge> 보내는 순서
           </p>
           <p className="mt-1 text-[0.8rem] font-semibold leading-relaxed text-ink/55">
-            먼저 ‘카카오톡으로 바로 보내기’를 눌러 보세요. 잘 안 되면 ‘다른 방법으로 보내기’를 열면
-            휴대폰 공유창이나 이미지 저장으로도 가족에게 그대로 전할 수 있어요.
+            ‘카카오톡으로 바로 보내기’를 누르면 카카오톡이 열려요. 보낼 사람(단톡방)을 고르면 돼요.
+            <br />
+            카카오톡이 열리지 않으면 사진과 글을 대신 준비해 드려요.
           </p>
         </div>
       </div>

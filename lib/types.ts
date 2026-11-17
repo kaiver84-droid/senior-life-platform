@@ -61,7 +61,7 @@ export type AppState = {
   lastVisit: string;
 };
 
-export type RankingScope = "region" | "zodiac" | "streak" | "national" | "group";
+export type RankingScope = "region" | "zodiac" | "streak" | "national" | "group" | "groups";
 
 export type RankingRow = {
   rank: number;
@@ -76,6 +76,32 @@ export type RankingResult = {
   scope: RankingScope;
   periodLabel: string;
   rows: RankingRow[];
+  total: number;
+  myRank: number | null;
+  myPercentile: number | null;
+  sample: boolean;
+};
+
+/** 단체(모임)끼리 겨루는 순위 한 칸 — 모임 하나가 한 줄 */
+export type GroupRankingRow = {
+  id: string;
+  rank: number;
+  name: string;
+  memberCount: number;
+  /** 오늘 출석한 모임원 비율(%) */
+  attendance: number;
+  /** 이번 주 모임 합산 점수 */
+  points: number;
+  /** 모임원 1인당 평균 점수 */
+  average: number;
+  isMine: boolean;
+};
+
+export type GroupRankingResult = {
+  weekId: string;
+  scope: "groups";
+  periodLabel: string;
+  rows: GroupRankingRow[];
   total: number;
   myRank: number | null;
   myPercentile: number | null;

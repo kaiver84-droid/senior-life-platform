@@ -202,26 +202,25 @@ def main():
         card.screenshot(path=f"{SHOT}/neulbom_health_challenge.png")
         check(os.path.exists(f"{SHOT}/neulbom_health_challenge.png"), "건강 챌린지 스크린샷 저장")
 
-        page.get_by_role("button", name="건강 기록 자랑하기").click()
+        check(page.get_by_role("button", name="건강 기록 자랑하기").count() == 0, "건강 기록 자랑하기 버튼 삭제됨")
+        check(page.locator("[data-health-item]").count() == 5, "건강 챌린지 도장 5종 유지")
+        nav_button(page, "홈").click()
+        page.wait_for_timeout(800)
+        page.get_by_role("button", name="카카오톡으로 보내기").first.click()
         page.wait_for_selector("[data-share-sheet]", timeout=20000)
         page.wait_for_timeout(1300)
         check(page.locator("[data-share-preview] canvas").count() == 1, "공유 카드 미리보기 캔버스")
         check(page.get_by_text("가족 단톡방").first.is_visible(), "카톡 단톡방 미리보기")
         page.screenshot(path=f"{SHOT}/neulbom_kakao_share_modal.png")
 
-        page.locator("[data-share-more]").click()
-        page.wait_for_timeout(350)
-        page.locator("[data-share-copy]").click()
-        page.wait_for_timeout(800)
-        check("복사" in page.locator("[data-share-hint]").inner_text(), "링크·글 복사 폴백", page.locator("[data-share-hint]").inner_text()[:40])
+        check(page.get_by_text("다른 방법으로 보내기").count() == 0, "‘다른 방법으로 보내기’ 삭제됨")
+        check(page.locator("[data-share-close] button").first.is_visible(), "공유 시트 닫기 버튼")
 
-        # 카카오 SDK 가 막힌 환경(카톡 인앱·도메인 미등록과 같은 상황) — 저장·복사로 끝나는지
+        # 카카오 SDK 가 막힌 환경(카톡 인앱·도메인 미등록과 같은 상황) — 보내기를 누르면 시트가 닫히고 안내 토스트가 뜬다
         page.locator("[data-share-kakao]").get_by_role("button").click()
-        page.wait_for_timeout(2600)
-        kakao_hint = page.locator("[data-share-hint]").inner_text()
-        check("저장" in kakao_hint or "복사" in kakao_hint, "카카오 불가 시 저장·복사 안전장치", kakao_hint[:60])
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(600)
+        page.wait_for_timeout(3000)
+        check(page.locator("[data-share-sheet]").count() == 0, "보내기 누르면 공유 시트가 닫힌다")
+        page.wait_for_timeout(400)
 
         # ---------- 4) 퀴즈: OX · 넌센스 ----------
         nav_button(page, "퀴즈").click()

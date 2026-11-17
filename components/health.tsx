@@ -1,20 +1,17 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useApp } from "@/lib/storage";
 import { useGroup } from "@/lib/group-store";
-import { siteOrigin } from "@/lib/groups";
 import {
   HEALTH_CHALLENGES,
   HEALTH_TOTAL,
   buildGroupHealth,
   healthOf,
 } from "@/lib/health";
-import { koreanDate } from "@/lib/week";
-import { BigButton, useToast } from "./ui";
+import { useToast } from "./ui";
 import { Icon3D, type Icon3DName } from "./art";
-import { IconChevron, IconShare, IconStamp } from "./icons";
-import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
+import { IconStamp } from "./icons";
 
 /** 챌린지 항목별 3D 클레이 아이콘 — 이모지 대신 쓴다 */
 const HEALTH_ICON: Record<string, Icon3DName> = {
@@ -33,7 +30,6 @@ export function HealthChallengeCard({ where = "home" }: { where?: "home" | "grou
   const { profile, today, state, healthToday, toggleHealth } = useApp();
   const { detail, active } = useGroup();
   const { show } = useToast();
-  const [shareOpen, setShareOpen] = useState(false);
 
   const done = healthToday.length;
   const percent = Math.round((done / HEALTH_TOTAL) * 100);
@@ -48,41 +44,6 @@ export function HealthChallengeCard({ where = "home" }: { where?: "home" | "grou
   const toggle = (id: string, title: string, doneText: string) => {
     const on = toggleHealth(id);
     show(on ? `✅ ${doneText}` : `${title} 도장을 잠시 풀었어요.`);
-  };
-
-  const shareData: ShareSheetData = {
-    kind: "health",
-    badge: "오늘의 건강 챌린지",
-    emoji: done === HEALTH_TOTAL ? "🎉" : "🌿",
-    headline:
-      done === HEALTH_TOTAL
-        ? `${profile?.nickname || "가족"} 님, 오늘 건강 챌린지 완성!`
-        : `${profile?.nickname || "가족"} 님, 오늘 ${done}/${HEALTH_TOTAL} 실천 중`,
-    sub:
-      done === HEALTH_TOTAL
-        ? "물·걷기·스트레칭·약·안부까지, 오늘 하루를 잘 챙기셨어요."
-        : "작은 실천이 쌓여 건강한 한 달이 돼요.",
-    message: active ? `${active.name}에서 ${group.joined}/${group.memberCount}명이 함께하고 있어요.` : undefined,
-    stats: active
-      ? [
-          { value: `${done}/${HEALTH_TOTAL}`, label: "내 실천" },
-          { value: `${group.joined}명`, label: "모임 참여" },
-          { value: `${group.rate}%`, label: "모임 달성률" },
-        ]
-      : [{ value: `${done}/${HEALTH_TOTAL}`, label: "오늘의 실천" }],
-    name: profile?.nickname,
-    dateLabel: koreanDate(today),
-    title: `${profile?.nickname || "가족"} 님의 오늘 건강 챌린지 ${done}/${HEALTH_TOTAL}`,
-    description: "물 마시기·15분 걷기·스트레칭·복약·가족 안부 — 늘봄에서 함께 챙겨요.",
-    buttonTitle: "나도 오늘부터",
-    text:
-      done === HEALTH_TOTAL
-        ? `오늘 건강 챌린지 5개 모두 완료했어요! 💪 (늘봄)`
-        : `오늘 건강 챌린지 ${done}/${HEALTH_TOTAL} 실천 중이에요. 함께해요! (늘봄)`,
-    link: siteOrigin(),
-    filename: `건강챌린지_${profile?.nickname || "늘봄"}_${today}.png`,
-    sheetTitle: "건강 챌린지 자랑하기",
-    sheetSubtitle: "가족 단톡방에 오늘의 실천을 알려 보세요",
   };
 
   return (
@@ -188,24 +149,12 @@ export function HealthChallengeCard({ where = "home" }: { where?: "home" | "grou
           </div>
         ) : null}
 
-        <div className={where === "home" ? "mt-3 grid grid-cols-1" : "mt-3 grid grid-cols-2 gap-2"}>
-          <BigButton variant="leaf" full onClick={() => setShareOpen(true)}>
-            <IconShare size={20} /> 건강 기록 자랑하기
-          </BigButton>
-          {where === "group" ? (
-            <BigButton variant="white" full onClick={() => setShareOpen(true)}>
-              모임에 알리기 <IconChevron size={18} />
-            </BigButton>
-          ) : null}
-        </div>
         {where === "home" ? (
-          <p className="mt-1.5 text-center text-[0.76rem] font-medium text-ink/40">
+          <p className="mt-3 text-center text-[0.76rem] font-medium text-ink/40">
             체크한 도장은 이 기기와 늘봄에 함께 저장돼요
           </p>
         ) : null}
       </section>
-
-      <SharePreviewSheet open={shareOpen} onClose={() => setShareOpen(false)} data={shareData} />
     </>
   );
 }

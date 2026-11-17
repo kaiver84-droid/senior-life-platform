@@ -1,4 +1,4 @@
-import type { RankingResult, RankingScope } from "./types";
+import type { GroupRankingResult, GroupRankingRow, RankingResult, RankingScope } from "./types";
 import { periodLabel, weekIdOf } from "./week";
 
 const SURNAMES = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "전", "홍"];
@@ -106,9 +106,103 @@ export function buildRanking(input: RankingInput): RankingResult {
 }
 
 export function scopeLabel(scope: RankingScope, sido?: string, sigungu?: string): string {
+  if (scope === "groups") return "단체별";
   if (scope === "group") return "우리 모임";
   if (scope === "national") return "전국";
   if (scope === "region") return `${sigungu || sido || "우리 동네"}`;
   if (scope === "zodiac") return "같은 띠·나이";
   return "개근상";
+}
+
+/* ------------------------------------------------------------------ */
+/* 단체(모임)별 순위                                                   */
+/* ------------------------------------------------------------------ */
+
+/** 실제 모임 데이터가 부족할 때 순위표를 채우는 동네·가족 모임 예시 */
+const GROUP_SAMPLES: { id: string; name: string; memberCount: number; base: number }[] = [
+  { id: "GROUP-S1", name: "우리 가족 사랑방", memberCount: 10, base: 74 },
+  { id: "GROUP-S2", name: "옥천 효도회", memberCount: 18, base: 71 },
+  { id: "GROUP-S3", name: "청주 시니어 배움터", memberCount: 24, base: 68 },
+  { id: "GROUP-S4", name: "서울 강남 실버합창단", memberCount: 15, base: 66 },
+  { id: "GROUP-S5", name: "대전 둔산 경로당", memberCount: 12, base: 63 },
+  { id: "GROUP-S6", name: "부산 해운대 친구들", memberCount: 9, base: 61 },
+  { id: "GROUP-S7", name: "광주 빛고을 모임", memberCount: 7, base: 58 },
+];
+
+export type MyGroupInput = {
+  id?: string;
+  name: string;
+  memberCount: number;
+  /** 이번 주 모임 합산 점수 */
+  points: number;
+  /** 오늘 출석한 모임원 수 */
+  attendedToday: number;
+};
+
+/**
+ * 모임 vs 모임 순위.
+ * - 서버가 실제 모임 합산 점수를 주면(myGroups) 그것을 먼저 넣고, 빈자리는 예시 모임으로 채운다.
+ * - 주차로만 값이 정해져 새로 고쳐도 같은 순위가 나온다.
+ */
+export function buildGroupRanking(input: {
+  weekId?: string;
+  myGroups?: MyGroupInput[];
+  totalMembers?: number;
+}): GroupRankingResult {
+  const weekId = input.weekId || weekIdOf();
+  const rnd = mulberry32(hashStr(`${weekId}|groups`));
+
+  const rows: Omit<GroupRankingRow, "rank">[] = [];
+
+  (input.myGroups || []).forEach((g, i) => {
+    const memberCount = Math.max(1, Math.round(g.memberCount));
+    const points = Math.max(0, Math.round(g.points));
+    rows.push({
+      id: g.id || `MINE-${i}`,
+      name: g.name,
+      memberCount,
+      attendance: Math.max(0, Math.min(100, Math.round((g.attendedToday / memberCount) * 100))),
+      points,
+      average: Math.round(points / memberCount),
+      isMine: true,
+    });
+  });
+
+  const used = new Set(rows.map((r) => r.name));
+  GROUP_SAMPLES.forEach((s) => {
+    if (used.has(s.name) || rows.length >= 10) return;
+    const jitter = Math.floor(rnd() * 9) - 4; // -4 ~ +4
+    const average = Math.max(30, s.base + jitter);
+    const attendance = Math.max(45, Math.min(100, 58 + Math.floor(rnd() * 40)));
+    rows.push({
+      id: s.id,
+      name: s.name,
+      memberCount: s.memberCount,
+      attendance,
+      points: average * s.memberCount,
+      average,
+      isMine: false,
+    });
+  });
+
+  rows.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.average !== a.average) return b.average - a.average;
+    return b.attendance - a.attendance;
+  });
+
+  const total = input.totalMembers && input.totalMembers > rows.length ? input.totalMembers : rows.length;
+  const ranked = rows.map((r, i) => ({ ...r, rank: i + 1 }));
+  const mine = ranked.find((r) => r.isMine) ?? null;
+
+  return {
+    weekId,
+    scope: "groups",
+    periodLabel: periodLabel(),
+    rows: ranked,
+    total,
+    myRank: mine ? mine.rank : null,
+    myPercentile: mine ? Math.max(1, Math.round((mine.rank / ranked.length) * 100)) : null,
+    sample: ranked.some((r) => !r.isMine) || !mine,
+  };
 }

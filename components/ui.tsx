@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { IconClose } from "./icons";
 
 /* ---------------------------------------------------------------- */
 /* 버튼                                                              */
@@ -268,8 +269,23 @@ export function Sheet({
     <Portal>
       <div className="fixed inset-0 z-[80] flex items-end justify-center">
         <button aria-label="닫기" onClick={onClose} className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]" />
-        <div className="fade-up relative w-full max-w-[460px] rounded-t-[2rem] bg-paper px-5 pb-[calc(env(safe-area-inset-bottom,0px)+22px)] pt-3 shadow-2xl">
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-ink/15" />
+        <div className="fade-up relative w-full max-w-[460px] rounded-t-[2rem] bg-paper px-5 pb-[calc(env(safe-area-inset-bottom,0px)+22px)] pt-2 shadow-2xl">
+          {/* 손잡이(드래그 바) + 늘 보이는 ‘✕ 닫기’ — 어느 시트든 같은 자리에서 닫을 수 있다 */}
+          <div className="mb-1.5 flex min-h-[44px] items-center justify-end">
+            <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
+              <div className="h-1.5 w-12 rounded-full bg-ink/15" />
+            </div>
+            <button
+              type="button"
+              data-sheet-close
+              onClick={onClose}
+              aria-label="닫기"
+              className="relative flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1 rounded-full border-2 border-ink/12 bg-white px-3.5 text-[0.94rem] font-extrabold text-ink/70 shadow-soft active:bg-paper"
+            >
+              <IconClose size={18} />
+              닫기
+            </button>
+          </div>
           {title ? (
             <div className="mb-3 text-center">
               <h3 className="text-[1.2rem] font-black leading-snug">{title}</h3>

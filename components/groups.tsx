@@ -258,11 +258,19 @@ export function GroupMissionBanner({ onJoin }: { onJoin: () => void }) {
 /* ------------------------------------------------------------------ */
 
 export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { active, detail, groups, addPost, cheer, leave, join, todayDone, online } = useGroup();
+  const { active, activeId, detail, groups, addPost, cheer, leave, join, select, todayDone, online } =
+    useGroup();
   const { show } = useToast();
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+
+  /** 모임 전환 — 이미 보던 모임이면 그대로, 아니면 서버에서 그 모임 자료를 불러온다 */
+  const switchTo = async (id: string) => {
+    if (id === activeId) return;
+    await select(id);
+    show("모임을 바꿨어요.");
+  };
 
   const members = detail?.members ?? [];
   const posts = detail?.posts ?? [];
@@ -314,6 +322,61 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
         </div>
       </section>
 
+      {/* 내 모임 — 여러 모임을 한눈에 보고 원터치로 전환 + 새 모임 추가 */}
+      {groups.length > 0 ? (
+        <div data-group-switcher>
+        <Card className="fade-up p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[0.94rem] font-black text-ink">내 모임 {groups.length}개</p>
+            <p className="text-[0.76rem] font-bold text-ink/40">눌러서 바로 전환</p>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {groups.map((g) => {
+              const on = g.id === activeId;
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  data-group-row={g.id}
+                  aria-pressed={on}
+                  onClick={() => void switchTo(g.id)}
+                  className={`flex min-h-[56px] w-full items-center gap-2.5 rounded-2xl border-2 px-3 py-2 text-left ${
+                    on ? "border-brand bg-brand-light" : "border-ink/8 bg-paper active:bg-white"
+                  }`}
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand-dark shadow-soft">
+                    <IconUsers size={18} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-[0.98rem] font-black text-ink">{g.name}</span>
+                      {g.isDemo ? <Badge tone="gold">체험</Badge> : null}
+                    </span>
+                    <span className="block truncate text-[0.78rem] font-bold text-ink/45">
+                      멤버 {g.memberCount}명 · 번호 {g.id}
+                    </span>
+                  </span>
+                  {on ? (
+                    <Badge tone="brand">보는 중</Badge>
+                  ) : (
+                    <span className="shrink-0 text-[0.8rem] font-extrabold text-brand-dark">전환 ›</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2.5 grid grid-cols-1 gap-2" data-group-add-buttons>
+            <BigButton variant="ink" full height={54} onClick={() => setSheet("create")}>
+              <IconPlus size={20} /> + 새 모임 만들기
+            </BigButton>
+            <BigButton variant="white" full height={54} onClick={() => setSheet("join")}>
+              초대 번호로 모임 추가
+            </BigButton>
+          </div>
+        </Card>
+        </div>
+      ) : null}
+
       {/* 모임이 없을 때 — 체험 모임 · 만들기 · 초대 코드 */}
       {!detail ? (
         <Card className="fade-up p-4">
@@ -352,18 +415,13 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
         </Card>
       ) : (
         <>
-          {/* 모임 동작 */}
-          <div className="grid grid-cols-2 gap-2">
-            <BigButton variant="ink" onClick={() => setSheet("create")}>
-              <IconPlus size={20} /> 모임 만들기
-            </BigButton>
-            <BigButton variant="sun" onClick={() => setSheet("invite")}>
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
-                TALK
-              </span>
-              초대하기
-            </BigButton>
-          </div>
+          {/* 모임 동작 — 새 모임 추가는 위 ‘내 모임’ 카드에 있고, 여기서는 카톡 초대 */}
+          <BigButton variant="sun" full onClick={() => setSheet("invite")}>
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
+              TALK
+            </span>
+            카카오톡으로 우리 모임 초대하기
+          </BigButton>
 
           {/* 오늘의 건강 챌린지 — 모임원과 함께 원터치 체크인 */}
           <HealthChallengeCard where="group" />
@@ -685,19 +743,28 @@ function GroupSheet({
                         멤버 {g.memberCount}명 · 번호 {g.id}
                       </span>
                     </span>
-                    {on ? <Badge tone="brand">보는 중</Badge> : null}
+                    {on ? (
+                      <Badge tone="brand">보는 중</Badge>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-[0.78rem] font-extrabold text-brand-dark">
+                        전환
+                      </span>
+                    )}
                   </button>
                 );
               })
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <BigButton variant="ink" onClick={() => onChange("create")}>
-              <IconPlus size={20} /> 모임 만들기
+          <div className="space-y-2" data-group-add-buttons>
+            <p className="text-center text-[0.82rem] font-bold text-ink/45">
+              모임은 여러 개에 함께 들어갈 수 있어요
+            </p>
+            <BigButton variant="ink" full height={58} onClick={() => onChange("create")}>
+              <IconPlus size={21} /> + 새 모임 만들기
             </BigButton>
-            <BigButton variant="white" onClick={() => onChange("join")}>
-              번호로 들어가기
+            <BigButton variant="white" full height={58} onClick={() => onChange("join")}>
+              <IconUsers size={20} /> 초대 번호로 모임 추가
             </BigButton>
           </div>
           <BigButton variant="ghost" full onClick={() => onChange("join")}>

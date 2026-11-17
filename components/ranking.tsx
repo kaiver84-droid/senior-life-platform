@@ -1,17 +1,24 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { buildRanking } from "@/lib/rankings";
-import type { RankingResult, RankingScope, RankingRow } from "@/lib/types";
+import { buildGroupRanking, buildRanking } from "@/lib/rankings";
+import type {
+  GroupRankingResult,
+  GroupRankingRow,
+  RankingResult,
+  RankingScope,
+  RankingRow,
+} from "@/lib/types";
 import { periodLabel, resetCountdown, weekIdOf } from "@/lib/week";
 import { useApp } from "@/lib/storage";
 import { useGroup } from "@/lib/group-store";
-import { Badge, BigButton, Card, PillTabs, SectionTitle } from "./ui";
+import { Badge, BigButton, Card, SectionTitle } from "./ui";
 import { IconChevron, IconCrown, IconQuiz, IconSparkle, IconTrophy, IconUsers } from "./icons";
 import { GroupRankingBanner } from "./groups";
 
 const TABS: { key: RankingScope; label: string; emoji: string; desc: string }[] = [
   { key: "group", label: "우리 모임", emoji: "👥", desc: "가족·친구와 함께 겨루는 순위" },
+  { key: "groups", label: "단체별", emoji: "🏆", desc: "모임끼리 겨루는 순위 — 우리 모임은 어디쯤일까요" },
   { key: "national", label: "전국", emoji: "🇰🇷", desc: "전국 어르신 순위" },
   { key: "region", label: "지역별", emoji: "🏘️", desc: "같은 시·군·구 어르신" },
   { key: "streak", label: "개근왕", emoji: "📅", desc: "연속 출석 일수" },
@@ -39,7 +46,7 @@ function useRanking(scope: RankingScope) {
   );
 
   useEffect(() => {
-    if (scope === "group") {
+    if (scope === "group" || scope === "groups") {
       setLoading(false);
       return;
     }
@@ -276,6 +283,263 @@ function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void 
 }
 
 /* ---------------------------------------------------------------- */
+/* 단체별 순위 (모임 vs 모임)                                          */
+/* ---------------------------------------------------------------- */
+
+function useGroupRanking() {
+  const { code, weekId } = useApp();
+  const { active, detail } = useGroup();
+
+  const fallback = useMemo<GroupRankingResult>(() => {
+    const mine =
+      active && detail
+        ? [
+            {
+              id: active.id,
+              name: active.name,
+              memberCount: detail.memberCount,
+              points: detail.members.reduce((sum, m) => sum + (m.points || 0), 0),
+              attendedToday: detail.todayAttended,
+            },
+          ]
+        : [];
+    return buildGroupRanking({ weekId, myGroups: mine });
+  }, [active, detail, weekId]);
+
+  const [data, setData] = useState<GroupRankingResult | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    const params = new URLSearchParams({ scope: "groups", weekId, code });
+    setLoading(true);
+    fetch(`/api/rankings?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad"))))
+      .then((j) => {
+        if (!alive) return;
+        if (j?.ok && Array.isArray(j.rows)) setData(j as GroupRankingResult);
+        else setData(fallback);
+      })
+      .catch(() => {
+        if (alive) setData(fallback);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [weekId, code, fallback]);
+
+  return { view: data ?? fallback, loading };
+}
+
+function GroupPodium({ rows }: { rows: GroupRankingRow[] }) {
+  const Column = ({
+    row,
+    place,
+    height,
+    bar,
+    avatar,
+  }: {
+    row?: GroupRankingRow;
+    place: number;
+    height: number;
+    bar: string;
+    avatar: string;
+  }) => (
+    <div className="flex min-w-0 flex-1 flex-col items-center">
+      <div className="relative mb-1 flex h-[32px] items-end justify-center">
+        {place === 1 ? <span className="text-[1.6rem] leading-none drop-shadow">👑</span> : null}
+      </div>
+      <div
+        className={`grid place-items-center rounded-full text-[1.05rem] font-black text-white shadow-soft ${
+          place === 1 ? "h-[56px] w-[56px] ring-4 ring-gold/60" : "h-[46px] w-[46px]"
+        } ${avatar}`}
+      >
+        {row ? row.name.slice(0, 1) : "?"}
+      </div>
+      <p
+        className={`mt-1.5 w-full truncate text-center ${
+          place === 1 ? "text-[0.9rem]" : "text-[0.84rem]"
+        } font-black text-ink`}
+      >
+        {row ? row.name : "-"}
+      </p>
+      <p className="w-full truncate text-center text-[0.72rem] font-bold text-ink/45">
+        {row ? `${row.memberCount}명 · 출석 ${row.attendance}%` : ""}
+      </p>
+      <p className={`tabular text-center text-[0.8rem] font-extrabold ${place === 1 ? "text-gold-dark" : "text-ink/55"}`}>
+        {row ? `평균 ${row.average}점` : ""}
+      </p>
+      <div
+        className={`mt-1.5 w-full rounded-t-[0.9rem] ${bar} ${place === 1 ? "podium-rise" : ""}`}
+        style={{ height }}
+      >
+        <p className="pt-2 text-center text-[0.95rem] font-black text-white/95">{place}위</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex items-end gap-1.5">
+      <Column row={rows[1]} place={2} height={62} bar="bg-[#9FB3C8]" avatar="bg-[#9FB3C8]" />
+      <Column
+        row={rows[0]}
+        place={1}
+        height={92}
+        bar="bg-gradient-to-b from-gold to-[#E9AE20]"
+        avatar="bg-gradient-to-br from-[#F7C346] to-[#E09A12]"
+      />
+      <Column row={rows[2]} place={3} height={46} bar="bg-[#D8A583]" avatar="bg-[#D8A583]" />
+    </div>
+  );
+}
+
+function GroupsBoard({
+  onNavigate,
+  loading,
+}: {
+  onNavigate?: (tab: string) => void;
+  loading: boolean;
+}) {
+  const { view } = useGroupRanking();
+  const rows = view.rows;
+  const mine = rows.find((r) => r.isMine) ?? null;
+  const rest = rows.slice(3);
+
+  return (
+    <div className="space-y-3" data-group-rank>
+      <div className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card">
+        <div className="mb-1 flex items-center justify-center gap-1.5 text-[0.8rem] font-extrabold text-gold-dark">
+          <IconTrophy size={16} /> {periodLabel()} 단체 명예의 전당
+        </div>
+        <GroupPodium rows={rows} />
+        <div className="mt-3 rounded-2xl bg-gradient-to-r from-plum to-[#5B4FA8] px-3.5 py-2.5 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-[0.9rem] font-black text-white">
+            <IconSparkle size={16} className="text-[#FFE28A]" />
+            {rows[0] ? `${rows[0].name}, 이번 주 1위예요!` : "이번 주 1위를 기다리고 있어요"}
+          </p>
+        </div>
+      </div>
+
+      {mine ? (
+        <div data-my-group-rank>
+        <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[0.8rem] font-bold text-ink/50">내 모임 순위</p>
+              <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
+                {mine.rank}
+                <span className="text-[0.92rem] font-extrabold text-ink/45">위 / {rows.length}개 모임</span>
+              </p>
+            </div>
+            <div className="min-w-0 text-right">
+              <p className="truncate text-[0.86rem] font-black text-ink">{mine.name}</p>
+              <p className="tabular text-[0.86rem] font-extrabold text-brand-dark">
+                평균 {mine.average}점 · 총 {mine.points}점
+              </p>
+              <p className="text-[0.8rem] font-extrabold text-leaf-dark">
+                {mine.memberCount}명 · 오늘 출석 {mine.attendance}%
+              </p>
+            </div>
+          </div>
+        </Card>
+        </div>
+      ) : (
+        <Card className="p-4 text-center">
+          <p className="text-[0.98rem] font-black text-ink">아직 모임이 없어요</p>
+          <p className="mt-1 text-[0.88rem] font-semibold leading-relaxed text-ink/55">
+            모임에 들어가면 우리 모임도 단체 순위에 나와요.
+          </p>
+          <div className="mt-2.5">
+            <BigButton variant="ink" full onClick={() => onNavigate?.("group")}>
+              <IconUsers size={20} /> 우리 모임 시작하기
+            </BigButton>
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-3.5">
+        <div className="mb-1.5 flex items-center justify-between">
+          <p className="text-[0.86rem] font-black text-ink/60">4위 ~ {rows.length}위</p>
+          <p className="text-[0.76rem] font-bold text-ink/35">이번 주 점수</p>
+        </div>
+        <div className="space-y-1">
+          {rest.map((r) => (
+            <div
+              key={r.id}
+              className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${r.isMine ? "bg-brand-light" : ""}`}
+            >
+              <span className="w-6 shrink-0 text-center text-[0.92rem] font-black text-ink/45">{r.rank}</span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1">
+                  <span
+                    className={`truncate text-[0.94rem] ${r.isMine ? "font-black text-brand-deep" : "font-bold text-ink/85"}`}
+                  >
+                    {r.name}
+                  </span>
+                  {r.isMine ? <Badge tone="brand">내 모임</Badge> : null}
+                </span>
+                <span className="block text-[0.76rem] font-bold text-ink/45">
+                  {r.memberCount}명 · 출석 {r.attendance}%
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block tabular text-[0.9rem] font-black text-ink/75">평균 {r.average}점</span>
+                <span className="block text-[0.72rem] font-bold text-ink/40">총 {r.points}점</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
+        모임원 점수를 모두 더해 겨루고, 인원이 달라도 공평하게 보이도록 평균 점수도 함께 보여 드려요.
+        {loading ? " 순위를 불러오는 중…" : ""}
+        {view.sample ? " 이름 뒤에 ‘예시’ 모임이 함께 있어요. 실제 모임이 늘면 그대로 채워집니다." : ""}
+      </p>
+    </div>
+  );
+}
+
+/** 랭킹 종류 탭 — 작은 화면에서도 글씨가 잘리지 않게 3열 · 2열 큰 버튼으로 나눈다 */
+function RankingTabs({ value, onChange }: { value: RankingScope; onChange: (v: RankingScope) => void }) {
+  const rows = [TABS.slice(0, 3), TABS.slice(3)];
+  return (
+    <div className="space-y-2" role="tablist" aria-label="랭킹 종류">
+      {rows.map((group, rowIndex) => (
+        <div
+          key={rowIndex}
+          className={`grid gap-2 ${group.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
+        >
+          {group.map((t) => {
+            const on = t.key === value;
+            return (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={on}
+                data-rank-tab={t.key}
+                onClick={() => onChange(t.key)}
+                className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[0.94rem] font-extrabold transition ${
+                  on ? "bg-ink text-white shadow-cta" : "bg-white text-ink/60 shadow-soft active:bg-paper"
+                }`}
+              >
+                <span aria-hidden className="text-[1.02rem] leading-none">
+                  {t.emoji}
+                </span>
+                <span className="whitespace-nowrap leading-tight">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
 /* 랭킹 보드 (탭 포함)                                                */
 /* ---------------------------------------------------------------- */
 
@@ -297,11 +561,13 @@ export function RankingBoard({
 
   return (
     <div className="space-y-3">
-      <PillTabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} value={scope} onChange={setScope} />
+      <RankingTabs value={scope} onChange={setScope} />
       <p className="text-center text-[0.8rem] font-semibold text-ink/45">{tab.desc}</p>
 
       {scope === "group" ? (
         <GroupRankingBoard onNavigate={onNavigate} />
+      ) : scope === "groups" ? (
+        <GroupsBoard onNavigate={onNavigate} loading={loading} />
       ) : (
         <>
           {/* 시상대 */}
@@ -389,7 +655,7 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
       <Card className="flex items-center justify-between gap-2 p-4">
         <div className="min-w-0 flex-1">
           <p className="text-[0.98rem] font-black leading-snug text-ink">우리 모임과 이웃 순위가 궁금하세요?</p>
-          <p className="mt-0.5 text-[0.85rem] font-semibold text-ink/55">우리 모임 · 전국 · 지역별 · 개근왕</p>
+          <p className="mt-0.5 text-[0.85rem] font-semibold text-ink/55">우리 모임 · 단체별 · 전국 · 지역별 · 개근왕</p>
         </div>
         <button
           onClick={() => onNavigate?.("ranking")}
