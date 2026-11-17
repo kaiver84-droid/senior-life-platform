@@ -367,7 +367,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
           </div>
           <div className="mt-2.5 grid grid-cols-1 gap-2" data-group-add-buttons>
             <BigButton variant="ink" full height={54} onClick={() => setSheet("create")}>
-              <IconPlus size={20} /> + 새 모임 만들기
+              <span className="text-[1.2rem] font-black leading-none">+</span> 새 모임 만들기
             </BigButton>
             <BigButton variant="white" full height={54} onClick={() => setSheet("join")}>
               초대 번호로 모임 추가
@@ -761,7 +761,7 @@ function GroupSheet({
               모임은 여러 개에 함께 들어갈 수 있어요
             </p>
             <BigButton variant="ink" full height={58} onClick={() => onChange("create")}>
-              <IconPlus size={21} /> + 새 모임 만들기
+              <span className="text-[1.25rem] font-black leading-none">+</span> 새 모임 만들기
             </BigButton>
             <BigButton variant="white" full height={58} onClick={() => onChange("join")}>
               <IconUsers size={20} /> 초대 번호로 모임 추가

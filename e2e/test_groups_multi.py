@@ -48,7 +48,13 @@ def make_group(page, name):
     page.wait_for_selector("#group-name", timeout=15000)
     page.locator("#group-name").fill(name)
     page.get_by_role("button", name=re.compile("^모임 만들기$")).last.click()
-    page.wait_for_timeout(2500)
+    # 서버 저장이 끝나 목록에 새 모임이 뜰 때까지 기다린다(라이브는 왕복이 조금 느리다)
+    page.wait_for_function(
+        "(n) => !!document.querySelector('[data-group-switcher]') && document.querySelector('[data-group-switcher]').innerText.includes(n)",
+        arg=name,
+        timeout=20000,
+    )
+    page.wait_for_timeout(900)
 
 
 def main():
@@ -113,23 +119,23 @@ def main():
                 check(h >= 52, f"추가 버튼 {i + 1} 높이 52px 이상", f"{h:.0f}px")
 
             # ---------- 2) 모임 A · 모임 B 연달아 만들기 ----------
-            make_group(page, "테스트 모임 하나")
+            make_group(page, "가족 모임")
             rows_a = page.locator("[data-group-row]").count()
             check(rows_a == before + 1, "모임 A 만든 뒤 목록 +1", f"{before} → {rows_a}")
-            check("테스트 모임 하나" in page.inner_text("main"), "모임 A 로 전환됨")
+            check("가족 모임" in page.inner_text("main"), "모임 A 로 전환됨")
             check(
-                page.get_by_text("테스트 모임 하나").first.is_visible()
+                page.get_by_text("가족 모임").first.is_visible()
                 and "멤버 1명" in page.inner_text("main"),
                 "모임 A 멤버 1명",
             )
 
-            make_group(page, "테스트 모임 둘")
+            make_group(page, "친구 모임")
             rows_b = page.locator("[data-group-row]").count()
             check(rows_b == before + 2, "모임 B 만든 뒤 목록 +2", f"{before} → {rows_b}")
-            check("테스트 모임 둘" in page.inner_text("main"), "모임 B 로 전환됨")
+            check("친구 모임" in page.inner_text("main"), "모임 B 로 전환됨")
             names = page.locator("[data-group-switcher]").inner_text()
             check(
-                "테스트 모임 하나" in names and "테스트 모임 둘" in names,
+                "가족 모임" in names and "친구 모임" in names,
                 "한 화면에 여러 모임이 함께 보임",
             )
             check(page.get_by_text("전환 ›").count() >= 1, "다른 모임에 ‘전환’ 표시")
@@ -142,10 +148,10 @@ def main():
             page.get_by_role("button", name="남기기").click()
             page.wait_for_timeout(1800)
 
-            page.locator("[data-group-row]", has_text="테스트 모임 하나").first.click()
+            page.locator("[data-group-row]", has_text="가족 모임").first.click()
             page.wait_for_timeout(2500)
             a_text = page.inner_text("main")
-            check("테스트 모임 하나" in a_text, "모임 A 로 전환")
+            check("가족 모임" in a_text, "모임 A 로 전환")
             check("B 모임에 남긴 안부" not in a_text, "모임 B 게시글은 모임 A 에 안 보임")
             check("오늘 출석 현황" in a_text and "이번 주 모임 달성률" in a_text, "모임 A 출석·달성률 표시")
 
@@ -153,7 +159,7 @@ def main():
             page.get_by_role("button", name="남기기").click()
             page.wait_for_timeout(1800)
 
-            page.locator("[data-group-row]", has_text="테스트 모임 둘").first.click()
+            page.locator("[data-group-row]", has_text="친구 모임").first.click()
             page.wait_for_timeout(2500)
             b_text = page.inner_text("main")
             check("A 모임에 남긴 안부" not in b_text, "모임 A 게시글은 모임 B 에 안 보임")
@@ -166,7 +172,7 @@ def main():
             page.wait_for_selector("text=보고 싶은 모임을 골라 주세요", timeout=15000)
             page.wait_for_timeout(600)
             sheet_text = page.inner_text("body")
-            check("테스트 모임 하나" in sheet_text and "테스트 모임 둘" in sheet_text, "홈 시트에 여러 모임")
+            check("가족 모임" in sheet_text and "친구 모임" in sheet_text, "홈 시트에 여러 모임")
             check(
                 page.get_by_role("button", name="+ 새 모임 만들기").first.is_visible(),
                 "홈 모임 시트: 새 모임 만들기 버튼",
@@ -176,9 +182,9 @@ def main():
                 "홈 모임 시트: 초대 번호로 모임 추가 버튼",
             )
             page.screenshot(path=f"{SHOT}/_home_group_sheet.png")
-            page.get_by_role("button", name=re.compile("테스트 모임 하나")).first.click()
+            page.get_by_role("button", name=re.compile("가족 모임")).first.click()
             page.wait_for_timeout(2500)
-            check("테스트 모임 하나" in page.inner_text("main"), "홈 시트에서도 한 번에 모임 전환")
+            check("가족 모임" in page.inner_text("main"), "홈 시트에서도 한 번에 모임 전환")
 
             # ---------- 5) 단체별 랭킹 ----------
             nav(page, "랭킹")
@@ -201,7 +207,7 @@ def main():
             check("평균" in board and "점" in board, "평균·총점 표시")
             check(page.locator("[data-my-group-rank]").count() == 1, "내 모임 순위 카드")
             check("내 모임" in board, "‘내 모임’ 표시")
-            check("테스트 모임" in board, "내가 만든 모임이 단체 순위에 나옴")
+            check("가족 모임" in board, "내가 만든 모임이 단체 순위에 나옴")
             # 전체 순위까지 한 장에 담기게 — 화면에 붙어 있는 위·아래 막대는 잠깐 숨기고 찍는다
             page.add_style_tag(
                 content="header{visibility:hidden!important} nav[aria-label='주요 메뉴']{visibility:hidden!important}"
