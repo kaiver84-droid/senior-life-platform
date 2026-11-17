@@ -243,7 +243,7 @@ function Shell() {
                 key={t.key}
                 onClick={() => navigate(t.key)}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex min-h-[64px] flex-col items-center justify-center gap-1 transition ${
+                className={`relative flex min-h-[72px] flex-col items-center justify-center gap-0.5 transition ${
                   active ? "text-brand-dark" : "text-ink/50"
                 }`}
               >

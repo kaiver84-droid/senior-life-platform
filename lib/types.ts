@@ -131,6 +131,8 @@ export type GroupSummary = {
   region?: string;
   isDemo: boolean;
   memberCount: number;
+  /** 정원 — 한 모임에 들어갈 수 있는 최대 인원(기본 100명) */
+  maxMembers?: number;
   /** 지금(최근 5분 안에) 접속해 있는 모임원 수 — 나 포함 */
   onlineCount?: number;
   goalScore: number;
@@ -209,6 +211,8 @@ export type GroupsPayload = {
   groups: GroupSummary[];
   activeGroupId: string | null;
   detail: GroupDetail | null;
+  /** 정원 — 한 모임에 들어갈 수 있는 최대 인원(기본 100명) */
+  maxMembers?: number;
 };
 
 export type WelfareProgram = {

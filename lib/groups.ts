@@ -2,6 +2,10 @@
 
 import type { GroupsPayload } from "./types";
 
+/** 한 모임에 들어갈 수 있는 최대 인원 — 서버(functions/api/groups.ts)와 같은 값 */
+export const GROUP_MAX_MEMBERS = 100;
+export const GROUP_FULL_MESSAGE = `이 모임은 정원(${GROUP_MAX_MEMBERS}명)이 다 찼어요. 새 모임을 만들거나 다른 모임에 들어가 주세요.`;
+
 /** 친구가 보낸 초대 링크(?group=XXXXXX)를 기억해 두는 키 */
 const INVITE_KEY = "seniorLife.pendingGroup";
 /** 친구가 보낸 초대 링크의 ?ref=<초대한 사람 id> 를 기억해 두는 키 */
@@ -184,17 +188,25 @@ export async function fetchGroups(params: {
 }
 
 /** 모임 만들기·가입·글쓰기 같은 동작. 성공하면 갱신된 목록·상세를 돌려준다 */
+export type GroupActionRejection = { ok: false; error?: string; message?: string };
+
 export async function sendGroupAction(
   body: GroupActionBody
-): Promise<(GroupsPayload & { ok: boolean; groupId?: string }) | null> {
+): Promise<(GroupsPayload & { ok: true; groupId?: string }) | GroupActionRejection | null> {
   try {
     const res = await fetch("/api/groups", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) return null;
-    const j = await res.json();
+    const j = await res.json().catch(() => null);
+    // 서버가 이유를 말해 준 거절(정원 초과 등)은 그대로 화면에 전한다 — 오프라인 저장으로 넘기지 않는다
+    if (!res.ok || !j?.ok) {
+      if (res.status >= 400 && res.status < 500 && j && (j.message || j.error)) {
+        return { ok: false, error: j.error, message: j.message };
+      }
+      return null;
+    }
     if (!j?.ok) return null;
     return {
       ok: true,

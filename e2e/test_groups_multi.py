@@ -167,8 +167,8 @@ def main():
             check("가족 모임" in page.inner_text("main"), "모임 A 로 전환됨")
             check(
                 page.get_by_text("가족 모임").first.is_visible()
-                and "멤버 1명" in page.inner_text("main"),
-                "모임 A 멤버 1명",
+                and ("멤버 1 / 100명" in page.inner_text("main") or "멤버 1명" in page.inner_text("main")),
+                "모임 A 멤버 1 / 100명",
             )
 
             make_group(page, "친구 모임")

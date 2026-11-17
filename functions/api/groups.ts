@@ -43,6 +43,10 @@ const enc = encodeURIComponent;
 
 const GROUP_COLUMNS = "id,name,description,region,goal_score,weekly_goal,creator_code,is_demo";
 
+/** 한 모임에 들어갈 수 있는 최대 인원 (체험 모임원도 한 사람으로 센다) */
+export const MAX_GROUP_MEMBERS = 100;
+export const GROUP_FULL_MESSAGE = `이 모임은 정원(${MAX_GROUP_MEMBERS}명)이 다 찼어요. 새 모임을 만들거나 다른 모임에 들어가 주세요.`;
+
 type GroupRow = {
   id: string;
   name: string;
@@ -401,6 +405,7 @@ async function buildPayload(
         region: r.region || "",
         isDemo: Boolean(r.is_demo),
         memberCount: countMap.get(r.id) || 0,
+        maxMembers: MAX_GROUP_MEMBERS,
         onlineCount: Math.max(1, onlineMap.get(r.id) || 0),
         goalScore: Number(r.goal_score) || 0,
         weeklyGoal: Number(r.weekly_goal) || 5,
@@ -422,6 +427,7 @@ async function buildPayload(
     groups,
     activeGroupId: detail?.id ?? preferred ?? null,
     detail,
+    maxMembers: MAX_GROUP_MEMBERS,
   };
 }
 
@@ -568,6 +574,23 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
         `group_members?group_id=eq.${enc(groupId)}&user_code=eq.${enc(code)}&select=user_code&limit=1`
       );
       if (!already.length) {
+        // 정원 확인 — 이미 들어 있는 사람은 그대로 두고, 새로 들어오는 사람만 막는다
+        const current = await sbGet<{ user_code: string }>(
+          env,
+          `group_members?group_id=eq.${enc(groupId)}&select=user_code`
+        );
+        if (current.length >= MAX_GROUP_MEMBERS) {
+          return json(
+            {
+              ok: false,
+              error: "group_full",
+              message: GROUP_FULL_MESSAGE,
+              maxMembers: MAX_GROUP_MEMBERS,
+              memberCount: current.length,
+            },
+            409
+          );
+        }
         try {
           await sbWrite(
             env,

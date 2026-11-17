@@ -93,6 +93,10 @@ export type FamilyEventInput = {
   alarm?: FamilyEvent["alarm"];
   /** 알람 시각 HH:MM */
   alarmTime?: string;
+  /** 양력/음력 — 안 적으면 양력 */
+  calendarType?: FamilyEvent["calendarType"];
+  /** 음력 윤달인지 */
+  isLeapMonth?: boolean;
 };
 
 type Ctx = {
@@ -142,7 +146,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    document.documentElement.style.setProperty("--app-font", `${state.fontSize}px`);
+    // 시니어 기준 기본 본문 19px — ‘크게/아주 크게’는 22px·25px 로 같은 비율을 지킨다
+    document.documentElement.style.setProperty("--app-font", `${state.fontSize + 1}px`);
     write(state);
   }, [state, ready]);
 
@@ -249,6 +254,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       memo: input.memo?.trim().slice(0, 40) || undefined,
       alarm: normalizeAlarm(input.alarm),
       alarmTime: normalizeAlarmTime(input.alarmTime),
+      calendarType: input.calendarType === "lunar" ? "lunar" : "solar",
+      isLeapMonth: input.calendarType === "lunar" && input.isLeapMonth ? true : undefined,
       createdAt: new Date().toISOString(),
     };
     setState((s) => ({ ...s, familyEvents: [...s.familyEvents, ev] }));
@@ -265,6 +272,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (patch.date !== undefined && !isValidDateKey(patch.date)) next.date = ev.date;
         if (patch.alarm !== undefined) next.alarm = normalizeAlarm(patch.alarm);
         if (patch.alarmTime !== undefined) next.alarmTime = normalizeAlarmTime(patch.alarmTime);
+        if (patch.calendarType !== undefined) {
+          next.calendarType = patch.calendarType === "lunar" ? "lunar" : "solar";
+          next.isLeapMonth = next.calendarType === "lunar" && patch.isLeapMonth ? true : undefined;
+        } else if (patch.isLeapMonth !== undefined) {
+          next.isLeapMonth = next.calendarType === "lunar" && patch.isLeapMonth ? true : undefined;
+        }
         return next;
       }),
     }));

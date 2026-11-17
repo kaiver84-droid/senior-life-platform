@@ -8,6 +8,7 @@ import { renderGreetingCard, downloadCanvas, THEMES, type GreetingTheme } from "
 import { kakaoConfig } from "@/lib/share";
 import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
+import { lunarShortOf } from "@/lib/lunar";
 import { shortSido } from "@/lib/regions";
 import { BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
 import { HomeCalendarBanner, TodayAlarmCard } from "./calendar";
@@ -179,11 +180,14 @@ export function HomeTab({
             <div className="leading-tight">
               <p className="tabular text-[0.82rem] font-black text-ink">{dateLabel.date}</p>
               <p className="text-[0.68rem] font-bold text-ink/50">{dateLabel.day}</p>
+              {lunarShortOf(today) ? (
+                <p className="text-[0.68rem] font-extrabold text-plum-dark">🌙 {lunarShortOf(today)}</p>
+              ) : null}
             </div>
           </div>
           <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
-            <p className="text-[0.84rem] font-extrabold tracking-tight text-white/90">안녕하세요,</p>
-            <h1 className="mt-0.5 flex items-center gap-1.5 text-[1.72rem] font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(8,24,38,0.45)]">
+            <p className="t-sub font-extrabold tracking-tight text-white/90">안녕하세요,</p>
+            <h1 className="t-title mt-0.5 flex items-center gap-1.5 text-white drop-shadow-[0_2px_6px_rgba(8,24,38,0.45)]">
               <span className="truncate">{profile?.nickname}</span>
               <span className="text-[1.42rem]">😊</span>
             </h1>
@@ -284,8 +288,8 @@ export function HomeTab({
           className="drop-shadow-[0_10px_16px_rgba(196,138,40,0.32)]"
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 운세</span>
-          <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
+          <span className="t-menu block leading-snug">오늘의 운세</span>
+          <span className="t-body mt-0.5 block truncate font-semibold text-ink/60">
             {fortune.headline} · {fortune.zodiac}띠
           </span>
         </span>
@@ -360,7 +364,9 @@ export function HomeTab({
       </button>
 
       <p className="flex items-center justify-center gap-1.5 pb-1 text-[0.76rem] font-semibold text-ink/35">
-        <NeulbomMark size={16} /> 늘봄과 함께, 더 편안한 하루
+        <span className="t-notice flex items-center gap-1.5">
+          <NeulbomMark size={16} /> 늘봄과 함께, 더 편안한 하루
+        </span>
       </p>
 
       <Sheet
@@ -408,13 +414,13 @@ function FortuneDetail({ fortune }: { fortune: Fortune }) {
         <div className="mx-auto mb-2 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[#FFE6D6] to-[#FFD3C4] text-[2rem]">
           {jisin?.emoji || fortune.zodiacEmoji}
         </div>
-        <p className="text-[1.3rem] font-black leading-snug text-brand-deep">{fortune.headline}</p>
+        <p className="t-notice leading-snug !text-brand-deep">{fortune.headline}</p>
         <div className="mt-1 flex items-center justify-center gap-2">
           <Stars n={fortune.stars} />
           <span className="tabular text-[0.95rem] font-extrabold text-ink/55">{fortune.score}점</span>
         </div>
         {fortune.timeTrait ? (
-          <p className="mt-2 text-[0.86rem] font-semibold leading-relaxed text-ink/45">{fortune.timeTrait}</p>
+          <p className="t-body mt-2 !text-ink/60">{fortune.timeTrait}</p>
         ) : null}
 
         {/* 글씨가 어려운 분을 위해 운세 전체를 소리로 읽어 준다 */}
@@ -523,7 +529,7 @@ function WeatherDetail({
             🌤️
           </div>
           <p className="text-[1.08rem] font-black leading-snug text-ink">지금은 날씨를 불러오지 못했어요</p>
-          <p className="mt-1 text-[0.92rem] font-semibold leading-relaxed text-ink/55">
+          <p className="t-notice mt-1 text-ink/55">
             잠시 뒤 &lsquo;다시 확인&rsquo;을 눌러 주세요.
             <br />
             그동안에도 아래 생활팁은 그대로 도움이 돼요.

@@ -56,6 +56,10 @@ export type StoredFamilyEvent = {
   alarm?: string;
   /** 알람 시각 HH:MM */
   alarmTime?: string;
+  /** 양력/음력 — 없는 예전 일정은 양력으로 읽힌다 */
+  calendarType?: string;
+  /** 음력 윤달인지 */
+  isLeapMonth?: boolean;
   createdAt?: string;
 };
 

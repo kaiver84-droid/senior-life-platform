@@ -23,7 +23,10 @@ import {
   dueAlarms,
   eventsInMonth,
   eventsOnDate,
+  isLunarEvent,
   kindInfo,
+  lunarBadgeText,
+  lunarSolarDate,
   monthMatrix,
   monthOf,
   monthTitle,
@@ -33,12 +36,23 @@ import {
   shiftMonth,
   upcomingEvents,
   weekdayOf,
+  weekdayShort,
   type DueAlarm,
+  type FamilyCalendarType,
   type FamilyEvent,
   type FamilyEventAlarm,
   type FamilyEventKind,
   type YearMonth,
 } from "@/lib/calendar";
+import {
+  hasLeapMonth,
+  leapMonthOf,
+  lunarMonthDays,
+  lunarShortOf,
+  lunarText,
+  lunarToSolar,
+  solarToLunar,
+} from "@/lib/lunar";
 import { eventIcsText, eventsIcsText, icsFileName } from "@/lib/ics";
 import {
   localNewsFor,
@@ -72,6 +86,28 @@ const YEARS = Array.from({ length: 106 }, (_, i) => 1930 + i);
 
 function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** 🌙 음력 배지 — 음력 일정이면 ‘음력 10월 15일 (양력 11월 23일)’ */
+function LunarBadge({
+  event,
+  occurrence,
+  className = "",
+}: {
+  event: FamilyEvent;
+  occurrence: string;
+  className?: string;
+}) {
+  const text = lunarBadgeText(event, occurrence);
+  if (!text) return null;
+  return (
+    <span
+      data-lunar-badge
+      className={`inline-flex items-center gap-1 rounded-full bg-plum-light px-2 py-0.5 text-[0.78rem] font-extrabold leading-tight text-plum-dark ${className}`}
+    >
+      🌙 {text}
+    </span>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -316,6 +352,7 @@ export function TodayAlarmCard({ where = "calendar" }: { where?: "home" | "calen
               {dayTitle(d.occurrence)}
               {d.daysLeft > 0 ? ` · ${d.daysLeft}일 뒤` : " · 오늘"}
             </p>
+            <LunarBadge event={d.event} occurrence={d.occurrence} className="mt-1" />
             <p className="mt-0.5 text-[0.78rem] font-extrabold text-gold-dark">
               🔔 {alarmLabel(d.event)}에 알려 드려요
             </p>
@@ -456,7 +493,9 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
       title: `${ev.title} 안내`,
       text: `[늘봄 가족안부달력] ${kindInfo(ev.kind).emoji} ${ev.title}\n· 날짜: ${dayTitle(date)}${
         days !== null ? ` (${ddayLabel(days)})` : ""
-      }${ev.repeatYearly ? "\n· 매년 반복하는 날이에요" : ""}${ev.memo ? `\n· ${ev.memo}` : ""}`,
+      }${lunarBadgeText(ev, date) ? `\n· 🌙 ${lunarBadgeText(ev, date)}` : ""}${
+        ev.repeatYearly ? "\n· 매년 반복하는 날이에요" : ""
+      }${ev.memo ? `\n· ${ev.memo}` : ""}`,
     });
     show(shareMessageText(result));
   };
@@ -556,6 +595,7 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                     <p className="mt-0.5 text-[0.8rem] font-bold text-leaf-dark">
                       🔔 {alarmLabel(justSaved.event) || "알람 없음"} · {dayTitle(justSaved.date)}
                     </p>
+                    <LunarBadge event={justSaved.event} occurrence={justSaved.date} className="mt-1" />
                   </div>
                   <button
                     type="button"
@@ -599,6 +639,11 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                       <span className="block text-[0.78rem] font-bold text-ink/50">
                         {dayTitle(u.date)} · {ddayLabel(u.days)}
                       </span>
+                      {isLunarEvent(u.event) ? (
+                        <span className="block truncate text-[0.76rem] font-extrabold text-plum-dark">
+                          🌙 {lunarBadgeText(u.event, u.date)}
+                        </span>
+                      ) : null}
                     </span>
                     <IconChevron size={18} className="shrink-0 text-ink/30" />
                   </button>
@@ -627,6 +672,15 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                 >
                   <span className="text-[1.2rem]">›</span>
                 </button>
+              </div>
+
+              <div className="mb-2 flex items-center justify-center">
+                <span
+                  data-today-lunar
+                  className="inline-flex items-center gap-1 rounded-full bg-plum-light px-3 py-1 text-[0.88rem] font-extrabold text-plum-dark"
+                >
+                  🌙 오늘 {dayTitle(today)} · {lunarShortOf(today) || "음력 정보 없음"}
+                </span>
               </div>
 
               <div className="mb-1 grid grid-cols-7">
@@ -708,8 +762,13 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
             {/* 고른 날짜 */}
             <section className="rounded-[1.6rem] bg-white p-4 shadow-card">
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-[1.08rem] font-black text-ink">{dayTitle(selected)}</h2>
-                {selected === today ? <Badge tone="gold">오늘</Badge> : null}
+                <div className="min-w-0">
+                  <h2 className="text-[1.08rem] font-black text-ink">{dayTitle(selected)}</h2>
+                  {lunarShortOf(selected) && selected !== today ? (
+                    <p className="text-[0.8rem] font-extrabold text-plum-dark">🌙 {lunarShortOf(selected)}</p>
+                  ) : null}
+                </div>
+                {selected === today ? <Badge tone="gold">오늘 · {lunarShortOf(today)}</Badge> : null}
               </div>
 
               {dayEvents.length === 0 && dayNews.length === 0 ? (
@@ -733,6 +792,11 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                             <span className={`rounded-full px-2 py-0.5 ${info.chip}`}>{info.label}</span>
                             {ev.repeatYearly ? <span className="ml-1.5">매년 반복</span> : null}
                           </p>
+                          {isLunarEvent(ev) ? (
+                            <p className="mt-1">
+                              <LunarBadge event={ev} occurrence={selected} />
+                            </p>
+                          ) : null}
                           {ev.memo ? (
                             <p className="mt-1 text-[0.86rem] font-semibold leading-snug text-ink/70">{ev.memo}</p>
                           ) : null}
@@ -922,6 +986,11 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                             {dayTitle(r.date)} · {info.label}
                             {r.event.repeatYearly ? " · 매년" : ""}
                           </span>
+                          {isLunarEvent(r.event) ? (
+                            <span className="mt-0.5 block truncate text-[0.78rem] font-extrabold text-plum-dark">
+                              🌙 {lunarBadgeText(r.event, r.date)}
+                            </span>
+                          ) : null}
                           {alarmModeOf(r.event) !== "none" ? (
                             <span className="mt-0.5 block truncate text-[0.74rem] font-extrabold text-gold-dark">
                               🔔 {alarmLabel(r.event)}
@@ -1156,13 +1225,20 @@ export function FamilyCalendarCard({ onOpen }: { onOpen: () => void }) {
           </p>
         ) : (
           up.map((u) => (
-            <div key={`${u.event.id}-${u.date}`} className="flex items-center gap-2 rounded-xl bg-paper px-3 py-2">
-              <span aria-hidden>{kindInfo(u.event.kind).emoji}</span>
-              <span className="min-w-0 flex-1 truncate text-[0.92rem] font-black text-ink">{u.event.title}</span>
-              <span className="shrink-0 text-[0.78rem] font-bold text-ink/50">{dayTitle(u.date)}</span>
-              <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[0.72rem] font-black text-coral-dark">
-                {ddayLabel(u.days)}
-              </span>
+            <div key={`${u.event.id}-${u.date}`} className="rounded-xl bg-paper px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span aria-hidden>{kindInfo(u.event.kind).emoji}</span>
+                <span className="min-w-0 flex-1 truncate text-[0.92rem] font-black text-ink">{u.event.title}</span>
+                <span className="shrink-0 text-[0.78rem] font-bold text-ink/50">{dayTitle(u.date)}</span>
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[0.72rem] font-black text-coral-dark">
+                  {ddayLabel(u.days)}
+                </span>
+              </div>
+              {isLunarEvent(u.event) ? (
+                <p className="mt-0.5 pl-6 text-[0.76rem] font-extrabold text-plum-dark">
+                  🌙 {lunarBadgeText(u.event, u.date)}
+                </p>
+              ) : null}
             </div>
           ))
         )}
@@ -1204,8 +1280,10 @@ export function HomeCalendarBanner({ onOpen }: { onOpen: () => void }) {
         <span className="block text-[1rem] font-black leading-tight text-ink">
           {next ? `${next.event.title} ${ddayLabel(next.days)}` : "가족안부달력"}
         </span>
-        <span className="block truncate text-[0.82rem] font-bold text-ink/55">
-          {next ? `${dayTitle(next.date)} · 우리 동네 소식 ${news.length}건` : "생일·기념일과 우리 동네 소식을 한눈에"}
+        <span className="block text-[0.82rem] font-bold text-ink/55">
+          {next
+            ? `${dayTitle(next.date)} · ${isLunarEvent(next.event) ? `🌙 ${lunarBadgeText(next.event, next.date)} · ` : ""}우리 동네 소식 ${news.length}건`
+            : "생일·기념일과 우리 동네 소식을 한눈에"}
         </span>
       </span>
       <span className="shrink-0 text-[0.78rem] font-extrabold text-brand-dark">열기 ›</span>
@@ -1235,6 +1313,8 @@ function EventFormSheet({
   const [kind, setKind] = useState<FamilyEventKind>("birthday");
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(presetDate);
+  const [calendarType, setCalendarType] = useState<FamilyCalendarType>("solar");
+  const [leap, setLeap] = useState(false);
   const [repeat, setRepeat] = useState(true);
   const [memo, setMemo] = useState("");
   const [alarm, setAlarm] = useState<FamilyEventAlarm>(DEFAULT_ALARM);
@@ -1248,6 +1328,8 @@ function EventFormSheet({
       setKind(editing.kind);
       setTitle(editing.title);
       setDate(editing.date);
+      setCalendarType(editing.calendarType === "lunar" ? "lunar" : "solar");
+      setLeap(Boolean(editing.isLeapMonth));
       setRepeat(editing.repeatYearly);
       setMemo(editing.memo ?? "");
       setAlarm(alarmModeOf(editing));
@@ -1256,6 +1338,8 @@ function EventFormSheet({
       setKind("birthday");
       setTitle("");
       setDate(presetDate);
+      setCalendarType("solar");
+      setLeap(false);
       setRepeat(true);
       setMemo("");
       setAlarm(DEFAULT_ALARM);
@@ -1269,21 +1353,38 @@ function EventFormSheet({
       show("이름과 날짜를 넣어 주세요.");
       return;
     }
+    const lunar = calendarType === "lunar";
+    // 화면에 보여 줄 실제 양력 날짜 (음력이면 그 해의 양력 날짜로 바꾼다)
+    const occurrence = lunar ? lunarSolarDate(dateParts.year, dateParts.month, dateParts.day, leapOn) : date;
+    if (!occurrence) {
+      show("이 음력 날짜를 양력으로 바꾸지 못했어요. 날짜를 다시 골라 주세요.");
+      return;
+    }
     const alarmFields = { alarm: normalizeAlarm(alarm), alarmTime: normalizeAlarmTime(alarmTime) };
+    const typeFields = { calendarType, isLeapMonth: lunar ? leapOn : undefined };
+    const base = editing ? "일정을 고쳤어요." : "일정을 저장했어요.";
+    const msg =
+      (lunar ? `${base} 음력 날짜라 달력에는 양력 ${dayTitle(occurrence)}으로 보여 드려요.` : base) +
+      (alarmFields.alarm === "none" ? "" : " 알람도 함께 맞춰 두었어요.");
     if (editing) {
-      updateFamilyEvent(editing.id, { title, date, repeatYearly: repeat, kind, memo, ...alarmFields });
-      onSaved(
+      updateFamilyEvent(editing.id, { title, date, repeatYearly: repeat, kind, memo, ...alarmFields, ...typeFields });
+      onSaved(occurrence, msg, {
+        ...editing,
+        title: title.trim(),
         date,
-        alarmFields.alarm === "none" ? "일정을 고쳤어요." : "일정을 고쳤어요. 알람도 함께 맞춰 두었어요.",
-        { ...editing, title: title.trim(), date, repeatYearly: repeat, kind, memo, ...alarmFields }
-      );
+        repeatYearly: repeat,
+        kind,
+        memo,
+        ...alarmFields,
+        ...typeFields,
+      });
     } else {
-      const ev = addFamilyEvent({ title, date, repeatYearly: repeat, kind, memo, ...alarmFields });
+      const ev = addFamilyEvent({ title, date, repeatYearly: repeat, kind, memo, ...alarmFields, ...typeFields });
       if (!ev) {
         show("일정을 저장하지 못했어요. 날짜를 확인해 주세요.");
         return;
       }
-      onSaved(date, alarmFields.alarm === "none" ? "일정을 저장했어요." : "일정을 저장했어요. 알람도 맞춰 두었어요.", ev);
+      onSaved(occurrence, msg, ev);
     }
     onClose();
   };
@@ -1294,8 +1395,63 @@ function EventFormSheet({
     return { year: y || 2026, month: m || 1, day: d || 1 };
   }, [date]);
 
+  /** 이 해 이 달에 윤달이 있는지 — 없으면 평달로 안전하게 넣는다 */
+  const leapAvailable = calendarType === "lunar" && hasLeapMonth(dateParts.year, dateParts.month);
+  const leapOn = calendarType === "lunar" && leap && leapAvailable;
+  const lastDayOfSelection =
+    calendarType === "lunar"
+      ? lunarMonthDays(dateParts.year, dateParts.month, leapOn)
+      : daysInMonth(dateParts.year, dateParts.month);
+
+  /** 고른 음력 날짜가 실제로 어떤 양력 날짜인지 (이번 해·다음 해) */
+  const lunarPreview = useMemo(() => {
+    if (calendarType !== "lunar") return null;
+    return {
+      solar: lunarToSolar(dateParts.year, dateParts.month, dateParts.day, leapOn),
+      nextSolar: lunarToSolar(dateParts.year + 1, dateParts.month, dateParts.day, leapOn),
+    };
+  }, [calendarType, dateParts.year, dateParts.month, dateParts.day, leapOn]);
+
   const setDateParts = (year: number, month: number, day: number) => {
+    if (calendarType === "lunar") {
+      const last = lunarMonthDays(year, month, leap && hasLeapMonth(year, month));
+      setDate(dateKey(year, month, Math.min(day, last)));
+      return;
+    }
     setDate(dateKey(year, month, Math.min(day, daysInMonth(year, month))));
+  };
+
+  /** 화면에 날짜로보여 줄 실제 양력 날짜 — 음력이면 바꾼 날짜 */
+  const occurrenceDate = calendarType === "lunar" ? lunarPreview?.solar ?? date : date;
+
+  /** ☀️ 양력 ↔ 🌙 음력 — 고른 날짜를 그대로 상대 달력 날짜로 바꿔 준다 */
+  const switchType = (next: FamilyCalendarType) => {
+    if (next === calendarType) return;
+    if (next === "lunar") {
+      const l = solarToLunar(date);
+      if (l) {
+        setDate(dateKey(l.year, l.month, l.day));
+        setLeap(l.leap);
+      }
+    } else {
+      const solar = lunarToSolar(dateParts.year, dateParts.month, dateParts.day, leapOn);
+      if (solar) setDate(solar);
+      setLeap(false);
+    }
+    setCalendarType(next);
+  };
+
+  /** ‘오늘·내일’ 같은 양력 날짜를 지금 고른 달력에 맞춰 넣는다 */
+  const applySolarDate = (solar: string) => {
+    if (calendarType === "lunar") {
+      const l = solarToLunar(solar);
+      if (l) {
+        setDate(dateKey(l.year, l.month, l.day));
+        setLeap(l.leap);
+        return;
+      }
+    }
+    setDate(solar);
   };
 
   return (
@@ -1303,7 +1459,7 @@ function EventFormSheet({
       open={open}
       onClose={onClose}
       title={editing ? "일정 고치기" : "가족 일정 추가"}
-      subtitle="생일·기념일은 매년 반복으로 두면 해마다 자동으로 나와요"
+      subtitle="생일·기념일은 매년 반복으로 두면 해마다 자동으로 나와요 · 음력 생일은 🌙 음력으로"
     >
       <div className="space-y-3">
         <div>
@@ -1316,6 +1472,7 @@ function EventFormSheet({
                   key={k.key}
                   onClick={() => setKind(k.key)}
                   aria-pressed={active}
+                  data-event-kind={k.key}
                   className={`flex min-h-[58px] items-center justify-center gap-1.5 rounded-2xl border-2 text-[0.95rem] font-extrabold transition ${
                     active ? "border-coral bg-coral-light text-ink" : "border-ink/10 bg-white text-ink/65"
                   }`}
@@ -1347,11 +1504,82 @@ function EventFormSheet({
           ) : null}
         </div>
 
-        <div>
+        <div data-date-box>
           <p className="mb-1.5 text-[0.95rem] font-extrabold text-ink">③ 언제인가요?</p>
-          <div className="grid grid-cols-3 gap-2">
+
+          {/* ☀️ 양력 / 🌙 음력 — 큰 버튼 두 개 */}
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="달력 종류">
+            <button
+              type="button"
+              data-calendar-type="solar"
+              aria-pressed={calendarType === "solar"}
+              onClick={() => switchType("solar")}
+              className={`flex min-h-[62px] flex-col items-center justify-center rounded-2xl border-2 text-[1.02rem] font-black transition ${
+                calendarType === "solar"
+                  ? "border-gold bg-gold-light text-[#7A5600] shadow-soft"
+                  : "border-ink/10 bg-white text-ink/60"
+              }`}
+            >
+              <span className="text-[1.2rem] leading-none" aria-hidden>
+                ☀️
+              </span>
+              <span className="mt-0.5 leading-tight">양력</span>
+            </button>
+            <button
+              type="button"
+              data-calendar-type="lunar"
+              aria-pressed={calendarType === "lunar"}
+              onClick={() => switchType("lunar")}
+              className={`flex min-h-[62px] flex-col items-center justify-center rounded-2xl border-2 text-[1.02rem] font-black transition ${
+                calendarType === "lunar"
+                  ? "border-plum bg-plum-light text-plum-dark shadow-soft"
+                  : "border-ink/10 bg-white text-ink/60"
+              }`}
+            >
+              <span className="text-[1.2rem] leading-none" aria-hidden>
+                🌙
+              </span>
+              <span className="mt-0.5 leading-tight">음력</span>
+            </button>
+          </div>
+
+          {/* 음력일 때만 — 윤달 고르기 */}
+          {calendarType === "lunar" ? (
+            <button
+              type="button"
+              data-lunar-leap={leapAvailable ? "available" : "none"}
+              aria-pressed={leapOn}
+              onClick={() => setLeap((v) => !v)}
+              className={`mt-2 flex min-h-[52px] w-full items-center gap-2.5 rounded-2xl border-2 px-3 text-left ${
+                leapOn ? "border-plum bg-plum-light" : "border-ink/10 bg-white"
+              }`}
+            >
+              <span
+                className={`grid h-6 w-10 shrink-0 items-center rounded-full p-0.5 transition ${
+                  leapOn ? "bg-plum" : "bg-ink/20"
+                }`}
+                aria-hidden
+              >
+                <span
+                  className={`h-5 w-5 rounded-full bg-white transition ${leapOn ? "translate-x-4" : "translate-x-0"}`}
+                />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.92rem] font-black text-ink">{dateParts.month}월 윤달</span>
+                <span className="block text-[0.76rem] font-semibold leading-snug text-ink/50">
+                  {leapAvailable
+                    ? `${dateParts.year}년에는 윤${dateParts.month}월이 있어요`
+                    : `${dateParts.year}년에는 윤${dateParts.month}월이 없어요 (평달로 넣어요)`}
+                </span>
+              </span>
+            </button>
+          ) : null}
+
+          <div className="mt-2 grid grid-cols-3 gap-2">
             <label className="block">
-              <span className="mb-1 block text-center text-[0.74rem] font-bold text-ink/50">해</span>
+              <span className="mb-1 block text-center text-[0.74rem] font-bold text-ink/50">
+                {calendarType === "lunar" ? "음력 해" : "해"}
+              </span>
               <select
                 aria-label="연도"
                 className="field !min-h-[54px] px-2 text-center text-[1rem] font-extrabold"
@@ -1388,7 +1616,7 @@ function EventFormSheet({
                 value={dateParts.day}
                 onChange={(e) => setDateParts(dateParts.year, dateParts.month, Number(e.target.value))}
               >
-                {Array.from({ length: daysInMonth(dateParts.year, dateParts.month) }, (_, i) => i + 1).map((d) => (
+                {Array.from({ length: lastDayOfSelection }, (_, i) => i + 1).map((d) => (
                   <option key={d} value={d}>
                     {d}일
                   </option>
@@ -1396,12 +1624,47 @@ function EventFormSheet({
               </select>
             </label>
           </div>
-          <p className="mt-1.5 flex items-center justify-center gap-1 text-[0.88rem] font-extrabold text-brand-dark">
-            <IconCalendar size={15} /> {dayTitle(date)}
-          </p>
+
+          {/* 🌙 고른 음력 날짜가 실제 양력 언제인지 바로 보여 준다 */}
+          {calendarType === "lunar" ? (
+            <div data-lunar-preview className="mt-2 rounded-2xl border-2 border-plum/25 bg-plum-light/50 px-3.5 py-2.5">
+              {lunarPreview?.solar ? (
+                <>
+                  <p className="text-[1rem] font-black leading-snug text-plum-dark" data-lunar-preview-main>
+                    🌙 {lunarText({ month: dateParts.month, day: dateParts.day, leap: leapOn })} →{" "}
+                    {Number(lunarPreview.solar.slice(0, 4)) === Number(today.slice(0, 4))
+                      ? "올해는"
+                      : `${Number(lunarPreview.solar.slice(0, 4))}년에는`}{" "}
+                    양력 {Number(lunarPreview.solar.slice(5, 7))}월 {Number(lunarPreview.solar.slice(8, 10))}일 (
+                    {weekdayShort(lunarPreview.solar)})이에요
+                  </p>
+                  {repeat && lunarPreview.nextSolar ? (
+                    <p className="mt-1 text-[0.86rem] font-extrabold leading-snug text-plum-dark/85" data-lunar-preview-next>
+                      다음 해(음력 {dateParts.year + 1}년)는 양력 {Number(lunarPreview.nextSolar.slice(5, 7))}월{" "}
+                      {Number(lunarPreview.nextSolar.slice(8, 10))}일 ({weekdayShort(lunarPreview.nextSolar)})이에요
+                    </p>
+                  ) : null}
+                  {repeat && lunarPreview.solar < today ? (
+                    <p className="mt-1 text-[0.82rem] font-bold leading-snug text-plum-dark/80">
+                      올해 음력 날짜는 이미 지났어요. 다음 해 날짜로 알려 드릴게요.
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-[0.92rem] font-bold leading-snug text-plum-dark">
+                  이 해의 음력 날짜를 찾지 못했어요. 해를 1900~2049년 사이로 골라 주세요.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-1.5 flex items-center justify-center gap-1 text-[0.88rem] font-extrabold text-brand-dark">
+              <IconCalendar size={15} /> {dayTitle(date)}
+            </p>
+          )}
+
           <div className="mt-2 flex gap-2">
             <button
-              onClick={() => setDate(today)}
+              onClick={() => applySolarDate(today)}
               className="min-h-[42px] flex-1 rounded-xl border-2 border-ink/10 bg-white text-[0.84rem] font-extrabold text-ink/70"
             >
               오늘
@@ -1410,7 +1673,7 @@ function EventFormSheet({
               onClick={() => {
                 const d = new Date(today + "T00:00:00Z");
                 d.setUTCDate(d.getUTCDate() + 1);
-                setDate(d.toISOString().slice(0, 10));
+                applySolarDate(d.toISOString().slice(0, 10));
               }}
               className="min-h-[42px] flex-1 rounded-xl border-2 border-ink/10 bg-white text-[0.84rem] font-extrabold text-ink/70"
             >
@@ -1440,6 +1703,11 @@ function EventFormSheet({
             <span className="block text-[0.78rem] font-semibold text-ink/50">
               생일·기념일은 켜 두세요 (해마다 같은 날 보여요)
             </span>
+            {calendarType === "lunar" && repeat ? (
+              <span className="block text-[0.78rem] font-extrabold text-plum-dark">
+                🌙 음력 {dateParts.month}월 {dateParts.day}일로 해마다 반복해요
+              </span>
+            ) : null}
           </span>
         </button>
 
@@ -1509,7 +1777,7 @@ function EventFormSheet({
               <div className="mt-2 rounded-2xl bg-gold-light/70 px-3.5 py-2.5">
                 <p className="text-[0.86rem] font-extrabold leading-snug text-[#7A5600]" data-alarm-summary>
                   🔔 {alarm === "0"
-                    ? `${dayTitle(date)} ${alarmTimeLabel(alarmTime)}에 알려 드려요`
+                    ? `${dayTitle(occurrenceDate)} ${alarmTimeLabel(alarmTime)}에 알려 드려요`
                     : `${ALARM_MODES.find((m) => m.key === alarm)?.label ?? ""} ${alarmTimeLabel(alarmTime)}에 미리 알려 드려요`}
                 </p>
                 <p className="mt-1 text-[0.8rem] font-semibold leading-snug text-[#7A5600]/85">

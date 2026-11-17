@@ -18,6 +18,7 @@ import {
 } from "./group-demo";
 import { buildGroupHealth } from "./health";
 import { kstDate, weekIdOf } from "./week";
+import { GROUP_FULL_MESSAGE, GROUP_MAX_MEMBERS } from "./groups";
 import { ACTIVE_GROUP_KEY, type MeStatsInput } from "./groups";
 
 const KEY = "seniorLife.groups.v1";
@@ -251,7 +252,7 @@ export function localAction(
     postId?: string;
     me?: MeStatsInput;
   }
-): GroupsPayload & { ok: boolean; groupId?: string } {
+): GroupsPayload & { ok: boolean; groupId?: string; message?: string } {
   const db = read();
   const code = body.code;
   const meName = (body.me?.name || body.name || "가족").slice(0, 12);
@@ -277,6 +278,10 @@ export function localAction(
   } else if (body.action === "join" && body.groupId) {
     const g = db.groups.find((x) => x.id === body.groupId);
     if (g && !g.members.some((m) => m.code === code)) {
+      // 오프라인 저장에서도 정원(100명)은 지킨다
+      if (g.members.length >= GROUP_MAX_MEMBERS) {
+        return { ...localPayload(code, { groupId: body.groupId, me: body.me }), ok: false, message: GROUP_FULL_MESSAGE };
+      }
       g.members.push({ code, name: meName, role: "member", joinedAt: new Date().toISOString() });
     }
   } else if (body.action === "update" && body.groupId) {

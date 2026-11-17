@@ -279,7 +279,7 @@ function GroupRankingBoard({ onNavigate }: { onNavigate?: (tab: string) => void 
           </div>
           <div className="text-right">
             <p className="text-[0.8rem] font-bold text-ink/50">이번 주 점수</p>
-            <p className="tabular text-[1.15rem] font-black text-brand-dark">{weekPoints}점</p>
+            <p className="t-num tabular text-brand-dark">{weekPoints}점</p>
             <p className="text-[0.82rem] font-extrabold text-leaf-dark">🔥 {streak}일 연속</p>
           </div>
         </div>
@@ -631,7 +631,7 @@ export function RankingBoard({
                 <p className="text-[0.8rem] font-bold text-ink/50">
                   {scope === "invite" ? "내가 초대한 사람" : scope === "streak" ? "연속 출석" : "이번 주 점수"}
                 </p>
-                <p className="tabular text-[1.15rem] font-black text-brand-dark">
+                <p className="t-num tabular text-brand-dark">
                   {scope === "invite"
                     ? `${view.myInvites ?? 0}명`
                     : scope === "streak"
@@ -725,13 +725,12 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
           <Badge tone="gold">🏆 명예의 전당</Badge>
           <Badge tone="brand">{periodLabel()}</Badge>
         </div>
-        <h1 className="mt-1.5 text-[1.5rem] font-black leading-snug text-ink">
-          {profile?.nickname} 님의 이번 주 순위
-        </h1>
-        <p className="mt-1 text-[0.9rem] font-semibold text-ink/55">
-          🔥 {streak}일 연속 출석 · 이번 주 {weekPoints}점
-          {active ? ` · ${active.name}` : ""}
-        </p>
+        <h1 className="t-title mt-1.5 text-ink">{profile?.nickname} 님의 이번 주 순위</h1>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="t-sub font-semibold text-ink/60">🔥 {streak}일 연속 출석 · 이번 주</span>
+          <span className="t-num text-brand-deep">{weekPoints}점</span>
+          {active ? <span className="t-sub text-ink/60">· {active.name}</span> : null}
+        </div>
       </section>
 
       <RankingBoard onNavigate={onNavigate} />

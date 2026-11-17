@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useGroup } from "@/lib/group-store";
-import { timeAgo } from "@/lib/groups";
+import { GROUP_MAX_MEMBERS, timeAgo } from "@/lib/groups";
 import { kstDate, koreanDate } from "@/lib/week";
 import { useApp } from "@/lib/storage";
 import { HealthChallengeCard } from "./health";
@@ -119,7 +119,7 @@ export function GroupSelectorBanner() {
           </span>
           <span className="mt-0.5 block truncate text-[0.84rem] font-bold text-brand-dark/80">
             {active
-              ? `멤버 ${active.memberCount}명${detail ? ` · 오늘 ${detail.todayAttended}명 출석` : ""}`
+              ? `멤버 ${active.memberCount} / ${active.maxMembers ?? GROUP_MAX_MEMBERS}명${detail ? ` · 오늘 ${detail.todayAttended}명 출석` : ""}`
               : groups.length
                 ? "모임을 골라 주세요"
                 : "우리 가족 사랑방에서 함께 시작해요"}
@@ -299,7 +299,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             </h1>
             <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
               {active
-                ? `멤버 ${active.memberCount}명 · 이번 주 달성률 ${detail?.weeklyRate ?? 0}%${
+                ? `멤버 ${active.memberCount} / ${active.maxMembers ?? GROUP_MAX_MEMBERS}명 · 이번 주 달성률 ${detail?.weeklyRate ?? 0}%${
                     detail?.region ? ` · ${detail.region}` : ""
                   }`
                 : "가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요"}
@@ -309,6 +309,20 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                 <span className="h-2 w-2 rounded-full bg-leaf" />
                 지금 {active.onlineCount ?? detail?.onlineCount ?? 1}명 접속 중
               </span>
+            ) : null}
+            {detail ? (
+              <p
+                data-group-capacity={detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS) ? "full" : "open"}
+                className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.8rem] font-black ${
+                  detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
+                    ? "bg-coral-light text-coral-dark"
+                    : "bg-paper text-ink/60"
+                }`}
+              >
+                {detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
+                  ? `정원이 다 찼어요 (${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명)`
+                  : `정원 ${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명`}
+              </p>
             ) : null}
           </div>
           {active ? (
@@ -371,7 +385,9 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                         {g.isDemo ? <Badge tone="gold">체험</Badge> : null}
                       </span>
                       <span className="block truncate text-[0.78rem] font-bold text-ink/45">
-                        {on ? `보는 중 · 번호 ${g.id}` : `멤버 ${g.memberCount}명 · 번호 ${g.id}`}
+                        {on
+                          ? `보는 중 · 번호 ${g.id}`
+                          : `멤버 ${g.memberCount} / ${g.maxMembers ?? GROUP_MAX_MEMBERS}명 · 번호 ${g.id}`}
                       </span>
                     </span>
                     {on ? null : (
@@ -795,7 +811,7 @@ function GroupSheet({
     const r = await join(gid);
     setBusy(false);
     if (!r.ok) {
-      show("그 번호의 모임을 찾지 못했어요. 번호를 다시 확인해 주세요.");
+      show(r.message || "그 번호의 모임을 찾지 못했어요. 번호를 다시 확인해 주세요.");
       return;
     }
     show("모임에 들어왔어요! 🎉");
@@ -897,7 +913,7 @@ function GroupSheet({
                         {g.myRole === "leader" ? <Badge tone="brand">모임장</Badge> : null}
                       </span>
                       <span className="text-[0.82rem] font-bold text-ink/50">
-                        멤버 {g.memberCount}명 · 번호 {g.id}
+                        멤버 {g.memberCount} / {g.maxMembers ?? GROUP_MAX_MEMBERS}명 · 번호 {g.id}
                       </span>
                     </span>
                     {on ? (
@@ -1006,6 +1022,20 @@ function GroupSheet({
             <p className="text-[0.78rem] font-bold text-ink/45">초대 링크</p>
             <p className="mt-1 break-all text-[0.84rem] font-semibold text-ink/70">{link}</p>
           </div>
+
+          {/* 정원 안내 — 한 모임은 100명까지 */}
+          <p
+            data-group-invite-capacity
+            className={`rounded-2xl px-3.5 py-2.5 text-[0.84rem] font-bold leading-snug ${
+              detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
+                ? "bg-coral-light text-coral-dark"
+                : "bg-brand-light/60 text-brand-dark"
+            }`}
+          >
+            {detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
+              ? `정원이 다 찼어요 (${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명) — 새 모임을 만들어 초대해 주세요.`
+              : `한 모임은 ${detail.maxMembers ?? GROUP_MAX_MEMBERS}명까지 들어올 수 있어요. 지금 ${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명이에요.`}
+          </p>
 
           <BigButton variant="sun" size="lg" full onClick={() => setShareOpen(true)}>
             <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">

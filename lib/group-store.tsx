@@ -203,7 +203,14 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
         return { ok: true, message: "", id: remote.groupId, groupId: remote.groupId };
       }
       setOnline(false);
+      // 정원 초과처럼 서버가 분명히 거절한 일은 기기에만 흉내 내지 않고 그대로 알린다
+      if (remote && remote.ok === false) {
+        return { ok: false, message: remote.message || "모임에 들어가지 못했어요." };
+      }
       const local = localAction(full);
+      if (local.ok === false) {
+        return { ok: false, message: local.message || "모임에 들어가지 못했어요." };
+      }
       apply(local);
       return { ok: true, message: "", id: local.groupId, groupId: local.groupId };
     },
@@ -333,7 +340,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     pendingRef.current = null;
     clearPendingInvite();
     void join(gid).then((r) => {
-      show(r.ok ? "초대받은 모임에 들어왔어요! 🎉" : "초대 링크의 모임을 찾지 못했어요.");
+      show(r.ok ? "초대받은 모임에 들어왔어요! 🎉" : r.message || "초대 링크의 모임을 찾지 못했어요.");
     });
   }, [appReady, code, payload, join, show]);
 
