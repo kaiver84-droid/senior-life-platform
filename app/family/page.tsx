@@ -107,12 +107,12 @@ function Dashboard() {
         <Card className="rounded-[1.75rem] p-5">
           <p className="text-center text-[1.1rem] font-black">아직 연결된 부모님이 없어요</p>
           <p className="mt-2 text-center text-[0.92rem] font-semibold leading-relaxed text-ink/60">
-            부모님 휴대폰의 <b className="text-ink">가족 연결</b> 화면에서 6자리 가족 코드를 받아 아래에 넣어 주세요.
+            부모님 휴대폰의 <b className="text-ink">가족 연결</b> 화면에서 6자리 가족 연결 번호를 받아 아래에 넣어 주세요.
           </p>
           <Divider />
           <input
             className="field text-center text-[1.4rem] font-black tracking-[0.3em]"
-            placeholder="가족 코드 6자리"
+            placeholder="가족 연결 번호 6자리"
             value={lookupCode}
             maxLength={6}
             onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
@@ -274,7 +274,7 @@ function Dashboard() {
       </Card>
 
       <p className="mt-2 rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.78rem] font-semibold leading-relaxed text-ink/45">
-        이 화면은 부모님이 보낸 가족 코드로 열렸어요. 부모님 정보는 안부 확인 목적으로만 보여 드려요.
+        이 화면은 부모님이 보낸 가족 연결 번호로 열렸어요. 부모님 정보는 안부 확인 목적으로만 보여 드려요.
       </p>
     </div>
   );

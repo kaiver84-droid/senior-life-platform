@@ -132,16 +132,26 @@ def main():
 
             page.fill("#setup-nick", "순자")
             page.select_option("#setup-birth", "1952")
+            page.wait_for_timeout(900)
+            # 처음 상태(모르겠음이 골라져 있음) 그대로 찍는다 — 버튼을 누른 직후의 다시 그리기 문제를 피한다
+            page.screenshot(path=f"{SHOT}/neulbom_ux_birthtime.png")
+            page.locator('#setup-time [data-birthtime="자시"]').scroll_into_view_if_needed()
+            page.wait_for_timeout(400)
+            page.screenshot(path=f"{TMP}/birthtime_top.png")
+
             page.locator('#setup-time [data-birthtime="묘시"]').click()
             check(
                 page.locator('#setup-time [data-birthtime="묘시"]').get_attribute("aria-checked") == "true",
                 "고른 시진이 선택 표시된다",
             )
-            page.wait_for_timeout(300)
-            page.screenshot(path=f"{SHOT}/neulbom_ux_birthtime.png")
-            page.locator('#setup-time [data-birthtime="모름"]').scroll_into_view_if_needed()
-            page.wait_for_timeout(300)
-            page.screenshot(path=f"{TMP}/birthtime_top.png")
+            check(
+                page.locator('#setup-time [data-birthtime="모름"]').get_attribute("aria-checked") == "false",
+                "다른 시진을 고르면 모르겠음은 풀린다",
+            )
+            page.wait_for_timeout(400)
+            page.locator("#setup-time [data-birthtime='모름']").scroll_into_view_if_needed()
+            page.wait_for_timeout(500)
+            page.screenshot(path=f"{TMP}/birthtime_picked.png")
 
             page.locator("#setup-sido").select_option("충청북도")
             page.locator("#setup-sigungu").select_option("옥천군")
@@ -197,8 +207,15 @@ def main():
             check(len(labels) == 6, "달력 갈래 6개가 모두 화면에 있다", str(labels))
             hh = page.locator("[data-calendar-filters] button").first.bounding_box()["height"]
             check(hh >= 48, "필터 버튼 높이 48px 이상", f"{hh}px")
-            page.locator("[data-calendar-filters]").scroll_into_view_if_needed()
-            page.wait_for_timeout(500)
+            # 갈래 버튼과 그 위 제목이 한 화면에 딱 들어오게 맞춘다
+            page.evaluate(
+                "() => { const el = document.querySelector('[data-calendar-filters]');"
+                " const sc = el.closest('.overflow-y-auto');"
+                " if (!sc) return;"
+                " const y = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 200;"
+                " sc.scrollTo(0, Math.max(0, y)); }"
+            )
+            page.wait_for_timeout(600)
             page.screenshot(path=f"{SHOT}/neulbom_ux_calendar_filters.png")
             page.locator('[data-calendar-filters] button:has-text("복지 소식")').click()
             page.wait_for_timeout(500)
