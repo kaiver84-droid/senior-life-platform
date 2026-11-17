@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.request
 
 sys.path.insert(0, "/workspace/work/senior-platform/e2e")
@@ -41,6 +42,29 @@ def sql(query):
     )
     with urllib.request.urlopen(req, timeout=30) as res:
         return json.loads(res.read() or b"[]")
+
+
+def server_groups(code):
+    """라이브에서만 — 서버(Supabase)에 실제로 저장된 내 모임 목록"""
+    if not code:
+        return []
+    try:
+        url = f"{BASE}/api/groups?code={code}&meName=%EC%88%9C%EC%9E%90&mePoints=0&meDays=1&meToday=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (E2E)"})
+        with urllib.request.urlopen(req, timeout=20) as res:
+            return json.loads(res.read().decode()).get("groups", [])
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def wait_server_group(code, name, tries=16):
+    """서버에 그 이름의 모임이 생길 때까지 잠깐 기다린다(폴백 저장이 아니라 진짜 저장 확인)"""
+    for _ in range(tries):
+        for g in server_groups(code):
+            if g.get("name") == name:
+                return g.get("id", "")
+        time.sleep(0.8)
+    return ""
 
 
 def make_group(page, name):
@@ -121,7 +145,20 @@ def main():
             # ---------- 2) 모임 A · 모임 B 연달아 만들기 ----------
             make_group(page, "가족 모임")
             rows_a = page.locator("[data-group-row]").count()
-            check(rows_a == before + 1, "모임 A 만든 뒤 목록 +1", f"{before} → {rows_a}")
+            if LOCAL:
+                m = re.search(
+                    r"번호 ([A-Z0-9]{6})",
+                    page.locator("[data-group-row]", has_text="가족 모임").first.inner_text(),
+                )
+                code_a = m.group(1) if m else ""
+            else:
+                code_a = wait_server_group(code, "가족 모임")
+            check(bool(code_a), "모임 A 가 서버에 저장됨", code_a)
+            check(
+                rows_a == before + 1 if LOCAL else rows_a >= before + 1,
+                "모임 A 만든 뒤 목록 +1",
+                f"{before} → {rows_a}",
+            )
             check("가족 모임" in page.inner_text("main"), "모임 A 로 전환됨")
             check(
                 page.get_by_text("가족 모임").first.is_visible()
@@ -131,7 +168,11 @@ def main():
 
             make_group(page, "친구 모임")
             rows_b = page.locator("[data-group-row]").count()
-            check(rows_b == before + 2, "모임 B 만든 뒤 목록 +2", f"{before} → {rows_b}")
+            check(
+                rows_b == before + 2 if LOCAL else rows_b >= before + 2,
+                "모임 B 만든 뒤 목록 +2",
+                f"{before} → {rows_b}",
+            )
             check("친구 모임" in page.inner_text("main"), "모임 B 로 전환됨")
             names = page.locator("[data-group-switcher]").inner_text()
             check(
@@ -164,6 +205,23 @@ def main():
             b_text = page.inner_text("main")
             check("A 모임에 남긴 안부" not in b_text, "모임 A 게시글은 모임 B 에 안 보임")
             check("B 모임에 남긴 안부" in b_text, "모임 B 게시글이 그대로 남아 있음")
+
+            # ---------- 3-b) 초대 번호로 다른 모임에 추가 가입 ----------
+            check(bool(code_a), "모임 A 초대 번호 확인", code_a)
+            page.get_by_role("button", name="초대 번호로 모임 추가").first.click()
+            page.wait_for_selector("#group-code", timeout=15000)
+            page.locator("#group-code").fill(code_a)
+            page.get_by_role("button", name="모임 들어가기", exact=True).click()
+            page.wait_for_function(
+                "() => document.body.innerText.includes('가족 모임')", timeout=20000
+            )
+            page.wait_for_timeout(1500)
+            check(
+                page.locator("[data-group-row]").count() >= before + 2,
+                "초대 번호로 들어가도 모임 목록 그대로",
+                str(page.locator("[data-group-row]").count()),
+            )
+            check("친구 모임" in page.inner_text("[data-group-switcher]"), "가입 후에도 원래 모임이 남아 있음")
 
             # ---------- 4) 홈 모임 선택 시트에도 추가 버튼 ----------
             nav(page, "홈")

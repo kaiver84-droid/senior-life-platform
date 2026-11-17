@@ -491,13 +491,25 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
       if (!rows.length) return json({ ok: false, error: "group_not_found" }, 404);
 
       const name = (body.name || me?.name || "가족").trim().slice(0, 12);
-      await sbWrite(
+      // 이미 들어가 있는 모임이면 다시 넣지 않는다 — 예전에는 중복 키(409)로 요청이 실패해
+      // 화면이 '오프라인 저장'으로 넘어가 모임 목록이 흐트러졌다.
+      const already = await sbGet<{ user_code: string }>(
         env,
-        "group_members",
-        "POST",
-        [{ group_id: groupId, user_code: code, name, role: "member" }],
-        "resolution=ignore-duplicates,return=minimal"
+        `group_members?group_id=eq.${enc(groupId)}&user_code=eq.${enc(code)}&select=user_code&limit=1`
       );
+      if (!already.length) {
+        try {
+          await sbWrite(
+            env,
+            "group_members",
+            "POST",
+            [{ group_id: groupId, user_code: code, name, role: "member" }],
+            "resolution=ignore-duplicates,return=minimal"
+          );
+        } catch {
+          /* 그사이 다른 기기에서 들어갔을 수 있다 — 아래 이름·활성 모임 갱신은 그대로 진행 */
+        }
+      }
       // 이름을 새로 고쳐 부르게 된 경우(프로필 이름 변경) 반영
       await sbWrite(
         env,
