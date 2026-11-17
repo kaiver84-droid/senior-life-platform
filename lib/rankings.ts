@@ -463,6 +463,7 @@ export function buildAreaRanking(input: AreaRankingInput): RankingResult {
     area: input.area,
     myGap,
     myDisplay: mine ? formatAreaValue(input.area, myValue) : undefined,
+    myInvites: input.area === "share" ? myValue : undefined,
     myChange:
       mine && myRank
         ? todayIndex === 0 || sumOf(mine.daily, todayIndex - 1) <= 0

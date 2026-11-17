@@ -1011,23 +1011,29 @@ function AreaBoard({
   range,
   band,
   onNavigate,
+  onGo,
+  invitesByDay,
 }: {
   area: LeagueArea;
   range: RankingRange;
   band: number;
   onNavigate?: (tab: string) => void;
+  onGo: (area: LeagueArea) => void;
+  invitesByDay?: Record<string, number>;
 }) {
   const { view, loading } = useAreaRanking(area, range, band);
   const { state, today, rankingVisible, streak } = useApp();
   const info = areaInfo(area);
   const rest = view.rows.slice(3, 10);
+  const invites = view.invitesByDay ?? invitesByDay;
   const localValue =
     area === "all"
-      ? leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay: view.invitesByDay }).total
+      ? leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay: invites }).total
       : myAreaValue(area, { ...state, missions: state.missions ?? {} }, { today, invites: view.myInvites });
 
   return (
     <div className="space-y-3" data-area-board={area}>
+      {area === "all" ? <LeagueMissionCard invitesByDay={invites} onGo={onGo} /> : null}
       <div
         data-podium
         className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card"
@@ -1070,9 +1076,11 @@ function AreaBoard({
 export function RankingBoard({
   initialScope = "all",
   onNavigate,
+  invitesByDay,
 }: {
   initialScope?: "all" | LeagueArea;
   onNavigate?: (tab: string) => void;
+  invitesByDay?: Record<string, number>;
 }) {
   const { profile, state, today } = useApp();
   const [area, setArea] = useState<LeagueArea>(initialScope);
@@ -1080,7 +1088,7 @@ export function RankingBoard({
   const [band, setBand] = useState<number>(() => ageBandOf(profile?.birthYear));
   const [groupView, setGroupView] = useState<"my" | "all">("my");
 
-  const myTotal = leagueWeek({ ...state, missions: state.missions ?? {} }, { today }).total;
+  const myTotal = leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay }).total;
 
   const go = (target: LeagueArea) => {
     if (target === "all") {
@@ -1142,8 +1150,6 @@ export function RankingBoard({
 
       <OptInCard />
 
-      {area === "all" ? <LeagueMissionCard onGo={go} /> : null}
-
       {area === "group" ? (
         groupView === "my" ? (
           <GroupRankingBoard onNavigate={onNavigate} compact />
@@ -1153,7 +1159,14 @@ export function RankingBoard({
       ) : range === "group" ? (
         <GroupRankingBoard onNavigate={onNavigate} compact />
       ) : (
-        <AreaBoard area={area} range={range} band={band} onNavigate={onNavigate} />
+        <AreaBoard
+          area={area}
+          range={range}
+          band={band}
+          onNavigate={onNavigate}
+          onGo={go}
+          invitesByDay={invitesByDay}
+        />
       )}
 
       <div data-area-mission={area}>
@@ -1202,9 +1215,33 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
 /* ------------------------------------------------------------------ */
 
 export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { profile, streak, state, today, todayDaily, rankingVisible } = useApp();
+  const { profile, streak, state, today, todayDaily, rankingVisible, code } = useApp();
   const { active } = useGroup();
-  const week = leagueWeek({ ...state, missions: state.missions ?? {} }, { today });
+
+  // 친구 초대 성공(+50점/명)은 서버만 안다 — 날짜별 초대 수를 한 번 받아 온다.
+  const [invitesByDay, setInvitesByDay] = useState<Record<string, number> | undefined>(undefined);
+  useEffect(() => {
+    if (!code) return;
+    const params = new URLSearchParams({
+      area: "share",
+      range: "national",
+      weekId: weekIdOf(today),
+      today,
+      code,
+    });
+    let alive = true;
+    fetch(`/api/rankings?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive && j?.invitesByDay) setInvitesByDay(j.invitesByDay as Record<string, number>);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [code, today]);
+
+  const week = leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay });
 
   return (
     <div className="space-y-4">
@@ -1228,7 +1265,7 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
         ) : null}
       </section>
 
-      <RankingBoard onNavigate={onNavigate} />
+      <RankingBoard onNavigate={onNavigate} invitesByDay={invitesByDay} />
 
       <div className="grid grid-cols-1 gap-2">
         <BigButton variant={todayDaily?.done ? "white" : "teal"} size="lg" full onClick={() => onNavigate("quiz")}>
