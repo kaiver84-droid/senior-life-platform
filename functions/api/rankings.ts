@@ -242,8 +242,10 @@ async function leagueAggregate(
 
     let daily = dailyOf(flags.get(u.code), opts.area);
     if (u.code === opts.code && opts.myDaily) {
-      // 방금 이 기기에서 한 활동까지 반영(서버 저장값과 큰 쪽)
-      daily = daily.map((v, i) => Math.max(v, opts.myDaily![i] || 0));
+      // 방금 이 기기에서 한 활동까지 반영(서버 저장값과 큰 쪽) — 아직 오지 않은 날은 세지 않는다.
+      daily = daily.map((v, i) =>
+        dates[i] > opts.today ? v : Math.max(v, opts.myDaily![i] || 0)
+      );
     }
     const total = scoreOf(daily);
     if (u.code === opts.code) {

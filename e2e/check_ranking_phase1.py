@@ -135,7 +135,16 @@ if not LOCAL:
         return handler
 
     def api(path):
-        with urllib.request.urlopen(f"{BASE}{path}", timeout=30) as res:
+        # Cloudflare 봇 차단을 피하려고 브라우저와 같은 User-Agent 로 부른다.
+        req = urllib.request.Request(
+            f"{BASE}{path}",
+            headers={
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 "
+                "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+                "Accept": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=30) as res:
             return json.loads(res.read())
 
 
@@ -177,8 +186,12 @@ def ensure_group(page):
     trial = page.get_by_role("button", name=re.compile("체험 모임 들어가기"))
     if trial.count():
         trial.first.click()
-        page.wait_for_timeout(2500)
-    return page.query_selector("[data-group-invite-top]") is not None
+    # 모임을 불러오는 데 몇 초 걸린다 — 초대 버튼이 나타날 때까지 기다린다.
+    for _ in range(20):
+        page.wait_for_timeout(800)
+        if page.query_selector("[data-group-invite-top]"):
+            return True
+    return False
 
 
 def today_score(page):
@@ -288,6 +301,7 @@ def main():
             "미션 체크리스트에 완료 도장(출석·퀴즈·건강·복지)",
             str(done_map),
         )
+        page.wait_for_timeout(2800)  # 안내 말풍선이 사라진 뒤에 찍는다
         page.locator("[data-league-missions]").scroll_into_view_if_needed()
         page.wait_for_timeout(500)
         page.screenshot(path=f"{SHOT}/_rank_p1_league.png")
@@ -307,9 +321,14 @@ def main():
                 f"서버도 하루 140점 상한(오늘까지 {WEEKDAY}일 × 140)",
                 f"{api_all.get('myDisplay')} (기대 {cap_total}점)",
             )
-            one_day = "999,0,0,0,0,0,0"
-            api_one = api(f"/api/rankings?area=all&code={CODE_T}&today={TODAY}&myd={one_day}")
-            check(api_one.get("myDisplay") == "140점", "큰 값을 보내도 하루 140점을 넘지 않음", str(api_one.get("myDisplay")))
+            # 하루 140점을 보낸 것과 터무니없이 큰 값(999)을 보낸 것이 같은 점수여야 한다 — 하루 상한이 먹었다는 뜻
+            exact = ",".join(["140"] * 7)
+            api_exact = api(f"/api/rankings?area=all&code={CODE_T}&today={TODAY}&myd={exact}")
+            check(
+                api_exact.get("myDisplay") == api_all.get("myDisplay"),
+                "큰 값을 보내도 하루 140점으로 잘림(140 입력과 같은 점수)",
+                f"999입력 {api_all.get('myDisplay')} vs 140입력 {api_exact.get('myDisplay')}",
+            )
 
         # ---------- 4. 순위 변동 · 격차 문구 ----------
         changes = gap_texts(page)
