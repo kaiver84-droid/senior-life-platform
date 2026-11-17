@@ -38,6 +38,7 @@ import { Avatar, Badge, BigButton, Card, SectionTitle, Sheet, useToast } from ".
 import { badgeCards, gradeOf, localLifetime, nextGradeMessage } from "@/lib/grades";
 import {
   DUEL_KIND_LABEL,
+  ENABLE_DUELS,
   clearPendingDuel,
   duelLinkFor,
   fetchDuels,
@@ -1299,7 +1300,8 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
 
       <GradeCard onOpenBadges={() => setBadgeOpen(true)} />
 
-      <DuelSection onNavigate={onNavigate} />
+      {/* 친구와 1:1 대결 — 지금은 숨김(ENABLE_DUELS). 코드는 lib/duels.ts 에 그대로 둔다. */}
+      {ENABLE_DUELS ? <DuelSection onNavigate={onNavigate} /> : null}
 
       <RankingBoard onNavigate={onNavigate} invitesByDay={invitesByDay} />
 

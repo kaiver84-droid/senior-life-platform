@@ -12,6 +12,16 @@ import type { DuelPayload } from "./types";
 
 const PENDING_KEY = "seniorLife.pendingDuel";
 
+/**
+ * 친구와 1:1 대결 화면 스위치.
+ *
+ * 지금은 화면에서 숨긴 상태다(2026-11-18 사용자 요청). 코드·API·DB(`duels` 테이블)는
+ * 그대로 두었으니 다시 켤 때는 이 값을 true 로 바꾸기만 하면 된다.
+ * — 랭킹 탭의 ‘오늘의 1:1 대결’ 목록·‘친구와 1:1 대결’ 신청 카드·대결 링크(?duel=) 배너가
+ *   이 값 하나로 함께 켜지고 꺼진다.
+ */
+export const ENABLE_DUELS = false;
+
 export type PendingDuel = { code: string; name: string; kind: "quiz" | "total" };
 
 function origin(): string {

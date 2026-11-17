@@ -22,7 +22,7 @@ import { InstallBanner, InstallGuide, InstallGuideRow } from "@/components/insta
 import { NeulbomMark } from "@/components/art";
 import { GroupProvider, useGroup } from "@/lib/group-store";
 import { captureInviteFromUrl } from "@/lib/groups";
-import { captureDuelFromUrl } from "@/lib/duels";
+import { ENABLE_DUELS, captureDuelFromUrl } from "@/lib/duels";
 import { kakaoConfig, loadKakaoSdk } from "@/lib/share";
 import { GroupTab } from "@/components/groups";
 import {
@@ -39,7 +39,8 @@ import {
 // 친구가 보낸 모임 초대 링크(?group=XXXXXX)를 화면이 그려지기 전에 붙잡아 둔다.
 captureInviteFromUrl();
 // 친구가 보낸 1:1 대결 링크(?duel=XXXXXX)도 함께 붙잡아 둔다.
-captureDuelFromUrl();
+// — 대결 화면을 숨긴 동안(ENABLE_DUELS=false)에는 링크도 받지 않는다.
+if (ENABLE_DUELS) captureDuelFromUrl();
 
 type TabKey = "home" | "group" | "quiz" | "ranking" | "welfare" | "more";
 
