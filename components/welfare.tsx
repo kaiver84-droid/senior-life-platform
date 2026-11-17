@@ -7,11 +7,13 @@ import { useApp } from "@/lib/storage";
 import { REGIONS, sigunguList, shortSido } from "@/lib/regions";
 import { shareText } from "@/lib/share";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
+import { SpeakButton } from "./speak";
 import { IconBank, IconBell, IconChevron, IconPhone, IconPin, IconSend } from "./icons";
 import { AssetImage } from "./art";
 import { BIRTH_YEARS } from "./profile-fields";
 
 const CATEGORY_EMOJI: Record<string, string> = {
+  전체: "🗂️",
   연금: "💰",
   교통: "🚌",
   의료: "🏥",
@@ -25,6 +27,18 @@ const CATEGORY_EMOJI: Record<string, string> = {
 function firstSentence(text: string): string {
   const i = text.indexOf(". ");
   return i > 10 ? text.slice(0, i + 1) : text;
+}
+
+const STEP_ORDER = ["첫째", "둘째", "셋째", "넷째", "다섯째"];
+
+/** 신청 방법을 소리로 읽어 줄 글 — 화면에 보이는 순서 그대로 */
+function stepsSpeech(program: WelfareProgram, limit?: number): string {
+  const steps = (limit ? program.steps.slice(0, limit) : program.steps)
+    .map((s, i) => `${STEP_ORDER[i] || `${i + 1}번째`}, ${s}`)
+    .join(". ");
+  const docs = program.documents.length ? ` 챙길 것은 ${program.documents.join(", ")}입니다.` : "";
+  const phone = program.phone ? ` 전화번호는 ${program.phone}입니다.` : "";
+  return `${program.title}. ${program.amount}. 신청 방법을 알려 드릴게요. ${steps}.${docs} 문의는 ${program.org}입니다.${phone}`;
 }
 
 export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
@@ -94,16 +108,22 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      {/* 분류 — 옆으로 잘리지 않고 화면 안에 꼭 차는 2열 큰 버튼 */}
+      <div className="grid grid-cols-2 gap-2" data-welfare-filters>
         {WELFARE_CATEGORIES.map((c) => (
           <button
             key={c}
             onClick={() => setCategory(c)}
             aria-pressed={category === c}
-            className={`min-h-[44px] rounded-full px-2 text-[0.84rem] font-extrabold transition ${
-              category === c ? "bg-ink text-white" : "bg-white text-ink/60 shadow-soft"
+            className={`flex min-h-[56px] items-center justify-center gap-1.5 rounded-2xl border-2 px-2 text-[1rem] font-extrabold transition ${
+              category === c
+                ? "border-ink bg-ink text-white shadow-soft"
+                : "border-ink/8 bg-white text-ink/70 shadow-soft active:bg-paper"
             }`}
           >
+            <span aria-hidden className="text-[1.1rem] leading-none">
+              {CATEGORY_EMOJI[c] || "🎁"}
+            </span>
             {c}
           </button>
         ))}
@@ -141,7 +161,9 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
 
           <div className="px-4 pb-4">
             <div className="rounded-[1.3rem] bg-[#FFF9EA] p-3.5">
-              <p className="mb-2 text-[0.82rem] font-black text-[#96700B]">이렇게 신청해요</p>
+              <div className="mb-2">
+                <p className="text-[0.86rem] font-black text-[#96700B]">이렇게 신청해요</p>
+              </div>
               <ol className="space-y-1.5">
                 {hero.steps.slice(0, 3).map((s, i) => (
                   <li key={i} className="flex gap-2">
@@ -152,6 +174,14 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
                   </li>
                 ))}
               </ol>
+              <div className="mt-2.5">
+                <SpeakButton
+                  text={stepsSpeech(hero, 3)}
+                  label="신청 방법 소리로 듣기"
+                  dataName="welfare-hero"
+                  tone="white"
+                />
+              </div>
             </div>
 
             <div className="mt-3">
@@ -306,6 +336,14 @@ function ProgramDetail({
               </li>
             ))}
           </ol>
+          <div className="mt-2.5">
+            <SpeakButton
+              text={stepsSpeech(program)}
+              label="신청 방법 소리로 듣기"
+              dataName="welfare-detail"
+              tone="white"
+            />
+          </div>
         </div>
 
         <div className="mt-3 rounded-2xl bg-paper p-3.5">

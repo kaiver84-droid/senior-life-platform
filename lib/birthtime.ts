@@ -1,7 +1,8 @@
 /**
  * 태어난 시간 — 시니어에게 익숙한 십이시진(十二時辰) 표기.
  * 프로필에는 짧은 이름("자시" … "해시") 또는 "모름"만 저장하고,
- * 화면에는 시간 범위를 함께 보여 준다.
+ * 화면에는 "자시 (밤 11시~새벽 1시)" 처럼 몇 시인지 함께 보여 준다.
+ * 모르는 분이 가장 많으므로 "모르겠음"을 맨 위 첫 번째에 둔다.
  */
 
 export type BirthTimeKey =
@@ -21,21 +22,39 @@ export type BirthTimeKey =
 
 export const UNKNOWN_BIRTH_TIME = "모름";
 
-export const BIRTH_TIME_OPTIONS: { key: BirthTimeKey; label: string }[] = [
-  { key: "자시", label: "자시 (23:30~01:29)" },
-  { key: "축시", label: "축시 (01:30~03:29)" },
-  { key: "인시", label: "인시 (03:30~05:29)" },
-  { key: "묘시", label: "묘시 (05:30~07:29)" },
-  { key: "진시", label: "진시 (07:30~09:29)" },
-  { key: "사시", label: "사시 (09:30~11:29)" },
-  { key: "오시", label: "오시 (11:30~13:29)" },
-  { key: "미시", label: "미시 (13:30~15:29)" },
-  { key: "신시", label: "신시 (15:30~17:29)" },
-  { key: "유시", label: "유시 (17:30~19:29)" },
-  { key: "술시", label: "술시 (19:30~21:29)" },
-  { key: "해시", label: "해시 (21:30~23:29)" },
-  { key: UNKNOWN_BIRTH_TIME, label: "모름 (잘 모르겠어요)" },
+export type BirthTimeOption = {
+  key: BirthTimeKey;
+  /** 화면에 크게 쓰는 이름 — "자시" / "모르겠음" */
+  name: string;
+  /** 몇 시인지 — "밤 11시~새벽 1시" (모를 때는 없음) */
+  range?: string;
+  /** 한 줄 전체 표기 — "자시 (밤 11시~새벽 1시)" */
+  label: string;
+};
+
+/** 모르겠음이 첫 번째, 그 아래 자시부터 해시까지 차례대로 */
+export const BIRTH_TIME_OPTIONS: BirthTimeOption[] = [
+  { key: UNKNOWN_BIRTH_TIME, name: "모르겠음", label: "모르겠음" },
+  { key: "자시", name: "자시", range: "밤 11시~새벽 1시", label: "자시 (밤 11시~새벽 1시)" },
+  { key: "축시", name: "축시", range: "새벽 1시~3시", label: "축시 (새벽 1시~3시)" },
+  { key: "인시", name: "인시", range: "새벽 3시~5시", label: "인시 (새벽 3시~5시)" },
+  { key: "묘시", name: "묘시", range: "새벽 5시~7시", label: "묘시 (새벽 5시~7시)" },
+  { key: "진시", name: "진시", range: "아침 7시~9시", label: "진시 (아침 7시~9시)" },
+  { key: "사시", name: "사시", range: "오전 9시~11시", label: "사시 (오전 9시~11시)" },
+  { key: "오시", name: "오시", range: "낮 11시~오후 1시", label: "오시 (낮 11시~오후 1시)" },
+  { key: "미시", name: "미시", range: "오후 1시~3시", label: "미시 (오후 1시~3시)" },
+  { key: "신시", name: "신시", range: "오후 3시~5시", label: "신시 (오후 3시~5시)" },
+  { key: "유시", name: "유시", range: "오후 5시~7시", label: "유시 (오후 5시~7시)" },
+  { key: "술시", name: "술시", range: "저녁 7시~9시", label: "술시 (저녁 7시~9시)" },
+  { key: "해시", name: "해시", range: "밤 9시~11시", label: "해시 (밤 9시~11시)" },
 ];
+
+/** 예전 화면에서 저장된 값을 모두 "모름" 하나로 모은다 */
+const ALIASES: Record<string, string> = {
+  "잘 모름": UNKNOWN_BIRTH_TIME,
+  "모르겠음": UNKNOWN_BIRTH_TIME,
+  "모름 (잘 모르겠어요)": UNKNOWN_BIRTH_TIME,
+};
 
 const LABELS: Record<string, string> = BIRTH_TIME_OPTIONS.reduce(
   (acc, o) => ({ ...acc, [o.key]: o.label }),
@@ -43,13 +62,30 @@ const LABELS: Record<string, string> = BIRTH_TIME_OPTIONS.reduce(
 );
 
 export function isBirthTimeKey(value: unknown): value is BirthTimeKey {
-  return typeof value === "string" && Boolean(LABELS[value]);
+  if (typeof value !== "string") return false;
+  return Boolean(LABELS[value] || ALIASES[value]);
 }
 
-/** 화면에 보여 줄 이름 — 저장값이 없거나 낯선 값이면 "모름" */
+/** 화면에 보여 줄 이름 — 저장값이 없거나 낯선 값이면 "모르겠음" */
 export function birthTimeLabel(value?: string): string {
   if (!value) return LABELS[UNKNOWN_BIRTH_TIME];
-  return LABELS[value] || value;
+  const key = ALIASES[value] || value;
+  return LABELS[key] || key;
+}
+
+/** 저장값을 지금 쓰는 값으로 맞춘다("잘 모름" → "모름") */
+export function normalizeBirthTime(value?: string): string {
+  if (!value) return UNKNOWN_BIRTH_TIME;
+  const key = ALIASES[value] || value;
+  return LABELS[key] ? key : UNKNOWN_BIRTH_TIME;
+}
+
+/** 소리로 읽어 줄 때 쓰는 말 — "자시, 밤 열한 시부터 새벽 한 시까지" */
+export function birthTimeSpeech(value?: string): string {
+  const key = normalizeBirthTime(value);
+  if (key === UNKNOWN_BIRTH_TIME) return "태어난 시간은 모르는 것으로 골랐어요.";
+  const opt = BIRTH_TIME_OPTIONS.find((o) => o.key === key);
+  return opt?.range ? `${opt.name}, ${opt.range}` : key;
 }
 
 /** 저장값 그대로의 짧은 이름 ("묘시생" 처럼 붙여 쓰기) */

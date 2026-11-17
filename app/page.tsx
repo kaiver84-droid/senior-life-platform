@@ -48,6 +48,8 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 ];
 
 const FONT_LABEL: Record<number, string> = { 18: "보통", 21: "크게", 24: "아주 크게" };
+/** 버튼에는 ‘지금 누르면 어떻게 되는지’를 적는다 — 어르신이 누를 이유를 바로 알 수 있게 */
+const FONT_ACTION: Record<number, string> = { 18: "글씨 크게", 21: "글씨 더 크게", 24: "글씨 보통으로" };
 
 function Shell() {
   const { ready, profile, fontSize, setFontSize, logout, code, updateProfile } = useApp();
@@ -159,11 +161,19 @@ function Shell() {
           <div className="flex items-center gap-2">
             <button
               onClick={cycleFont}
-              aria-label={`글씨 크기 바꾸기 (지금 ${FONT_LABEL[fontSize]})`}
-              className="flex h-10 items-center gap-1 rounded-full border border-ink/10 bg-white px-3 text-[0.92rem] font-black text-ink shadow-soft"
+              aria-label={`글씨 크기 바꾸기 — 지금 ${FONT_LABEL[fontSize]}, 누르면 ${FONT_ACTION[fontSize]}`}
+              className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-full border-2 border-brand/25 bg-brand-light px-2.5 shadow-soft active:scale-[0.98]"
             >
-              <span className="text-[1.05rem]">가</span>
-              <span className="text-[0.66rem] font-bold text-ink/45">{FONT_LABEL[fontSize]}</span>
+              <span
+                aria-hidden
+                className="font-black leading-none text-brand-dark"
+                style={{ fontSize: fontSize === 18 ? 18 : fontSize === 21 ? 20 : 22 }}
+              >
+                가
+              </span>
+              <span className="whitespace-nowrap text-[13.5px] font-black leading-tight text-brand-dark">
+                {FONT_ACTION[fontSize]}
+              </span>
             </button>
             <button
               onClick={() => setSettingsOpen(true)}
@@ -264,25 +274,25 @@ function Shell() {
               </div>
               <Divider />
               <div className="flex items-center justify-between">
-                <p className="text-[0.9rem] font-semibold text-ink/55">가족 코드</p>
+                <p className="text-[0.95rem] font-semibold text-ink/55">가족 연결 번호</p>
                 <p className="tabular text-[1.1rem] font-black tracking-[0.16em] text-brand-dark">{code}</p>
               </div>
-              <p className="mt-1 text-[0.78rem] font-medium leading-relaxed text-ink/45">
-                내 정보는 이 기기에 저장되고, 다시 카카오톡으로 로그인하면 그대로 이어져요.
+              <p className="mt-1 text-[0.8rem] font-medium leading-relaxed text-ink/45">
+                이 번호를 자녀에게 알려 주면 가족 확인 화면에서 내 안부를 볼 수 있어요.
               </p>
             </div>
           )}
         </div>
 
         <div className="mt-3 rounded-3xl bg-white p-4 shadow-soft">
-          <p className="mb-2 text-[0.95rem] font-black">글씨 크기</p>
+          <p className="mb-2 text-[1.02rem] font-black">글씨 크기 · 지금 {FONT_LABEL[fontSize]}</p>
           <div className="grid grid-cols-3 gap-2">
             {([18, 21, 24] as const).map((size, i) => (
               <button
                 key={size}
                 onClick={() => setFontSize(size)}
                 aria-pressed={fontSize === size}
-                className={`min-h-[52px] rounded-2xl border-2 text-[0.9rem] font-extrabold ${
+                className={`min-h-[60px] rounded-2xl border-2 text-[1.02rem] font-extrabold ${
                   fontSize === size
                     ? "border-brand bg-brand text-white"
                     : "border-ink/10 bg-paper text-ink/70"
@@ -292,6 +302,9 @@ function Shell() {
               </button>
             ))}
           </div>
+          <p className="mt-2 text-[0.82rem] font-semibold leading-relaxed text-ink/50">
+            화면 위쪽의 ‘가 글씨 크게’ 버튼을 눌러도 한 단계씩 커져요.
+          </p>
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-2">
@@ -431,13 +444,13 @@ function MoreTab({
         <MoreRow
           emoji="⚙️"
           title="내 정보 · 설정"
-          sub="이름 · 지역 · 글씨 크기 · 가족 코드"
+          sub="이름 · 지역 · 글씨 크기 · 가족 연결 번호"
           onClick={onOpenSettings}
         />
       </div>
 
       <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
-        <p className="mb-2 text-[0.95rem] font-black">글씨 크기</p>
+        <p className="mb-2 text-[1.02rem] font-black">글씨 크기 · 지금 {FONT_LABEL[fontSize]}</p>
         <div className="grid grid-cols-3 gap-2">
           {([18, 21, 24] as const).map((size, i) => (
             <button
@@ -445,7 +458,7 @@ function MoreTab({
               type="button"
               onClick={() => setFontSize(size)}
               aria-pressed={fontSize === size}
-              className={`min-h-[52px] rounded-2xl border-2 text-[0.9rem] font-extrabold ${
+              className={`min-h-[60px] rounded-2xl border-2 text-[1.02rem] font-extrabold ${
                 fontSize === size ? "border-brand bg-brand text-white" : "border-ink/10 bg-paper text-ink/70"
               }`}
             >

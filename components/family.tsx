@@ -179,13 +179,13 @@ export function FamilyTab({
 
         <div className="mt-3 flex items-center justify-between rounded-2xl bg-brand-light/70 px-4 py-3">
           <div>
-            <p className="text-[0.78rem] font-bold text-ink/50">가족 코드</p>
+            <p className="text-[0.8rem] font-bold text-ink/50">가족 연결 번호</p>
             <p className="tabular text-[1.35rem] font-black tracking-[0.18em] text-brand-deep">{code || "------"}</p>
           </div>
           <button
             onClick={() => {
               void navigator.clipboard?.writeText(code);
-              show("가족 코드를 복사했어요.");
+              show("가족 연결 번호를 복사했어요.");
             }}
             className="rounded-xl bg-white px-3.5 py-2 text-[0.86rem] font-extrabold text-brand-deep shadow-soft"
           >
@@ -199,7 +199,7 @@ export function FamilyTab({
           자녀 화면 미리 보기
         </Link>
         <p className="mt-2 text-center text-[0.78rem] font-medium leading-relaxed text-ink/45">
-          같은 휴대폰이면 바로 보이고, 자녀 휴대폰에서는 위 코드를 넣으면 확인할 수 있어요.
+          같은 휴대폰이면 바로 보이고, 자녀 휴대폰에서는 위 번호를 넣으면 확인할 수 있어요.
         </p>
       </Card>
 

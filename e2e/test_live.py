@@ -102,7 +102,7 @@ def main():
         res["onboarding_ok"] = True
         page.fill("#setup-nick", "순자")
         page.select_option("#setup-birth", "1952")
-        page.select_option("#setup-time", "묘시")
+        page.click('[data-birthtime="묘시"]')
         page.select_option("#setup-sido", "충청북도")
         page.select_option("#setup-sigungu", "옥천군")
         page.get_by_role("button", name="저장하고 늘봄 시작하기").click()
@@ -281,9 +281,9 @@ def main():
 
         # 4갈래 소식 필터
         res["calendar_filters"] = all(
-            page.get_by_role("tab", name=re.compile(t)).is_visible() for t in ["행사", "축제", "무료강좌", "복지소식"]
+            page.get_by_role("tab", name=re.compile(t)).is_visible() for t in ["행사", "축제", "무료 강좌", "복지 소식"]
         )
-        page.get_by_role("tab", name=re.compile("복지소식")).click()
+        page.get_by_role("tab", name=re.compile("복지 소식")).click()
         page.wait_for_timeout(500)
         res["calendar_filter_welfare"] = page.get_by_text("복지 소식", exact=True).first.is_visible()
         page.screenshot(path=f"{SHOT}/neulbom_family_calendar.png")

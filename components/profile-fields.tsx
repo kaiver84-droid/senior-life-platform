@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo } from "react";
 import { REGIONS, sigunguList } from "@/lib/regions";
-import { BIRTH_TIME_OPTIONS, UNKNOWN_BIRTH_TIME } from "@/lib/birthtime";
+import { BIRTH_TIME_OPTIONS, UNKNOWN_BIRTH_TIME, normalizeBirthTime } from "@/lib/birthtime";
 
 /** 태어난 해 선택 범위 — 40대(1987년생·한국 나이 40세, 1986년생·만 40세)부터 어르신 세대까지 */
 export const BIRTH_YEARS = Array.from({ length: 1987 - 1930 + 1 }, (_, i) => 1930 + i);
@@ -60,7 +60,8 @@ export function ProfileFields({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sigunguOptions]);
 
-  const birthTimeKnown = value.birthTime && value.birthTime !== UNKNOWN_BIRTH_TIME;
+  const birthTimeKnown = Boolean(value.birthTime && normalizeBirthTime(value.birthTime) !== UNKNOWN_BIRTH_TIME);
+  const pickedTime = normalizeBirthTime(value.birthTime);
 
   return (
     <div>
@@ -99,27 +100,69 @@ export function ProfileFields({
           </select>
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-time`} className="mb-1.5 block text-[1rem] font-extrabold">
+          <p id={`${idPrefix}-time-label`} className="mb-1.5 block text-[1rem] font-extrabold">
             태어난 시간
-          </label>
-          <select
+          </p>
+          {/* 시니어는 태어난 시간을 모르는 분이 많다 — ‘모르겠음’을 맨 위에 크게,
+              그 아래 십이시진을 누르기 쉬운 2열 큰 버튼으로 펼쳐 둔다. */}
+          <div
             id={`${idPrefix}-time`}
-            className="field"
-            value={value.birthTime || UNKNOWN_BIRTH_TIME}
-            onChange={(e) => onChange({ birthTime: e.target.value })}
+            role="radiogroup"
+            aria-labelledby={`${idPrefix}-time-label`}
+            className="grid grid-cols-2 gap-2"
           >
-            {BIRTH_TIME_OPTIONS.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            {BIRTH_TIME_OPTIONS.filter((o) => o.key === UNKNOWN_BIRTH_TIME).map((o) => {
+              const active = pickedTime === o.key;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  data-birthtime={o.key}
+                  onClick={() => onChange({ birthTime: o.key })}
+                  className={`col-span-2 flex min-h-[56px] flex-col items-center justify-center rounded-2xl border-2 px-3 py-2 transition active:scale-[0.99] ${
+                    active ? "border-brand bg-brand text-white shadow-soft" : "border-brand/25 bg-brand-light/50 text-brand-dark"
+                  }`}
+                >
+                  <span className="text-[1.08rem] font-black leading-tight">{o.name}</span>
+                  <span className={`text-[0.78rem] font-bold leading-tight ${active ? "text-white/80" : "text-ink/50"}`}>
+                    태어난 시간이 기억나지 않아도 괜찮아요
+                  </span>
+                </button>
+              );
+            })}
+            {BIRTH_TIME_OPTIONS.filter((o) => o.key !== UNKNOWN_BIRTH_TIME).map((o) => {
+              const active = pickedTime === o.key;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  data-birthtime={o.key}
+                  aria-label={o.label}
+                  onClick={() => onChange({ birthTime: o.key })}
+                  className={`flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-2xl border-2 px-1.5 py-2 transition active:scale-[0.99] ${
+                    active ? "border-brand bg-brand-light shadow-soft" : "border-ink/10 bg-white"
+                  }`}
+                >
+                  <span className={`text-[1.06rem] font-black leading-tight ${active ? "text-brand-dark" : "text-ink"}`}>
+                    {o.name}
+                  </span>
+                  <span className={`text-[0.76rem] font-bold leading-snug ${active ? "text-brand-dark/80" : "text-ink/55"}`}>
+                    {o.range}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
       <p className="mt-1.5 text-[0.82rem] font-semibold leading-relaxed text-ink/45">
         {birthTimeKnown
           ? "태어난 시간은 오늘의 운세와 시간대 팁에만 써요."
-          : "태어난 시간을 모르면 ‘모름’을 골라 주세요. 나중에 고칠 수 있어요."}
+          : "태어난 시간을 모르면 ‘모르겠음’을 골라 주세요. 나중에 고칠 수 있어요."}
       </p>
 
       <div className="mt-3 grid grid-cols-1 gap-3">

@@ -200,7 +200,7 @@ export function HealthChallengeCard({ where = "home" }: { where?: "home" | "grou
         </div>
         {where === "home" ? (
           <p className="mt-1.5 text-center text-[0.76rem] font-medium text-ink/40">
-            체크한 도장은 이 기기와 서버에 함께 저장돼요
+            체크한 도장은 이 기기와 늘봄에 함께 저장돼요
           </p>
         ) : null}
       </section>

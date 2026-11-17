@@ -121,7 +121,7 @@ def login(page):
     page.wait_for_selector("#setup-nick", timeout=30000)
     page.fill("#setup-nick", NAME_A)
     page.select_option("#setup-birth", "1952")
-    page.select_option("#setup-time", "묘시")
+    page.click('[data-birthtime="묘시"]')
     page.select_option("#setup-sido", "충청북도")
     page.select_option("#setup-sigungu", "옥천군")
     page.get_by_role("button", name="저장하고 늘봄 시작하기").click()
@@ -209,6 +209,8 @@ def main():
         check(page.get_by_text("가족 단톡방").first.is_visible(), "카톡 단톡방 미리보기")
         page.screenshot(path=f"{SHOT}/neulbom_kakao_share_modal.png")
 
+        page.locator("[data-share-more]").click()
+        page.wait_for_timeout(350)
         page.locator("[data-share-copy]").click()
         page.wait_for_timeout(800)
         check("복사" in page.locator("[data-share-hint]").inner_text(), "링크·글 복사 폴백", page.locator("[data-share-hint]").inner_text()[:40])

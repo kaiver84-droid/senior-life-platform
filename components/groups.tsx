@@ -341,7 +341,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
               <IconPlus size={20} /> 새 모임 만들기
             </BigButton>
             <BigButton variant="ghost" full onClick={() => setSheet("join")}>
-              초대 코드로 들어가기
+              초대 번호로 들어가기
             </BigButton>
           </div>
           {groups.length ? (
@@ -488,7 +488,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
               onClick={() => setSheet("invite")}
               className="text-[0.82rem] font-bold text-ink/45 underline decoration-ink/20 underline-offset-4"
             >
-              초대 코드 {active?.id}
+              초대 번호 {active?.id}
             </button>
             <span className="text-ink/20">|</span>
             <button
@@ -508,7 +508,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
 
       {!online ? (
         <p className="px-2 text-center text-[0.76rem] font-semibold leading-relaxed text-ink/40">
-          지금은 서버에 연결하지 못해 이 기기에만 저장하고 있어요. 연결되면 그대로 올라가요.
+          지금은 인터넷에 연결하지 못해 이 기기에만 저장하고 있어요. 연결되면 그대로 올라가요.
         </p>
       ) : null}
 
@@ -599,14 +599,14 @@ function GroupSheet({
   const doJoin = async (target: string) => {
     const gid = target.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(gid)) {
-      show("초대 코드 6자리를 정확히 적어 주세요.");
+      show("초대 번호 6자리를 정확히 적어 주세요.");
       return;
     }
     setBusy(true);
     const r = await join(gid);
     setBusy(false);
     if (!r.ok) {
-      show("그 코드의 모임을 찾지 못했어요. 코드를 다시 확인해 주세요.");
+      show("그 번호의 모임을 찾지 못했어요. 번호를 다시 확인해 주세요.");
       return;
     }
     show("모임에 들어왔어요! 🎉");
@@ -635,7 +635,7 @@ function GroupSheet({
           : mode === "create"
             ? "새 모임 만들기"
             : mode === "join"
-              ? "초대 코드로 들어가기"
+              ? "초대 번호로 들어가기"
               : "우리 모임"
       }
       subtitle={
@@ -644,7 +644,7 @@ function GroupSheet({
           : mode === "create"
             ? "가족방이든 친구 모임이든 1초면 만들어져요"
             : mode === "join"
-              ? "받은 초대 코드 6자리를 적어 주세요"
+              ? "받은 초대 번호 6자리를 적어 주세요"
               : "보고 싶은 모임을 골라 주세요"
       }
     >
@@ -682,7 +682,7 @@ function GroupSheet({
                         {g.myRole === "leader" ? <Badge tone="brand">모임장</Badge> : null}
                       </span>
                       <span className="text-[0.82rem] font-bold text-ink/50">
-                        멤버 {g.memberCount}명 · 코드 {g.id}
+                        멤버 {g.memberCount}명 · 번호 {g.id}
                       </span>
                     </span>
                     {on ? <Badge tone="brand">보는 중</Badge> : null}
@@ -697,7 +697,7 @@ function GroupSheet({
               <IconPlus size={20} /> 모임 만들기
             </BigButton>
             <BigButton variant="white" onClick={() => onChange("join")}>
-              코드로 들어가기
+              번호로 들어가기
             </BigButton>
           </div>
           <BigButton variant="ghost" full onClick={() => onChange("join")}>
@@ -737,7 +737,7 @@ function GroupSheet({
         <div className="space-y-3">
           <div>
             <label htmlFor="group-code" className="mb-1.5 block text-[0.95rem] font-extrabold">
-              초대 코드 6자리
+              초대 번호 6자리
             </label>
             <input
               id="group-code"
@@ -775,7 +775,7 @@ function GroupSheet({
           <div className="rounded-[1.4rem] bg-white p-4 text-center shadow-soft">
             <p className="text-[0.86rem] font-bold text-ink/50">{detail.name}</p>
             <p className="tabular mt-1 text-[2rem] font-black tracking-[0.28em] text-brand-deep">{detail.id}</p>
-            <p className="text-[0.82rem] font-semibold text-ink/45">초대 코드</p>
+            <p className="text-[0.82rem] font-semibold text-ink/45">초대 번호</p>
           </div>
 
           <div className="rounded-2xl bg-paper px-3.5 py-3">
@@ -809,7 +809,7 @@ function GroupSheet({
             badge: "우리 모임 초대",
             emoji: "👥",
             headline: `${detail.name}에 함께해요`,
-            sub: `초대 코드 ${detail.id} · 두뇌 퀴즈로 순위를 겨뤄요`,
+            sub: `초대 번호 ${detail.id} · 두뇌 퀴즈로 순위를 겨뤄요`,
             message: "누르면 바로 모임에 들어와요.",
             stats: [
               { value: `${detail.memberCount}명`, label: "모임원" },
@@ -818,9 +818,9 @@ function GroupSheet({
             name: profile?.nickname,
             dateLabel: koreanDate(today),
             title: `[늘봄] ${detail.name}에 초대합니다`,
-            description: `초대 코드 ${detail.id} · 함께 두뇌 퀴즈 풀고 순위를 겨뤄요!`,
+            description: `초대 번호 ${detail.id} · 함께 두뇌 퀴즈 풀고 순위를 겨뤄요!`,
             buttonTitle: "모임 들어가기",
-            text: `${profile?.nickname || "가족"} 님이 ${detail.name}에 초대했어요! 초대 코드 ${detail.id}`,
+            text: `${profile?.nickname || "가족"} 님이 ${detail.name}에 초대했어요! 초대 번호 ${detail.id}`,
             link,
             filename: `모임초대_${detail.id}.png`,
             sheetTitle: "카카오톡으로 모임 초대",

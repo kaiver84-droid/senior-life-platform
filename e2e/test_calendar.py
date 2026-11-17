@@ -5,6 +5,7 @@ python3 e2e/test_calendar.py
 import json
 import re
 import sys
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, "/workspace/work/senior-platform/e2e")
 from playwright.sync_api import sync_playwright  # noqa: E402
@@ -12,6 +13,8 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 from harness import onboard, start_server  # noqa: E402
 
 SHOT = "/workspace/downloads"
+# 이 테스트는 '오늘'에 일정을 넣고 확인한다 — 날짜가 바뀌어도 그대로 돌도록 한국 시간으로 계산한다
+TODAY = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d")
 
 
 def main():
@@ -72,7 +75,7 @@ def main():
         res["filter_tabs"] = tabs.count()
         res["filter_labels"] = [tabs.nth(i).inner_text() for i in range(tabs.count())]
 
-        for label in ["축제", "무료강좌", "복지소식", "행사"]:
+        for label in ["축제", "무료 강좌", "복지 소식", "행사"]:
             page.get_by_role("tab", name=re.compile(label)).click()
             page.wait_for_timeout(250)
             count = page.locator("section").last.inner_text()
@@ -84,7 +87,7 @@ def main():
         page.screenshot(path=f"{SHOT}/neulbom_family_calendar.png", full_page=False)
 
         # 날짜 칸 클릭 → 상세 카드 (오늘 칸: 만든 일정 + 소식)
-        page.get_by_role("button", name=re.compile("^2026-11-16")).first.click()
+        page.locator(f"button[aria-label^='{TODAY}']").first.click()
         page.wait_for_timeout(400)
         res["day_detail_event"] = page.get_by_text("큰딸 생일").first.is_visible()
 

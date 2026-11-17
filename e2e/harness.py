@@ -32,7 +32,7 @@ def onboard(page, name="순자", birth="1952", sido="충청북도", sigungu="옥
     page.wait_for_selector("#setup-nick", timeout=15000)
     page.fill("#setup-nick", name)
     page.select_option("#setup-birth", birth)
-    page.select_option("#setup-time", birth_time)
+    page.click(f'[data-birthtime="{birth_time}"]')
     page.select_option("#setup-sido", sido)
     page.select_option("#setup-sigungu", sigungu)
     page.get_by_role("button", name="저장하고 늘봄 시작하기").click()

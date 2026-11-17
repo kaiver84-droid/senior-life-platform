@@ -19,6 +19,8 @@ type BtnProps = {
   className?: string;
   type?: "button" | "submit";
   ariaLabel?: string;
+  /** 터치 높이를 꼭 지정해야 할 때(px) — .touch-btn 기본값(56px)보다 우선한다 */
+  height?: number;
 };
 
 const VARIANTS: Record<BtnVariant, string> = {
@@ -43,6 +45,7 @@ export function BigButton({
   className = "",
   type = "button",
   ariaLabel,
+  height,
 }: BtnProps) {
   return (
     <button
@@ -50,6 +53,7 @@ export function BigButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
+      style={height ? { minHeight: `${height}px` } : undefined}
       className={`touch-btn ${VARIANTS[variant]} ${
         size === "lg" ? "min-h-[64px] text-[1.12rem]" : ""
       } ${full ? "w-full" : ""} ${disabled ? "opacity-40 grayscale" : ""} ${className}`}

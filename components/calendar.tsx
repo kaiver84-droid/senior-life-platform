@@ -46,8 +46,8 @@ const FILTERS: { key: Filter; label: string; emoji: string }[] = [
   { key: "family", label: "가족일정", emoji: "👨‍👩‍👧" },
   { key: "event", label: "행사", emoji: "🎪" },
   { key: "festival", label: "축제", emoji: "🏮" },
-  { key: "class", label: "무료강좌", emoji: "🎓" },
-  { key: "welfare", label: "복지소식", emoji: "🎁" },
+  { key: "class", label: "무료 강좌", emoji: "🎓" },
+  { key: "welfare", label: "복지 소식", emoji: "🎁" },
 ];
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
@@ -215,8 +215,8 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                 <IconBack size={22} />
               </button>
               <div className="min-w-0 flex-1">
-                <h1 className="truncate text-[1.24rem] font-black leading-tight text-ink">📅 가족안부달력</h1>
-                <p className="truncate text-[0.78rem] font-bold text-ink/50">가족 일정과 우리 동네 소식</p>
+                <h1 className="text-[1.16rem] font-black leading-tight text-ink">📅 가족안부달력</h1>
+                <p className="text-[0.76rem] font-bold leading-snug text-ink/50">가족 일정과 우리 동네 소식</p>
               </div>
               <button
                 onClick={() => setForm({ open: true, editing: null, date: selected })}
@@ -251,9 +251,9 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
           </header>
 
           <div className="space-y-3 px-4 pt-3">
-            {/* 다음 생일·기념일 */}
+            {/* 다음 생일·기념일 — 옆으로 잘리지 않도록 세로로 차곡차곡 */}
             {upcomingEvents(events, today, 120, 3).length > 0 ? (
-              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              <div className="space-y-2" data-calendar-upcoming>
                 {upcomingEvents(events, today, 120, 3).map((u) => (
                   <button
                     key={`${u.event.id}-${u.date}`}
@@ -261,17 +261,16 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                       setYm(monthOf(u.date));
                       setSelected(u.date);
                     }}
-                    className="flex shrink-0 items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-soft active:bg-paper"
+                    className="flex min-h-[58px] w-full items-center gap-2.5 rounded-2xl bg-white px-3 py-2 text-left shadow-soft active:bg-paper"
                   >
-                    <span className="text-[1.15rem]">{kindInfo(u.event.kind).emoji}</span>
-                    <span className="text-left">
-                      <span className="block max-w-[8.5rem] truncate text-[0.86rem] font-black text-ink">
-                        {u.event.title}
-                      </span>
-                      <span className="block text-[0.72rem] font-bold text-ink/50">
+                    <span className="text-[1.3rem]">{kindInfo(u.event.kind).emoji}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[0.98rem] font-black text-ink">{u.event.title}</span>
+                      <span className="block text-[0.78rem] font-bold text-ink/50">
                         {dayTitle(u.date)} · {ddayLabel(u.days)}
                       </span>
                     </span>
+                    <IconChevron size={18} className="shrink-0 text-ink/30" />
                   </button>
                 ))}
               </div>
@@ -507,7 +506,13 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                 </span>
               </div>
 
-              <div className="mb-2 flex gap-2 overflow-x-auto pb-1 no-scrollbar" role="tablist" aria-label="소식 갈래">
+              {/* 갈래는 옆으로 잘리지 않고 한눈에 다 보이도록 3열 큰 버튼으로 */}
+              <div
+                className="mb-2.5 grid grid-cols-3 gap-2"
+                role="tablist"
+                aria-label="소식 갈래"
+                data-calendar-filters
+              >
                 {FILTERS.map((f) => {
                   const active = filter === f.key;
                   return (
@@ -516,12 +521,16 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                       role="tab"
                       aria-selected={active}
                       onClick={() => setFilter(f.key)}
-                      className={`flex min-h-[44px] shrink-0 items-center gap-1 rounded-full px-3.5 text-[0.84rem] font-extrabold transition ${
-                        active ? "bg-ink text-white shadow-soft" : "bg-white text-ink/60 shadow-soft active:bg-paper"
+                      className={`flex min-h-[60px] flex-col items-center justify-center gap-0.5 rounded-2xl border-2 px-1 text-[0.94rem] font-extrabold transition ${
+                        active
+                          ? "border-ink bg-ink text-white shadow-soft"
+                          : "border-ink/8 bg-white text-ink/65 shadow-soft active:bg-paper"
                       }`}
                     >
-                      <span aria-hidden>{f.emoji}</span>
-                      {f.label}
+                      <span aria-hidden className="text-[1.15rem] leading-none">
+                        {f.emoji}
+                      </span>
+                      <span className="leading-tight">{f.label}</span>
                     </button>
                   );
                 })}

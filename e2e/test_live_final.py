@@ -76,7 +76,7 @@ def onboard_demo(page):
     if page.query_selector("#setup-nick"):
         page.fill("#setup-nick", "순자")
         page.select_option("#setup-birth", "1952")
-        page.select_option("#setup-time", "묘시")
+        page.click('[data-birthtime="묘시"]')
         page.select_option("#setup-sido", "충청북도")
         page.select_option("#setup-sigungu", "옥천군")
         page.get_by_role("button", name="저장하고 늘봄 시작하기").click()

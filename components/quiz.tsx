@@ -17,11 +17,38 @@ import { useGroup } from "@/lib/group-store";
 import { siteOrigin } from "@/lib/groups";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
+import { SpeakButton } from "./speak";
 import { IconChevron, IconClock, IconDownload, IconShare, IconTrophy } from "./icons";
 import { AssetImage } from "./art";
 import { RankingPanel } from "./ranking";
 import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
 import type { QuizType } from "@/lib/types";
+
+/** 초성을 소리로 읽을 때 쓰는 이름 — “ㅅ ㄹ”을 “시옷, 리을”로 읽어 준다 */
+const JAMO_NAME: Record<string, string> = {
+  ㄱ: "기역", ㄲ: "쌍기역", ㄴ: "니은", ㄷ: "디귿", ㄸ: "쌍디귿", ㄹ: "리을",
+  ㅁ: "미음", ㅂ: "비읍", ㅃ: "쌍비읍", ㅅ: "시옷", ㅆ: "쌍시옷", ㅇ: "이응",
+  ㅈ: "지읒", ㅉ: "쌍지읒", ㅊ: "치읓", ㅋ: "키읔", ㅌ: "티읕", ㅍ: "피읖", ㅎ: "히읗",
+  ㅏ: "아", ㅑ: "야", ㅓ: "어", ㅕ: "여", ㅗ: "오", ㅛ: "요", ㅜ: "우", ㅠ: "유", ㅡ: "으", ㅣ: "이",
+};
+
+/** 문제 하나를 소리로 읽어 줄 글 — 보기까지 차례대로 */
+function questionSpeech(q: Question): string {
+  const typeLabel = QUIZ_TYPE_LABEL[q.type];
+  const plain = q.prompt.replace(/_{2,}/g, "빈칸").replace(/\n+/g, ". ");
+  const options = q.options.map((o, i) => `${i + 1}번, ${o}`).join(". ");
+  if (q.type === "choseong") {
+    const letters = plain.replace(/\s/g, "").split("").map((ch) => JAMO_NAME[ch] || ch).join(", ");
+    return `${typeLabel}. 초성 ${letters}. 힌트, ${q.hint}. 보기는 ${options} 입니다.`;
+  }
+  if (q.type === "spot") {
+    return `${typeLabel}. ${plain}. 힌트, ${q.hint}. 그림 아홉 개 중에서 다른 하나를 찾아 눌러 주세요.`;
+  }
+  if (q.type === "ox") {
+    return `${typeLabel}. ${plain}. 힌트, ${q.hint}. 맞으면 맞아요, 틀리면 아니에요를 눌러 주세요.`;
+  }
+  return `${typeLabel}. ${plain}. ${q.hint ? `힌트, ${q.hint}.` : ""} 보기는 ${options} 입니다.`;
+}
 
 export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { today, todayDaily, completeQuiz, weekPoints, streak } = useApp();
@@ -247,6 +274,11 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
                   </span>
                 ) : null}
               </span>
+            </div>
+
+            {/* 글씨가 어려운 분을 위해 문제와 보기를 소리로 읽어 준다 */}
+            <div className="mt-2.5">
+              <SpeakButton text={questionSpeech(q)} label="문제 소리로 듣기" dataName="quiz" />
             </div>
 
             {q.type === "ox" ? (

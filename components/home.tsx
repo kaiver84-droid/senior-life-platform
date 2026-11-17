@@ -14,6 +14,7 @@ import { HomeCalendarBanner } from "./calendar";
 import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
 import { HealthChallengeCard } from "./health";
 import { SharePreviewSheet } from "./share-sheet";
+import { SpeakButton } from "./speak";
 import { AssetImage, Icon3D, NeulbomMark, RaisedTile, WeatherArt, type Icon3DName } from "./art";
 import {
   IconBank,
@@ -33,6 +34,23 @@ import {
 const PRESETS = ["오늘도 건강하세요", "행복한 하루 보내세요", "손주가 보고 싶은 날", "우리 함께 힘내요"];
 
 const WEEKDAY = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+
+/** 오늘의 운세를 소리로 읽어 줄 글 */
+function fortuneSpeech(fortune: Fortune): string {
+  const parts = [
+    `오늘의 운세입니다. ${fortune.headline}.`,
+    `별 다섯 개 중 ${fortune.stars}개, ${fortune.score}점입니다.`,
+    fortune.timeTrait ? `${fortune.timeTrait}` : "",
+    `총운, ${fortune.general}`,
+    `금전, ${fortune.money}`,
+    `건강, ${fortune.health}`,
+    `인연, ${fortune.social}`,
+    fortune.timeTip ? `${fortune.birthTime} 태생 팁, ${fortune.timeTip}` : "",
+    `행운의 색은 ${fortune.luckyColor.name}, 행운의 숫자는 ${fortune.luckyNumber}, 행운의 방향은 ${fortune.luckyDirection}, 좋은 시간은 ${fortune.luckyTime}입니다.`,
+    `오늘의 한마디. ${fortune.advice}`,
+  ];
+  return parts.filter(Boolean).join(" ");
+}
 
 function longKoreanDate(dateStr: string): { date: string; day: string } {
   const d = new Date(dateStr + "T00:00:00Z");
@@ -364,6 +382,16 @@ function FortuneDetail({ fortune }: { fortune: Fortune }) {
         {fortune.timeTrait ? (
           <p className="mt-2 text-[0.86rem] font-semibold leading-relaxed text-ink/45">{fortune.timeTrait}</p>
         ) : null}
+
+        {/* 글씨가 어려운 분을 위해 운세 전체를 소리로 읽어 준다 */}
+        <div className="mt-3">
+          <SpeakButton
+            text={fortuneSpeech(fortune)}
+            label="운세 소리로 듣기"
+            size="lg"
+            dataName="fortune"
+          />
+        </div>
       </div>
 
       <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
@@ -599,7 +627,7 @@ function GreetingSheet({
       <p className="mt-2 text-center text-[0.78rem] font-medium leading-relaxed text-ink/45">
         {kakaoConfig().configured
           ? "카카오톡 공유 카드로 바로 보낼 수 있어요. 친구를 고르면 끝나요."
-          : "휴대폰 공유창으로 보낼 수 있어요. 카카오 앱 키를 넣으면 카카오톡 공유 카드로 바뀌어요."}
+          : "휴대폰 공유창으로 보낼 수 있어요. 카카오톡 공유 설정이 아직 준비되지 않아 공유창으로 보내요."}
       </p>
 
       <SharePreviewSheet

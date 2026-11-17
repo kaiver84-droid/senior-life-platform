@@ -392,11 +392,11 @@ export function Onboarding() {
           </section>
 
           <Card className="rounded-[1.75rem] p-5">
-            <p className="text-center text-[1.06rem] font-black leading-snug text-ink">카카오톡으로 시작해요</p>
+            <p className="text-center text-[1.06rem] font-black leading-snug text-ink">카카오 계정으로 시작해요</p>
             <p className="mt-1 text-center text-[0.9rem] font-semibold leading-relaxed text-ink/55">
-              아이디와 비밀번호를 새로 만들 필요 없이
+              카카오 계정으로 한 번만 로그인하면 끝나요.
               <br />
-              카카오톡 버튼만 누르면 끝나요.
+              새로 가입하거나 비밀번호를 만들지 않아도 돼요.
             </p>
 
             <button
@@ -417,6 +417,8 @@ export function Onboarding() {
               </p>
             ) : (
               <p className="mt-2.5 text-center text-[0.82rem] font-semibold leading-relaxed text-ink/45">
+                버튼을 누르면 카카오 로그인 화면이 열려요. 쓰던 카카오 계정으로 로그인해 주세요.
+                <br />
                 처음 한 번만 이름·태어난 시간·사는 곳을 여쭤봐요.
               </p>
             )}
