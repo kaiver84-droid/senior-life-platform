@@ -181,3 +181,11 @@ select.field {
     display: none;
   }
 }
+
+/* 사진·3D 아이콘 — 아이폰 레티나(3배) 화면에서 브라우저가 가장 선명한 방식으로 그린다.
+   안드로이드 크롬은 이 값을 픽셀 확대로 해석하므로 아이폰 사파리에만 적용한다. */
+@supports (-webkit-touch-callout: none) {
+  img {
+    image-rendering: -webkit-optimize-contrast;
+  }
+}

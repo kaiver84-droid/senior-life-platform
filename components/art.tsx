@@ -36,7 +36,8 @@ export function AssetImage({
         alt={alt}
         className={className}
         loading={priority ? "eager" : "lazy"}
-        decoding="async"
+        /* 첫 화면 그림은 화면이 그려지기 전에 다 풀어 두어, 스크롤하거나 흔들릴 때 늦게 번지지 않게 한다 */
+        decoding={priority ? "sync" : "async"}
         fetchPriority={priority ? "high" : "auto"}
       />
     </picture>
@@ -47,7 +48,7 @@ export function AssetImage({
 /* 3D 입체 아이콘 (public/images/icon-3d-*)                           */
 /* ---------------------------------------------------------------- */
 /* - 클레이·글래스 질감의 3D 아이콘. 단색 선 SVG 대신 쓴다.           */
-/* - 640px(표시 크기의 4~8배)로 두어 아이폰 3배 화면에서도 또렷하다.   */
+/* - 1024px(표시 크기의 20배 이상)로 두어 아이폰 3배 화면에서도 또렷하다. */
 /* - 모서리는 이미지에 투명하게 새겨 두어 어떤 배경에서도 자연스럽다.  */
 /* ================================================================ */
 
@@ -65,7 +66,8 @@ export type Icon3DName =
   | "icon-3d-walk"
   | "icon-3d-stretch"
   | "icon-3d-medicine"
-  | "icon-3d-call";
+  | "icon-3d-call"
+  | "icon-3d-brain";
 
 export function Icon3D({
   name,

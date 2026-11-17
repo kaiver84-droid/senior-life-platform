@@ -375,7 +375,13 @@ export function Onboarding() {
                 priority
                 className="absolute inset-0 h-full w-full object-cover object-[50%_46%]"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B2233]/85 via-[#0B2233]/18 to-transparent" />
+              <div
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-[66%]"
+                style={{
+                  background:
+                    "linear-gradient(to top, rgba(11,34,51,0.90) 0%, rgba(11,34,51,0.62) 30%, rgba(11,34,51,0.24) 62%, rgba(11,34,51,0))",
+                }}
+              />
               <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
                 <div className="flex items-center gap-1.5">
                   <NeulbomMark size={32} />

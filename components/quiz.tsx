@@ -19,7 +19,7 @@ import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { SpeakButton } from "./speak";
 import { IconChevron, IconClock, IconDownload, IconShare, IconTrophy } from "./icons";
-import { AssetImage } from "./art";
+import { AssetImage, Icon3D } from "./art";
 import { RankingPanel } from "./ranking";
 import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
 import type { QuizType } from "@/lib/types";
@@ -171,7 +171,9 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       {mode === "intro" ? (
         <Card className="fade-up overflow-hidden p-5">
           <div className="rounded-[1.4rem] bg-gradient-to-br from-sky to-[#F4F9FD] p-5 text-center">
-            <div className="text-[2.6rem] leading-none">🧠</div>
+            <div className="mx-auto w-fit drop-shadow-[0_10px_18px_rgba(120,60,80,0.18)]">
+              <Icon3D name="icon-3d-brain" size={78} alt="두뇌" />
+            </div>
             <p className="mt-2 text-[1.15rem] font-black leading-snug text-ink">
               오늘의 3문제가
               <br />

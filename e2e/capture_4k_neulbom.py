@@ -9,8 +9,8 @@ BASE=https://senior-life-platform.pages.dev python3 e2e/capture_4k_neulbom.py   
 - 3D 아이콘(icon-3d-*)이 모두 640px 원본으로 로드되는지, 깨진 이미지 0건
 - 콘솔/페이지 오류 0건
 스크린샷
-- downloads/neulbom_4k_onboarding.png · neulbom_4k_home.png · neulbom_4k_icons.png
-- 보조: downloads/_4k_quiz.png · _4k_welfare.png · _4k_tiles.png
+- downloads/neulbom_uhd_onboarding.png · neulbom_uhd_home.png · neulbom_uhd_icons.png
+- 보조: downloads/_uhd_quiz.png · _uhd_welfare.png · _uhd_tiles.png
 """
 import json
 import os
@@ -27,12 +27,14 @@ CHROME = os.environ.get("CHROME_PATH", "/workspace/.cache/ms-playwright/chromium
 KAKAO_ID, KAKAO_NAME = "777009002", "순자"
 
 BIG = {  # 고해상도 여야 하는 배너·사진 (파일명 조각 → 최소 naturalWidth)
-    "onboarding-hero": 1600,
-    "greeting-chrysanthemum": 1500,
-    "quiz-couple": 1200,
-    "welfare-pension-bg": 1500,
-    "family-greeting-couple": 1400,
+    "onboarding-hero": 2400,
+    "home-hero": 2400,
+    "greeting-chrysanthemum": 2400,
+    "quiz-couple": 2400,
+    "welfare-pension-bg": 2400,
+    "family-greeting-couple": 2400,
 }
+ICON_MIN = 768  # 3D 아이콘(icon-3d-*) 최소 원본 크기
 
 
 def kakao_stub(route, request):
@@ -107,7 +109,7 @@ def report(rows, where):
     for r in rows:
         name = r["src"].split("/")[-1]
         ok = r["w"] > 0
-        need = next((v for k, v in BIG.items() if k in name), 640)
+        need = next((v for k, v in BIG.items() if k in name), ICON_MIN)
         sharp = ok and r["w"] >= need
         if not ok:
             problems.append(f"{where}: 로드 실패 {name}")
@@ -173,9 +175,9 @@ def main():
         page.wait_for_selector("img[src*='onboarding-hero']", timeout=20000)
         page.wait_for_timeout(2200)
         problems += report(img_rows(page), "onboarding")
-        page.screenshot(path=f"{OUT}/neulbom_4k_onboarding.png", full_page=True)
+        page.screenshot(path=f"{OUT}/neulbom_uhd_onboarding.png", full_page=True)
         # 히어로 영역만 따로(디테일 확인용)
-        page.locator("section").first.screenshot(path=f"{OUT}/_4k_onboarding_hero.png")
+        page.locator("section").first.screenshot(path=f"{OUT}/_uhd_onboarding_hero.png")
 
         # ---------- 홈 화면 ----------
         if LOCAL:
@@ -185,7 +187,7 @@ def main():
             page.route("**/api/auth/kakao**", kakao_stub)
             live_login(page)
         page.wait_for_timeout(2600)
-        page.screenshot(path=f"{OUT}/neulbom_4k_home.png")
+        page.screenshot(path=f"{OUT}/neulbom_uhd_home.png")
 
         # 지연 로딩(lazy) 아이콘까지 모두 불러오게 한 번 끝까지 훑는다
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -245,8 +247,8 @@ def main():
         if tb and tb["height"] > 40:
             clips.append(page.screenshot(clip=tb))
         if clips:
-            stack_images(clips, f"{OUT}/neulbom_4k_icons.png")
-        page.screenshot(path=f"{OUT}/_4k_tiles.png")
+            stack_images(clips, f"{OUT}/neulbom_uhd_icons.png")
+        page.screenshot(path=f"{OUT}/_uhd_tiles.png")
         page.evaluate("window.scrollTo(0, 0)")
         page.wait_for_timeout(400)
 
@@ -260,16 +262,21 @@ def main():
         page.evaluate("window.scrollTo(0, 360)")
         page.wait_for_timeout(900)
         problems += report(img_rows(page), "quiz")
-        page.screenshot(path=f"{OUT}/_4k_quiz.png")
+        page.screenshot(path=f"{OUT}/_uhd_quiz.png")
 
         # ---------- 복지 화면 ----------
         nav.nth(4).click()
         page.wait_for_timeout(1600)
+        # 아래쪽 가족 사진은 lazy 라서, 끝까지 내려 실제로 받아진 뒤에 검사한다
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        page.wait_for_timeout(1600)
+        page.evaluate("window.scrollTo(0, 0)")
+        page.wait_for_timeout(500)
         problems += report(img_rows(page), "welfare")
-        page.screenshot(path=f"{OUT}/_4k_welfare.png")
+        page.screenshot(path=f"{OUT}/_uhd_welfare.png")
         page.evaluate("window.scrollTo(0, 900)")
         page.wait_for_timeout(900)
-        page.screenshot(path=f"{OUT}/_4k_welfare_family.png")
+        page.screenshot(path=f"{OUT}/_uhd_welfare_family.png")
 
         browser.close()
     if httpd:

@@ -163,8 +163,14 @@ export function HomeTab({
             priority
             className="absolute inset-0 h-full w-full object-cover object-[54%_36%]"
           />
-          {/* 딥네이비 그라디언트 — 흰 인사말이 어떤 그림 위에서도 또렷하게 읽힌다 */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B2233]/95 via-[#0B2233]/40 to-transparent" />
+          {/* 아래쪽 글자 자리에만 깔리는 딥네이비 그라디언트 — 그림 위쪽은 가리지 않는다 */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[74%]"
+            style={{
+              background:
+                "linear-gradient(to top, rgba(11,34,51,0.95) 0%, rgba(11,34,51,0.74) 24%, rgba(11,34,51,0.36) 52%, rgba(11,34,51,0))",
+            }}
+          />
           <div className="absolute left-3.5 top-3.5 flex items-center gap-1.5 rounded-2xl bg-white/95 px-2.5 py-1.5 shadow-soft backdrop-blur">
             <IconCalendar size={19} className="text-brand" />
             <div className="leading-tight">
@@ -205,9 +211,15 @@ export function HomeTab({
             priority
             className="absolute inset-0 h-full w-full object-cover object-[64%_center]"
           />
-          {/* 왼쪽 손글씨가 그림자 없이도 선명하게 읽히도록 하는 부드러운 흰 그라디언트 */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/75 to-white/0" />
-          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white/55 via-white/15 to-transparent" />
+          {/* 왼쪽 손글씨 자리만 덮는 흰 그라디언트 — 국화 사진 오른쪽은 원본 그대로 선명하게 */}
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 w-[78%]"
+            style={{
+              background:
+                "linear-gradient(to right, #FFFFFF 0%, rgba(255,255,255,0.96) 32%, rgba(255,255,255,0.66) 58%, rgba(255,255,255,0))",
+            }}
+          />
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/45 via-white/10 to-transparent" />
           <div className="relative flex h-full flex-col justify-center gap-1 px-4">
             <button
               type="button"

@@ -144,8 +144,14 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
               priority
               className="absolute inset-0 h-full w-full object-cover object-[58%_center]"
             />
-            {/* 아래로 갈수록 흰색 — 글씨가 사진 위에서도 깔끔하게 읽힌다 */}
-            <div className="absolute inset-0 bg-gradient-to-b from-white/0 via-white/45 to-white" />
+            {/* 글자 자리(아래쪽)에만 흰색을 올린다 — 사진 위쪽은 원본 그대로 보이게 */}
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-[64%]"
+              style={{
+                background:
+                  "linear-gradient(to top, #FFFFFF 0%, rgba(255,255,255,0.96) 32%, rgba(255,255,255,0.62) 64%, rgba(255,255,255,0))",
+              }}
+            />
             <div className="relative flex h-full flex-col justify-end px-4 pb-3">
               <div className="flex items-center gap-1.5">
                 <Badge tone="brand">{hero.category}</Badge>
