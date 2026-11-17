@@ -918,10 +918,15 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[0.98rem] font-black text-ink">{r.event.title}</span>
-                          <span className="block text-[0.78rem] font-bold text-ink/50">
+                          <span className="block truncate text-[0.78rem] font-bold text-ink/50">
                             {dayTitle(r.date)} · {info.label}
                             {r.event.repeatYearly ? " · 매년" : ""}
                           </span>
+                          {alarmModeOf(r.event) !== "none" ? (
+                            <span className="mt-0.5 block truncate text-[0.74rem] font-extrabold text-gold-dark">
+                              🔔 {alarmLabel(r.event)}
+                            </span>
+                          ) : null}
                         </span>
                         <span className="shrink-0 rounded-full bg-coral-light px-2.5 py-1 text-[0.74rem] font-black text-coral-dark">
                           {ddayLabel(r.days)}
