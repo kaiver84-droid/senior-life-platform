@@ -154,7 +154,9 @@ def main():
 
         body = page.inner_text("main")
         check("우리 가족 사랑방" in body, "체험 모임 이름 표시")
-        check(re.search(r"멤버 11명", body) is not None, "체험 모임 회원 11명(체험 10 + 나)", re.search(r"멤버 \d+명", body).group(0) if re.search(r"멤버 \d+명", body) else "")
+        # 체험 모임(10명) + 나 = 11명이 기본. 지난 검증에서 들어온 회원이 있으면 그보다 많을 수 있다.
+        member = re.search(r"멤버 (\d+)명", body)
+        check(bool(member) and int(member.group(1)) >= 11, "체험 모임 회원 11명 이상(체험 10 + 나)", member.group(0) if member else "")
         donut = re.search(r"(\d+) / (\d+)명", body)
         check(bool(donut) and int(donut.group(1)) >= 8, "오늘 출석 인원 표시", donut.group(0) if donut else "")
         check("이번 주 모임 달성률" in body and "%" in body, "주간 달성률 게이지")
@@ -186,7 +188,9 @@ def main():
         nav_button(page, "홈").click()
         page.wait_for_timeout(1500)
         home = page.inner_text("main")
-        check("우리 가족 사랑방" in home and "멤버 11명" in home, "홈 상단 모임 배너(이름·멤버 수)")
+        home_member = re.search(r"멤버 (\d+)명", home)
+        check("우리 가족 사랑방" in home and bool(home_member) and int(home_member.group(1)) >= 11,
+              "홈 상단 모임 배너(이름·멤버 수)", home_member.group(0) if home_member else "")
         check("오늘의 모임 현황" in home, "홈 오늘의 모임 현황 카드")
         check("모임 1위" in home, "홈 모임 1위 표시")
         check("오늘의 모임 미션" in home and "모임 랭킹에 도전하세요" in home, "홈 오늘의 모임 미션 배너")
@@ -266,7 +270,9 @@ def main():
         page.get_by_role("button", name=re.compile("우리 가족 사랑방")).first.click()
         page.wait_for_timeout(2500)
         switched = page.inner_text("main")
-        check("우리 가족 사랑방" in switched and "멤버 11명" in switched, "모임 전환 후 출석·게시판 다시 표시")
+        sw_member = re.search(r"멤버 (\d+)명", switched)
+        check("우리 가족 사랑방" in switched and bool(sw_member) and int(sw_member.group(1)) >= 11,
+              "모임 전환 후 출석·게시판 다시 표시", sw_member.group(0) if sw_member else "")
 
         rows = sql(f"select id from public.groups where creator_code = '{CODE_A}' order by created_at desc limit 1")
         new_code = rows[0]["id"] if rows else ""
