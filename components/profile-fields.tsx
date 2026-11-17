@@ -4,8 +4,8 @@ import React, { useEffect, useMemo } from "react";
 import { REGIONS, sigunguList } from "@/lib/regions";
 import { BIRTH_TIME_OPTIONS, UNKNOWN_BIRTH_TIME, normalizeBirthTime } from "@/lib/birthtime";
 
-/** 태어난 해 선택 범위 — 40대(1987년생·한국 나이 40세, 1986년생·만 40세)부터 어르신 세대까지 */
-export const BIRTH_YEARS = Array.from({ length: 1987 - 1930 + 1 }, (_, i) => 1930 + i);
+/** 태어난 해 선택 범위 — 전 연령(10대 이하·20대 … 90대)을 고를 수 있게 1926~2020년생 */
+export const BIRTH_YEARS = Array.from({ length: 2020 - 1926 + 1 }, (_, i) => 1926 + i);
 export const DEFAULT_BIRTH_YEAR = 1952;
 export const DEFAULT_SIDO = "충청북도";
 export const DEFAULT_SIGUNGU = "옥천군";

@@ -55,8 +55,8 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
 
   const age = profile ? new Date().getFullYear() - profile.birthYear : 0;
   const filtered = category === "전체" ? matched : matched.filter((p) => p.category === category);
-  // 65세 이상은 기초연금을, 40·50대는 지금 챙길 수 있는 직업훈련·일자리 혜택을 맨 앞에 보여 준다.
-  const heroId = age >= 65 ? "basic-pension" : "training-card";
+  // 65세 이상은 기초연금을, 40·50대는 직업훈련·건강검진, 10~30대는 지금 나이에 맞는 복지를 먼저 보여 준다.
+  const heroId = age >= 65 ? "basic-pension" : age >= 18 ? "training-card" : "bokjiro-search";
   const hero = filtered.find((p) => p.id === heroId) ?? filtered[0];
   const others = filtered.filter((p) => p.id !== hero?.id);
   const openProgram = matched.find((p) => p.id === openId) ?? null;
@@ -137,7 +137,9 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
 
       {age > 0 && age < 60 ? (
         <p className="fade-up rounded-2xl bg-leaf-light px-3.5 py-2.5 text-[0.84rem] font-semibold leading-snug text-leaf-dark">
-          40·50대는 직업훈련·건강검진처럼 지금부터 챙길 수 있는 혜택을 먼저 보여 드려요. 예순이 되면 연금·돌봄 혜택도 함께 열려요.
+          {age >= 40
+            ? "40·50대는 직업훈련·건강검진처럼 지금부터 챙길 수 있는 혜택을 먼저 보여 드려요. 예순이 되면 연금·돌봄 혜택도 함께 열려요."
+            : "지금 나이에 맞는 혜택을 먼저 보여 드려요. 예순이 되면 연금·돌봄 혜택도 함께 열려요."}
         </p>
       ) : null}
 

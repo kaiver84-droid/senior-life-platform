@@ -291,17 +291,27 @@ export function gapMessage(gap: {
     : `현재 ${gap.rank}위 · 조금만 더 하면 10위권이에요`;
 }
 
-/** 태어난 해 → 연령대(50·60·70·80대+) */
+/**
+ * 태어난 해 → 연령대(10대 이하 · 20대 … 70대 · 80대 이상).
+ * 만 나이(올해 - 태어난 해)를 기준으로 하고, 해가 바뀌는 순간에도 화면과 서버가
+ * 같은 연령대를 보도록 오늘 날짜는 한국 시간(KST)으로 읽는다.
+ */
 export function ageBandOf(birthYear: number | undefined | null): number {
-  const age = new Date().getFullYear() - Number(birthYear || 1955);
+  const year = Number(kstDate().slice(0, 4)) || new Date().getFullYear();
+  const raw = Number(birthYear || 0);
+  // 태어난 해를 모르면 1950년대생(70대) 기준으로 본다 — 예전 화면과 같은 자리에 서도록.
+  const born = Number.isFinite(raw) && raw > 1900 ? raw : 1955;
+  const age = Math.max(0, year - born);
+  if (age < 20) return 10;
   if (age >= 80) return 80;
-  if (age >= 70) return 70;
-  if (age >= 60) return 60;
-  return 50;
+  return Math.floor(age / 10) * 10;
 }
 
-export const AGE_BANDS = [50, 60, 70, 80];
+/** 전 연령 연령대 — 10대 이하부터 80대 이상까지 8개 */
+export const AGE_BANDS = [10, 20, 30, 40, 50, 60, 70, 80];
 
 export function ageBandLabel(band: number): string {
-  return band >= 80 ? "80대 이상" : `${band}대`;
+  if (band <= 10) return "10대 이하";
+  if (band >= 80) return "80대 이상";
+  return `${band}대`;
 }

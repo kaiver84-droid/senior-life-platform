@@ -201,7 +201,8 @@ function RangeTabs({
         })}
       </div>
       {value === "age" ? (
-        <div className="grid grid-cols-4 gap-2" data-age-bands>
+        // 전 연령 8개 연령대 — 390px 화면에서도 잘리지 않게 4×2 그리드로 놓는다
+        <div className="grid grid-cols-4 gap-1.5" data-age-bands>
           {AGE_BANDS.map((b) => {
             const on = b === band;
             return (
@@ -210,7 +211,7 @@ function RangeTabs({
                 data-age-band={b}
                 aria-pressed={on}
                 onClick={() => onBand(b)}
-                className={`min-h-[48px] rounded-xl px-1 text-[0.9rem] font-extrabold transition ${
+                className={`min-h-[48px] whitespace-nowrap rounded-xl px-0.5 text-[0.86rem] font-extrabold leading-tight tracking-[-0.03em] transition ${
                   on ? "bg-ink text-white" : "bg-white text-ink/55 shadow-soft"
                 }`}
               >
@@ -506,11 +507,14 @@ function MyRankCard({
   area,
   localValue,
   localNote,
+  notice,
 }: {
   view: RankingResult;
   area: LeagueArea;
   localValue: number;
   localNote?: string;
+  /** 내 순위가 없는 이유를 알려 줄 한 줄(다른 연령대 순위표를 볼 때) */
+  notice?: string;
 }) {
   const { rankingVisible, setRankingVisible } = useApp();
   const info = areaInfo(area);
@@ -576,7 +580,9 @@ function MyRankCard({
         data-rank-gap
         className="mt-2 rounded-xl bg-white/85 px-3 py-2 text-center text-[0.92rem] font-bold leading-snug text-brand-deep"
       >
-        {gapMessage({ rank, aheadDiff: gap?.aheadDiff, top10Diff: gap?.top10Diff, total: view.total })}
+        {!rank && notice
+          ? notice
+          : gapMessage({ rank, aheadDiff: gap?.aheadDiff, top10Diff: gap?.top10Diff, total: view.total })}
       </p>
       {note && rank ? (
         <p className="mt-1 text-center text-[0.78rem] font-semibold text-ink/45">{note}</p>
@@ -973,7 +979,9 @@ function useAreaRanking(area: LeagueArea, range: RankingRange, band: number) {
         sido: profile?.sido,
         sigungu: profile?.sigungu,
         band,
-        me: rankingVisible
+        // 연령대 순위표에서 내 연령대가 아니면 내 줄은 넣지 않는다(서버 집계와 같은 기준).
+        me:
+          rankingVisible && (range !== "age" || band === ageBandOf(profile?.birthYear))
           ? {
               name: profile?.nickname || "나",
               key: code || undefined,
@@ -1053,8 +1061,14 @@ function AreaBoard({
   invitesByDay?: Record<string, number>;
 }) {
   const { view, loading } = useAreaRanking(area, range, band);
-  const { state, today, rankingVisible, streak } = useApp();
+  const { state, today, rankingVisible, streak, profile } = useApp();
   const info = areaInfo(area);
+  // 다른 연령대 순위표를 보고 있을 때는 내 순위가 없는 게 당연하다 — 그 이유를 알려 준다.
+  const myBand = ageBandOf(profile?.birthYear);
+  const otherBandNote =
+    range === "age" && band !== myBand
+      ? `지금은 ${ageBandLabel(band)} 순위표예요. 내 연령대(${ageBandLabel(myBand)}) 순위는 위에서 ‘${ageBandLabel(myBand)}’를 누르면 보여요.`
+      : undefined;
   const rest = view.rows.slice(3, 10);
   const invites = view.invitesByDay ?? invitesByDay;
   const localValue =
@@ -1086,7 +1100,7 @@ function AreaBoard({
 
       <RestList rows={rest} area={area} />
 
-      <MyRankCard view={view} area={area} localValue={localValue} />
+      <MyRankCard view={view} area={area} localValue={localValue} notice={otherBandNote} />
 
       <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
         공개 순위표에는 10위까지만 보여 드려요. 매주 월요일 0시에 새로 시작해요 (앞으로 {resetCountdown()}).

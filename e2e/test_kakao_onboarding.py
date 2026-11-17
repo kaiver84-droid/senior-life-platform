@@ -186,7 +186,7 @@ def main():
         check(options[1].startswith("자시") and "밤 11시" in options[1], "자시 버튼에 밤 11시~새벽 1시 표기")
         check(options[2].startswith("축시") and "새벽 1시" in options[2], "축시 버튼에 새벽 1시~3시 표기")
         years = page.eval_on_selector_all("#setup-birth option", "els => els.map(e => e.value)")
-        check(years[0] == "1930" and years[-1] == "1987", "태어난 해 범위 1930~1987(40대까지)")
+        check(years[0] == "1926" and years[-1] == "2020", "태어난 해 범위 1926~2020(전 연령)")
         nick_value = page.input_value("#setup-nick")
         print("   카카오 닉네임 기본값:", nick_value)
         shot_setup = crisp(page, f"{TMP}/02_setup.png", 500)

@@ -166,8 +166,8 @@ def main():
         if page.query_selector("#setup-nick"):
             years = page.eval_on_selector_all("#setup-birth option", "els => els.map(e => e.value)")
             check(
-                "생년월일 1930~1987 58개",
-                lambda: (len(years) == 58 and years[0] == "1930" and years[-1] == "1987", f"{years[0]}~{years[-1]} n={len(years)}"),
+                "생년월일 1926~2020 전 연령 95개",
+                lambda: (len(years) == 95 and years[0] == "1926" and years[-1] == "2020", f"{years[0]}~{years[-1]} n={len(years)}"),
             )
             order = page.eval_on_selector_all("[data-birthtime]", "els => els.map(e => e.getAttribute('data-birthtime'))")
             check("12시진 '모르겠음' 최상단", lambda: (order[0] == "모름" and len(order) == 13, f"first={order[0]} n={len(order)}"))

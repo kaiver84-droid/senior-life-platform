@@ -14,7 +14,21 @@ import { LEAGUE_DAILY_CAP, LEAGUE_POINTS, formatAreaValue, weekDatesOf } from ".
 import { periodLabel, weekIdOf } from "./week";
 
 const SURNAMES = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "전", "홍"];
+/** 어르신 세대(60대 이상) 이름 — 예전 그대로 */
 const LAST = ["자", "순", "례", "옥", "분", "희", "영", "숙", "자", "순", "덕", "임", "남", "정", "미", "경"];
+/** 40~50대 이름 */
+const MID_LAST = ["지훈", "수진", "은지", "성훈", "미경", "상현", "혜영", "재민", "보라", "동욱", "선영", "태호"];
+/** 10~30대 이름 */
+const YOUNG_LAST = ["민준", "서연", "지우", "하준", "예린", "도윤", "수아", "지호", "유진", "민서", "현우", "채원"];
+
+/** 연령대에 맞는 예시 참여자 이름 — 20대 순위표에 ‘김○자’ 같은 이름이 섞이지 않게 */
+function givenNamesFor(opts: { range: RankingRange; band?: number }): string[] {
+  const band = opts.band ?? 0;
+  if (opts.range !== "age" || !band) return LAST;
+  if (band <= 30) return YOUNG_LAST;
+  if (band <= 50) return MID_LAST;
+  return LAST;
+}
 
 function hashStr(s: string): number {
   let h = 2166136261;
@@ -501,12 +515,13 @@ function sampleParticipants(input: {
   const count = input.range === "national" ? 120 + Math.floor(head() * 30) : 46 + Math.floor(head() * 14);
   const used = new Set<string>();
   const out: RankParticipant[] = [];
+  const givenNames = givenNamesFor({ range: input.range, band: input.band });
 
   for (let i = 0; i < count; i++) {
     const rnd = mulberry32(hashStr(`${seedBase}|${i}`));
     let name = "";
     do {
-      name = `${SURNAMES[Math.floor(rnd() * SURNAMES.length)]}○${LAST[Math.floor(rnd() * LAST.length)]}`;
+      name = `${SURNAMES[Math.floor(rnd() * SURNAMES.length)]}○${givenNames[Math.floor(rnd() * givenNames.length)]}`;
     } while (used.has(name));
     used.add(name);
 

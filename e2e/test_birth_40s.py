@@ -110,7 +110,7 @@ def main():
         page.wait_for_selector("#setup-nick", timeout=30000)
 
         years = page.locator("#setup-birth option").all_inner_texts()
-        check(len(years) > 0 and years[-1].startswith("1987"), "초기 설정 출생연도 마지막 항목이 1987년", years[-1] if years else "-")
+        check(len(years) == 95 and years[-1].startswith("2020"), "초기 설정 출생연도가 1926~2020(전 연령) 95개", years[-1] if years else "-")
         check(any(y.startswith("1986") for y in years), "1986년 선택지 있음")
 
         page.fill("#setup-nick", NAME)
@@ -141,7 +141,7 @@ def main():
         page.get_by_role("button", name="내 정보 고치기").click()
         page.wait_for_timeout(700)
         years2 = page.locator("#edit-birth option").all_inner_texts()
-        check(len(years2) > 0 and years2[-1].startswith("1987"), "내 정보 고치기에도 1987년까지 있음", years2[-1] if years2 else "-")
+        check(len(years2) == 95 and years2[-1].startswith("2020"), "내 정보 고치기에도 2020년까지 있음", years2[-1] if years2 else "-")
         check(page.locator("#edit-birth").input_value() == BIRTH, "저장한 출생연도가 그대로 선택돼 있음")
         page.select_option("#edit-birth", "1987")
         save_btn = page.get_by_role("button", name="저장", exact=True)
