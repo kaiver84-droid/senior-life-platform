@@ -17,15 +17,23 @@ create table if not exists public.users (
   sido           text not null default '',
   sigungu        text not null default '',
   source         text not null default 'demo' check (source in ('demo','kakao')),
+  -- 카카오톡 로그인 프로필 사진 주소(https). 랭킹·모임 출석 현황에 원형 사진으로 보인다
+  avatar_url     text,
+  -- 초대 링크(?ref=)로 가입할 때 남는 초대한 사람의 내부 id — 랭킹 ‘초대왕’ 순위
+  invited_by     text,
   -- 최초 1회 초기 설정(이름·태어난해·태어난시간·지역)을 마쳤는지 — true 면 재로그인 시 설정 화면을 건너뛴다
   profile_completed boolean not null default false,
   created_at     timestamptz not null default now(),
   last_seen_at   timestamptz not null default now()
 );
 
--- 이미 만들어진 DB에도 두 열을 더한다(있으면 그대로 둔다).
+-- 이미 만들어진 DB에도 열을 더한다(있으면 그대로 둔다).
 alter table public.users add column if not exists birth_time text not null default '모름';
 alter table public.users add column if not exists profile_completed boolean not null default false;
+alter table public.users add column if not exists avatar_url text;
+alter table public.users add column if not exists invited_by text;
+
+create index if not exists users_invited_idx on public.users (invited_by);
 
 -- 로그인한 사람을 카카오 회원번호(external_id)로 찾을 수 있게
 create index if not exists users_external_idx on public.users (external_id);
@@ -205,6 +213,8 @@ create table if not exists public.groups (
   id           text primary key,                 -- 6자리 초대 코드 (예: FAM101)
   name         text not null,
   description  text not null default '',
+  -- 모임 지역 — ‘옥천군’ 처럼 짧게. 모임 수정에서 바꿀 수 있다
+  region       text not null default '',
   goal_score   int  not null default 500,        -- 우리 모임 주간 목표 점수
   weekly_goal  int  not null default 5,          -- 한 사람이 일주일에 참여할 목표 일수
   creator_code text,
@@ -240,6 +250,9 @@ create table if not exists public.group_cheers (
   created_at timestamptz not null default now(),
   primary key (post_id, user_code)
 );
+
+-- 모임 지역(region) — 이미 만들어진 DB에도 더한다.
+alter table public.groups add column if not exists region text not null default '';
 
 -- 기본 선택 모임 (다시 로그인해도 보던 모임으로)
 alter table public.users add column if not exists active_group_id text;

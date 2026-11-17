@@ -6,6 +6,10 @@ import { HEALTH_IDS, healthOf, mergeHealth } from "./health";
 import type { FamilyEvent } from "./calendar";
 import { isValidDateKey, newEventId } from "./calendar";
 import { kstDate, weekIdOf } from "./week";
+import { makeCode } from "./code";
+
+// 화면 곳곳에서 `@/lib/storage` 에서 그대로 가져다 쓴다(계산식은 lib/code.ts 한 곳).
+export { makeCode };
 
 const KEY = "seniorLife.v1";
 
@@ -48,17 +52,6 @@ function write(state: AppState) {
   } catch {
     /* 저장 공간이 없으면 화면은 그대로 동작 */
   }
-}
-
-export function makeCode(seed?: string): string {
-  const base = seed || Math.random().toString(36).slice(2);
-  let h = 2166136261;
-  for (let i = 0; i < base.length; i++) {
-    h ^= base.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const n = (h >>> 0).toString(36).toUpperCase();
-  return n.slice(-6).padStart(6, "0");
 }
 
 /** 오늘 또는 어제까지 이어진 활동 일수를 센다 */
@@ -315,8 +308,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : [];
         const familyEvents =
           s.familyEvents.length === 0 && Array.isArray(remote.familyEvents) ? remote.familyEvents : s.familyEvents;
+        // 다른 기기에서 카톡으로 로그인해 사진이 저장됐으면 내 프로필에도 붙여 준다.
+        const remoteAvatar = typeof remote.profile?.avatarUrl === "string" ? remote.profile.avatarUrl : "";
+        const profile =
+          s.profile && remoteAvatar && !s.profile.avatarUrl
+            ? { ...s.profile, avatarUrl: remoteAvatar, avatar: remoteAvatar }
+            : s.profile;
         return {
           ...s,
+          profile,
           health,
           med,
           quizLogs: [...s.quizLogs, ...extra].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-120),

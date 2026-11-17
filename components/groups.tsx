@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useGroup } from "@/lib/group-store";
 import { timeAgo } from "@/lib/groups";
 import { kstDate, koreanDate } from "@/lib/week";
 import { useApp } from "@/lib/storage";
 import { HealthChallengeCard } from "./health";
 import { SharePreviewSheet } from "./share-sheet";
-import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
+import { Avatar, Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import {
   IconChevron,
   IconCrown,
@@ -258,8 +258,7 @@ export function GroupMissionBanner({ onJoin }: { onJoin: () => void }) {
 /* ------------------------------------------------------------------ */
 
 export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { active, activeId, detail, groups, addPost, cheer, leave, join, select, todayDone, online } =
-    useGroup();
+  const { active, activeId, detail, groups, addPost, cheer, join, select, todayDone, online } = useGroup();
   const { show } = useToast();
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [text, setText] = useState("");
@@ -300,7 +299,9 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             </h1>
             <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
               {active
-                ? `멤버 ${active.memberCount}명 · 이번 주 달성률 ${detail?.weeklyRate ?? 0}%`
+                ? `멤버 ${active.memberCount}명 · 이번 주 달성률 ${detail?.weeklyRate ?? 0}%${
+                    detail?.region ? ` · ${detail.region}` : ""
+                  }`
                 : "가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요"}
             </p>
             {active ? (
@@ -519,13 +520,13 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                 posts.map((p) => (
                   <div key={p.id} className="rounded-2xl bg-paper px-3.5 py-2.5">
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[0.86rem] font-black text-white ${
-                          p.authorCode === detail.creatorCode ? "bg-gold-dark" : "bg-brand"
-                        }`}
-                      >
-                        {p.authorName.slice(0, 1)}
-                      </span>
+                      <Avatar
+                        name={p.authorName}
+                        size={32}
+                        background={p.authorCode === detail.creatorCode ? "bg-gold-dark" : "bg-brand"}
+                        className="text-white"
+                        alt={`${p.authorName} 님 프로필 사진`}
+                      />
                       <p className="min-w-0 flex-1 truncate text-[0.9rem] font-black text-ink">
                         {p.authorName}
                         {p.authorCode === detail.creatorCode ? (
@@ -553,6 +554,15 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             </div>
           </Card>
 
+          <div className="grid grid-cols-2 gap-2">
+            <BigButton variant="white" full height={52} onClick={() => setSheet("edit")}>
+              ✏️ 모임 수정
+            </BigButton>
+            <BigButton variant="ghost" full height={52} onClick={() => setSheet("leave")}>
+              🚪 모임 탈퇴하기
+            </BigButton>
+          </div>
+
           <div className="flex items-center justify-center gap-2 pb-1">
             <button
               type="button"
@@ -564,14 +574,10 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             <span className="text-ink/20">|</span>
             <button
               type="button"
-              onClick={() => {
-                if (typeof window !== "undefined" && window.confirm("이 모임에서 나갈까요? 남긴 글은 그대로 남아요.")) {
-                  void leave();
-                }
-              }}
+              onClick={() => setSheet("switch")}
               className="text-[0.82rem] font-bold text-ink/45 underline decoration-ink/20 underline-offset-4"
             >
-              모임 나가기
+              모임 바꾸기
             </button>
           </div>
         </>
@@ -589,19 +595,49 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
 }
 
 function MemberChip({ member }: { member: GroupMemberInfo }) {
+  // 오늘 출석했으면 도장, 아직이면 이름 첫 글자 — 사진(카톡 프로필)이 있으면 그 위에 사진을 보여 준다.
+  const fallback = member.todayAttended ? (
+    <IconStamp size={20} />
+  ) : (
+    member.name.slice(0, 1)
+  );
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="relative">
-        <span
-          className={`grid h-11 w-11 place-items-center rounded-full text-[1rem] font-black ${
-            member.todayAttended
-              ? "bg-leaf text-white shadow-soft"
-              : "border-2 border-dashed border-ink/15 bg-white text-ink/25"
-          } ${member.isMe ? "ring-2 ring-brand ring-offset-2" : ""}`}
-          aria-label={`${member.name}${member.isMe ? "(나)" : ""}${member.online ? " 접속 중" : ""} ${member.todayAttended ? "출석" : "미출석"}`}
-        >
-          {member.todayAttended ? <IconStamp size={20} /> : member.name.slice(0, 1)}
-        </span>
+        {member.avatarUrl ? (
+          <Avatar
+            name={member.name}
+            src={member.avatarUrl}
+            size={44}
+            background={member.todayAttended ? "bg-leaf" : "bg-brand-light"}
+            ring={
+              member.isMe
+                ? "ring-2 ring-brand ring-offset-2"
+                : member.todayAttended
+                  ? "ring-2 ring-leaf/60 ring-offset-1"
+                  : undefined
+            }
+            className="text-white shadow-soft"
+            alt={`${member.name}${member.isMe ? "(나)" : ""} 프로필 사진`}
+          />
+        ) : (
+          <span
+            className={`grid h-11 w-11 place-items-center rounded-full text-[1rem] font-black ${
+              member.todayAttended
+                ? "bg-leaf text-white shadow-soft"
+                : "border-2 border-dashed border-ink/15 bg-white text-ink/25"
+            } ${member.isMe ? "ring-2 ring-brand ring-offset-2" : ""}`}
+            aria-label={`${member.name}${member.isMe ? "(나)" : ""}${member.online ? " 접속 중" : ""} ${member.todayAttended ? "출석" : "미출석"}`}
+          >
+            {fallback}
+          </span>
+        )}
+        {/* 오늘 출석 — 사진 위에 작은 도장 */}
+        {member.avatarUrl && member.todayAttended ? (
+          <span className="absolute -bottom-0.5 -left-0.5 grid h-4 w-4 place-items-center rounded-full bg-leaf text-white shadow-soft">
+            <IconStamp size={11} />
+          </span>
+        ) : null}
         {/* 지금 접속 중 — 초록 점 */}
         {member.online ? (
           <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-white">
@@ -649,7 +685,7 @@ function MemberChip({ member }: { member: GroupMemberInfo }) {
 /* 모임 시트 (바꾸기 · 만들기 · 코드로 들어가기 · 초대)                 */
 /* ------------------------------------------------------------------ */
 
-type SheetKind = null | "switch" | "create" | "join" | "invite";
+type SheetKind = null | "switch" | "create" | "join" | "invite" | "edit" | "leave";
 
 function GroupSheet({
   mode,
@@ -660,7 +696,7 @@ function GroupSheet({
   onClose: () => void;
   onChange: (m: SheetKind) => void;
 }) {
-  const { groups, activeId, detail, select, create, join, inviteLink } = useGroup();
+  const { groups, activeId, detail, select, create, join, inviteLink, updateGroup, leave } = useGroup();
   const { profile, today } = useApp();
   const { show } = useToast();
   const [name, setName] = useState("");
@@ -668,6 +704,17 @@ function GroupSheet({
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editRegion, setEditRegion] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+
+  // 수정 시트를 열 때마다 지금 모임 값으로 채운다.
+  useEffect(() => {
+    if (mode !== "edit" || !detail) return;
+    setEditName(detail.name || "");
+    setEditRegion(detail.region || "");
+    setEditDesc(detail.description || "");
+  }, [mode, detail]);
 
   const open = mode !== null;
   const link = useMemo(() => (detail ? inviteLink(detail.id) : ""), [detail, inviteLink]);
@@ -715,6 +762,24 @@ function GroupSheet({
     }
   };
 
+  const doEdit = async () => {
+    if (busy) return;
+    setBusy(true);
+    const r = await updateGroup({ name: editName, region: editRegion, description: editDesc });
+    setBusy(false);
+    show(r.message);
+    if (r.ok) onClose();
+  };
+
+  const doLeave = async () => {
+    if (busy) return;
+    setBusy(true);
+    const r = await leave();
+    setBusy(false);
+    show(r.message);
+    onClose();
+  };
+
   return (
     <Sheet
       open={open}
@@ -726,7 +791,11 @@ function GroupSheet({
             ? "새 모임 만들기"
             : mode === "join"
               ? "초대 번호로 들어가기"
-              : "우리 모임"
+              : mode === "edit"
+                ? "모임 수정하기"
+                : mode === "leave"
+                  ? "모임에서 탈퇴하기"
+                  : "우리 모임"
       }
       subtitle={
         mode === "invite"
@@ -735,7 +804,11 @@ function GroupSheet({
             ? "가족방이든 친구 모임이든 1초면 만들어져요"
             : mode === "join"
               ? "받은 초대 번호 6자리를 적어 주세요"
-              : "보고 싶은 모임을 골라 주세요"
+              : mode === "edit"
+                ? "이름·지역·소개를 바꾸면 모임원 모두에게 바로 보여요"
+                : mode === "leave"
+                  ? "정말 이 모임에서 나갈까요?"
+                  : "보고 싶은 모임을 골라 주세요"
       }
     >
       {mode === "switch" ? (
@@ -896,6 +969,74 @@ function GroupSheet({
             <br />
             자동으로 이 모임에 들어옵니다.
           </p>
+        </div>
+      ) : null}
+
+      {mode === "edit" && detail ? (
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="group-edit-name" className="mb-1.5 block text-[0.95rem] font-extrabold">
+              모임 이름
+            </label>
+            <input
+              id="group-edit-name"
+              className="field"
+              placeholder="예) 우리 가족 사랑방"
+              value={editName}
+              maxLength={20}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="group-edit-region" className="mb-1.5 block text-[0.95rem] font-extrabold">
+              지역
+            </label>
+            <input
+              id="group-edit-region"
+              className="field"
+              placeholder="예) 충북 옥천군"
+              value={editRegion}
+              maxLength={20}
+              onChange={(e) => setEditRegion(e.target.value)}
+            />
+            <p className="mt-1 text-[0.8rem] font-semibold text-ink/45">비워 두어도 괜찮아요.</p>
+          </div>
+          <div>
+            <label htmlFor="group-edit-desc" className="mb-1.5 block text-[0.95rem] font-extrabold">
+              소개
+            </label>
+            <textarea
+              id="group-edit-desc"
+              className="field min-h-[88px] resize-none"
+              placeholder="예) 매일 아침 함께 두뇌 퀴즈를 풀어요"
+              value={editDesc}
+              maxLength={80}
+              onChange={(e) => setEditDesc(e.target.value)}
+            />
+          </div>
+          <BigButton variant="ink" size="lg" full onClick={doEdit} disabled={busy || editName.trim().length < 2}>
+            ✏️ 바꾼 내용 저장하기
+          </BigButton>
+          <p className="text-center text-[0.8rem] font-semibold text-ink/45">
+            모임원 모두에게 같은 내용이 보여요.
+          </p>
+        </div>
+      ) : null}
+
+      {mode === "leave" && detail ? (
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-coral-light/70 px-4 py-3.5">
+            <p className="text-[1rem] font-black text-coral-dark">‘{detail.name}’에서 나갈까요?</p>
+            <p className="mt-1 text-[0.88rem] font-semibold leading-relaxed text-coral-dark/80">
+              모임 게시판에 남긴 글은 그대로 남아요. 언제든 초대 번호로 다시 들어올 수 있어요.
+            </p>
+          </div>
+          <BigButton variant="coral" size="lg" full onClick={doLeave} disabled={busy}>
+            🚪 모임 탈퇴하기
+          </BigButton>
+          <BigButton variant="white" full onClick={onClose} disabled={busy}>
+            그만두기 (모임에 남기)
+          </BigButton>
         </div>
       ) : null}
 

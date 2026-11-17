@@ -9,6 +9,9 @@ export type Profile = {
   sigungu: string;
   createdAt: string;
   source: "demo" | "kakao";
+  /** 카카오톡 프로필 사진 주소(https). 없으면 이름 첫 글자로 표시한다. */
+  avatarUrl?: string;
+  /** 예전 이름 — avatarUrl 과 같은 값(이 기기에 이미 저장된 설정과 호환) */
   avatar?: string;
   /** 로그인 후 최초 1회 초기 설정(이름·태어난해·태어난시간·지역)을 마쳤는지 */
   profileCompleted?: boolean;
@@ -61,7 +64,7 @@ export type AppState = {
   lastVisit: string;
 };
 
-export type RankingScope = "region" | "zodiac" | "streak" | "national" | "group" | "groups";
+export type RankingScope = "region" | "zodiac" | "streak" | "national" | "group" | "groups" | "invite";
 
 export type RankingRow = {
   rank: number;
@@ -69,6 +72,10 @@ export type RankingRow = {
   points: number;
   streak: number;
   isMe: boolean;
+  /** 카카오톡 프로필 사진(있으면 원형 사진, 없으면 이름 첫 글자) */
+  avatarUrl?: string;
+  /** 초대왕 순위에서 초대에 성공한 사람 수 */
+  invites?: number;
 };
 
 export type RankingResult = {
@@ -80,6 +87,8 @@ export type RankingResult = {
   myRank: number | null;
   myPercentile: number | null;
   sample: boolean;
+  /** 초대왕 순위에서 내가 초대한 사람 수 */
+  myInvites?: number;
 };
 
 /** 단체(모임)끼리 겨루는 순위 한 칸 — 모임 하나가 한 줄 */
@@ -118,6 +127,8 @@ export type GroupSummary = {
   id: string;
   name: string;
   description: string;
+  /** 모임 지역 — ‘옥천군’ 처럼 짧게(없으면 빈 값) */
+  region?: string;
   isDemo: boolean;
   memberCount: number;
   /** 지금(최근 5분 안에) 접속해 있는 모임원 수 — 나 포함 */
@@ -130,6 +141,8 @@ export type GroupSummary = {
 export type GroupMemberInfo = {
   code: string;
   name: string;
+  /** 카카오톡 프로필 사진 주소 — 모임원 출석 현황에 원형 사진으로 보여 준다 */
+  avatarUrl?: string;
   isMe: boolean;
   isLeader: boolean;
   isDemo: boolean;

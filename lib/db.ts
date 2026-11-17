@@ -5,6 +5,7 @@
  *
  * Supabase 는 PostgREST(REST) 로 접근하므로 별도 SDK 없이 fetch 만 사용한다.
  */
+import { normalizeAvatarUrl } from "./avatar";
 
 export type DbEnv = {
   NEXT_PUBLIC_SUPABASE_URL?: string;
@@ -28,6 +29,9 @@ export type StoredProfile = {
   createdAt: string;
   /** 최초 1회 초기 설정을 마쳤는지 — true 면 다시 로그인해도 설정 화면을 건너뛴다 */
   profileCompleted?: boolean;
+  /** 카카오톡 프로필 사진(https) — 랭킹·모임 출석 현황에 원형 사진으로 보인다 */
+  avatarUrl?: string;
+  /** 예전 이름(avatarUrl 과 같은 값) */
   avatar?: string;
 };
 
@@ -174,11 +178,40 @@ export async function upsertUser(env: DbEnv, code: string, profile: StoredProfil
         external_id: profile.id,
         profile_completed: Boolean(profile.profileCompleted),
         last_seen_at: new Date().toISOString(),
+        // 사진이 없을 때는 이 열을 보내지 않는다 — 다른 기기에서 저장된 사진을 지우지 않게.
+        ...(() => {
+          const avatarUrl = normalizeAvatarUrl(profile.avatarUrl || profile.avatar);
+          return avatarUrl ? { avatar_url: avatarUrl } : {};
+        })(),
       },
     ]),
   });
   if (!res.ok) throw new Error(`supabase users ${res.status}: ${await res.text()}`);
   return { ok: true, mode: "supabase" as const };
+}
+
+/**
+ * 초대왕 집계 — ‘누가 초대했는지’(invited_by)를 계정마다 한 번만 적는다.
+ * 이미 초대한 사람이 있으면 그대로 두고(first touch), 자기 자신 초대는 세지 않는다.
+ */
+export async function rememberInviter(env: DbEnv, code: string, myId: string, inviterId?: string) {
+  const inviter = (inviterId || "").trim();
+  if (!inviter || !myId || inviter === myId) return;
+  const { configured } = supabaseConfig(env);
+  if (!configured) return;
+  try {
+    await sbRequest(
+      env,
+      `${TABLE.users}?code=eq.${encodeURIComponent(code)}&invited_by=is.null`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ invited_by: inviter }),
+        headers: { Prefer: "return=minimal" },
+      }
+    );
+  } catch {
+    /* 초대 기록은 부가 정보 — 실패해도 저장은 그대로 */
+  }
 }
 
 export async function saveQuizLog(env: DbEnv, code: string, log: StoredQuizLog) {
@@ -341,7 +374,8 @@ export async function getState(env: DbEnv, code: string): Promise<StoredState | 
           source: u.source || "demo",
           createdAt: u.created_at,
           profileCompleted: Boolean(u.profile_completed),
-          avatar: u.avatar || undefined,
+          avatarUrl: normalizeAvatarUrl(u.avatar_url),
+          avatar: normalizeAvatarUrl(u.avatar_url),
         }
       : null,
     quizLogs: (Array.isArray(quiz) ? quiz : []).map(

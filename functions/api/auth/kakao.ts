@@ -1,5 +1,7 @@
-import { dbStatus } from "../../../lib/db";
+import { dbStatus, sbRequest, supabaseConfig } from "../../../lib/db";
 import type { DbEnv } from "../../../lib/db";
+import { normalizeAvatarUrl } from "../../../lib/avatar";
+import { makeCode } from "../../../lib/code";
 
 type Ctx = { request: Request; env: DbEnv };
 
@@ -23,13 +25,36 @@ function newCodeId(): string {
 type KakaoUser = {
   id: number;
   kakao_account?: {
-    profile?: { nickname?: string; profile_image_url?: string };
+    profile?: { nickname?: string; profile_image_url?: string; thumbnail_image_url?: string };
     name?: string;
     birthyear?: string;
     birthday?: string;
     email?: string;
   };
 };
+
+/**
+ * 카톡 프로필 사진 주소 — 카카오는 계정에 따라 http:// 를 주기도 한다.
+ * 아이폰 사파리는 https 화면에서 http 사진을 가로막으므로 https 로 바꿔서만 쓴다.
+ */
+function avatarOf(me: KakaoUser): string | undefined {
+  const profile = me.kakao_account?.profile;
+  return normalizeAvatarUrl(profile?.profile_image_url || profile?.thumbnail_image_url);
+}
+
+/** 다시 로그인한 사람의 사진을 users.avatar_url 에 바로 반영한다(프로필 저장 전이라도). */
+async function rememberAvatar(env: DbEnv, internalId: string, avatarUrl?: string) {
+  if (!avatarUrl || !supabaseConfig(env).configured) return;
+  try {
+    await sbRequest(env, `users?code=eq.${encodeURIComponent(makeCode(internalId))}`, {
+      method: "PATCH",
+      body: JSON.stringify({ avatar_url: avatarUrl }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* 사진 저장은 부가 정보 — 실패해도 로그인은 그대로 진행한다 */
+  }
+}
 
 /** 카카오 로그인 설정 여부를 알려 준다 (클라이언트가 버튼 상태를 정할 때 사용) */
 export const onRequestGet = async ({ request, env }: Ctx) => {
@@ -90,15 +115,20 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
 
     const nickname = me.kakao_account?.profile?.nickname || "카카오 이용자";
     const birthYear = Number(me.kakao_account?.birthyear || 0);
+    const avatarUrl = avatarOf(me);
+    const internalId = `kakao_${me.id}`;
+    await rememberAvatar(env, internalId, avatarUrl);
     const profile = {
-      id: `kakao_${me.id}`,
+      id: internalId,
       nickname,
       birthYear: birthYear || 1955,
       sido: "",
       sigungu: "",
       source: "kakao" as const,
       createdAt: new Date().toISOString(),
-      avatar: me.kakao_account?.profile?.profile_image_url,
+      avatarUrl,
+      // 예전 이름 — 이 기기에 이미 쌓인 설정과 호환
+      avatar: avatarUrl,
     };
     return json({ ok: true, profile, needsProfile: true });
   } catch (e) {

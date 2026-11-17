@@ -1,4 +1,4 @@
-import { dbStatus, getState, saveFamilyEvents, saveHealth, saveMed, saveQuizLog, saveVisit, upsertUser } from "../../lib/db";
+import { dbStatus, getState, rememberInviter, saveFamilyEvents, saveHealth, saveMed, saveQuizLog, saveVisit, upsertUser } from "../../lib/db";
 import type { DbEnv, StoredFamilyEvent } from "../../lib/db";
 
 type Ctx = { request: Request; env: DbEnv };
@@ -34,6 +34,10 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
       source: string;
       createdAt: string;
       profileCompleted?: boolean;
+      /** 카카오톡 프로필 사진(https) */
+      avatarUrl?: string;
+      /** 예전 이름(avatarUrl 과 같은 값) */
+      avatar?: string;
     };
     quizLogs?: {
       date: string;
@@ -49,6 +53,8 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     familyEvents?: StoredFamilyEvent[];
     /** 날짜별 건강 챌린지 체크인 — { "2026-11-16": ["water","walk"] } */
     health?: Record<string, string[]>;
+    /** 초대 링크(?ref=)로 처음 가입했을 때 — 초대한 사람의 내부 id(초대왕 순위) */
+    invitedBy?: string;
     today?: string;
   };
   try {
@@ -63,6 +69,7 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
 
   try {
     await upsertUser(env, body.code, body.profile);
+    if (body.invitedBy) await rememberInviter(env, body.code, body.profile.id, body.invitedBy);
     const latest = body.quizLogs?.[body.quizLogs.length - 1];
     if (latest) await saveQuizLog(env, body.code, latest);
     const med = body.med?.[today];

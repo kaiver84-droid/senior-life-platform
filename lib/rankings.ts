@@ -43,6 +43,8 @@ export type RankingInput = {
 export function buildRanking(input: RankingInput): RankingResult {
   const weekId = input.weekId || weekIdOf();
   const scope = input.scope;
+  // 초대왕은 초대 건수로 겨루는 별도 순위표를 쓴다.
+  if (scope === "invite") return buildInviteRanking({ weekId, myName: input.myName });
   const seedBase =
     scope === "region"
       ? `${weekId}|${input.sido || ""}|${input.sigungu || ""}`
@@ -109,9 +111,119 @@ export function scopeLabel(scope: RankingScope, sido?: string, sigungu?: string)
   if (scope === "groups") return "단체별";
   if (scope === "group") return "우리 모임";
   if (scope === "national") return "전국";
+  if (scope === "invite") return "초대왕";
   if (scope === "region") return `${sigungu || sido || "우리 동네"}`;
   if (scope === "zodiac") return "같은 띠·나이";
   return "개근상";
+}
+
+/* ------------------------------------------------------------------ */
+/* 초대왕 — 친구를 많이 초대한 사람 순위                                 */
+/* ------------------------------------------------------------------ */
+
+/** 실제 초대 기록이 적을 때 순위표를 채우는 예시 (이름·건수 모두 날짜로만 정해진다) */
+const INVITER_SAMPLES: { name: string; invites: number }[] = [
+  { name: "김영숙", invites: 9 },
+  { name: "박정자", invites: 8 },
+  { name: "이말순", invites: 7 },
+  { name: "최순희", invites: 6 },
+  { name: "정옥분", invites: 6 },
+  { name: "강영자", invites: 5 },
+  { name: "조정순", invites: 5 },
+  { name: "윤미숙", invites: 4 },
+  { name: "장덕임", invites: 4 },
+  { name: "임경자", invites: 3 },
+  { name: "한복순", invites: 3 },
+  { name: "오금순", invites: 2 },
+];
+
+export type InviterInput = {
+  /** 초대한 사람 이름 */
+  name: string;
+  /** 초대에 성공한 사람 수 */
+  invites: number;
+  avatarUrl?: string;
+  isMe?: boolean;
+};
+
+/**
+ * 초대왕 순위 — 초대 링크로 새로 가입한 사람이 많은 순서.
+ * 실제 가입자(inviters)를 먼저 넣고, 빈자리는 예시 회원으로 채워 화면이 비어 보이지 않게 한다.
+ */
+export function buildInviteRanking(input: {
+  weekId?: string;
+  myName?: string;
+  myInvites?: number;
+  myAvatarUrl?: string;
+  inviters?: InviterInput[];
+}): RankingResult {
+  const weekId = input.weekId || weekIdOf();
+  const rnd = mulberry32(hashStr(`${weekId}|invite`));
+
+  const rows: { name: string; invites: number; avatarUrl?: string; isMe: boolean }[] = [];
+  const used = new Set<string>();
+
+  (input.inviters || [])
+    .filter((x) => x && x.name && Number.isFinite(x.invites) && x.invites > 0)
+    .sort((a, b) => b.invites - a.invites)
+    .forEach((x) => {
+      if (used.has(x.name)) return;
+      used.add(x.name);
+      rows.push({ name: x.name, invites: Math.round(x.invites), avatarUrl: x.avatarUrl, isMe: Boolean(x.isMe) });
+    });
+
+  INVITER_SAMPLES.forEach((s) => {
+    if (used.has(s.name) || rows.length >= 12) return;
+    used.add(s.name);
+    rows.push({
+      name: s.name,
+      invites: s.invites,
+      isMe: false,
+    });
+  });
+
+  // 나 — 실제 초대 성공 건수와 카톡 사진을 그대로 보여 준다.
+  const myName = (input.myName || "나").trim() || "나";
+  const existingMe = rows.find((r) => r.isMe);
+  if (existingMe) {
+    existingMe.name = myName;
+    existingMe.invites = Math.max(existingMe.invites, Math.round(input.myInvites ?? existingMe.invites));
+    existingMe.avatarUrl = input.myAvatarUrl || existingMe.avatarUrl;
+  } else if (!used.has(myName)) {
+    rows.push({
+      name: myName,
+      invites: Math.max(0, Math.round(input.myInvites ?? 0)),
+      avatarUrl: input.myAvatarUrl,
+      isMe: true,
+    });
+  }
+
+  // 동점이면 이름 순으로 안정적으로 정렬(새로 고쳐도 순서가 흔들리지 않게)
+  rows.sort((a, b) => b.invites - a.invites || a.name.localeCompare(b.name) || (rnd() - 0.5));
+
+  const total = rows.length;
+  const ranked = rows.map((r, i) => ({
+    rank: i + 1,
+    name: r.name,
+    points: 0,
+    streak: 0,
+    invites: r.invites,
+    avatarUrl: r.avatarUrl,
+    isMe: r.isMe,
+  }));
+  const meRow = ranked.find((r) => r.isMe);
+
+  return {
+    weekId,
+    scope: "invite",
+    periodLabel: periodLabel(),
+    rows: ranked.slice(0, 10),
+    total,
+    myRank: meRow ? meRow.rank : null,
+    myPercentile: meRow ? Math.max(1, Math.round((meRow.rank / total) * 100)) : null,
+    sample: true,
+    myInvites: meRow?.invites ?? 0,
+  };
 }
 
 /* ------------------------------------------------------------------ */

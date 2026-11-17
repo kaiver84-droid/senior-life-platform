@@ -27,6 +27,7 @@ type LocalGroup = {
   id: string;
   name: string;
   description: string;
+  /** 모임 지역(선택) */  region?: string;
   goalScore: number;
   weeklyGoal: number;
   creatorCode: string;
@@ -240,11 +241,12 @@ export function localPayload(
 
 export function localAction(
   body: {
-    action: "create" | "join" | "select" | "leave" | "post" | "cheer" | "ping";
+    action: "create" | "join" | "select" | "leave" | "post" | "cheer" | "ping" | "update";
     code: string;
     groupId?: string | null;
     name?: string;
     description?: string;
+    region?: string;
     content?: string;
     postId?: string;
     me?: MeStatsInput;
@@ -263,6 +265,7 @@ export function localAction(
       id,
       name: (body.name || "우리 모임").trim().slice(0, 20),
       description: (body.description || "").trim().slice(0, 80),
+      region: (body.region || "").trim().slice(0, 20),
       goalScore: 500,
       weeklyGoal: 5,
       creatorCode: code,
@@ -275,6 +278,13 @@ export function localAction(
     const g = db.groups.find((x) => x.id === body.groupId);
     if (g && !g.members.some((m) => m.code === code)) {
       g.members.push({ code, name: meName, role: "member", joinedAt: new Date().toISOString() });
+    }
+  } else if (body.action === "update" && body.groupId) {
+    const g = db.groups.find((x) => x.id === body.groupId);
+    if (g) {
+      if (body.name !== undefined) g.name = body.name.trim().slice(0, 20) || g.name;
+      if (body.description !== undefined) g.description = body.description.trim().slice(0, 80);
+      if (body.region !== undefined) g.region = body.region.trim().slice(0, 20);
     }
   } else if (body.action === "leave" && body.groupId) {
     const g = db.groups.find((x) => x.id === body.groupId);

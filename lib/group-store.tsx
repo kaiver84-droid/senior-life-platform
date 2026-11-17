@@ -35,7 +35,9 @@ type GroupCtx = {
   select: (id: string) => Promise<void>;
   create: (name: string, description?: string) => Promise<ActionResult>;
   join: (groupId: string) => Promise<ActionResult>;
-  leave: () => Promise<void>;
+  leave: () => Promise<ActionResult>;
+  /** 모임 이름·지역·소개 바꾸기 */
+  updateGroup: (patch: { name?: string; region?: string; description?: string }) => Promise<ActionResult>;
   addPost: (content: string) => Promise<ActionResult>;
   cheer: (postId: string) => Promise<void>;
   inviteLink: (id?: string) => string;
@@ -57,6 +59,8 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   const meRef = useRef<MeStatsInput>({});
   const pendingRef = useRef<string | null>(null);
   const autoJoinRef = useRef(false);
+  /** 응원 요청이 날아가 있는 글 — 연타 방지 */
+  const cheerBusy = useRef<Set<string>>(new Set());
   /** 늦게 도착한 옛 응답이 새 상태를 덮어쓰지 않도록 요청 순번을 센다 */
   const reqSeq = useRef(0);
 
@@ -236,10 +240,29 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     [runAction]
   );
 
-  const leave = useCallback(async () => {
-    if (!activeRef.current) return;
-    await runAction({ action: "leave", groupId: activeRef.current });
+  const leave = useCallback(async (): Promise<ActionResult> => {
+    if (!activeRef.current) return { ok: false, message: "먼저 모임에 들어와 주세요." };
+    const r = await runAction({ action: "leave", groupId: activeRef.current });
+    return r.ok ? { ok: true, message: "모임에서 나왔어요." } : r;
   }, [runAction]);
+
+  const updateGroup = useCallback(
+    async (patch: { name?: string; region?: string; description?: string }): Promise<ActionResult> => {
+      if (!activeRef.current) return { ok: false, message: "먼저 모임에 들어와 주세요." };
+      const name = (patch.name ?? "").trim();
+      if (patch.name !== undefined && name.length < 2)
+        return { ok: false, message: "모임 이름을 두 글자 이상 적어 주세요." };
+      const r = await runAction({
+        action: "update",
+        groupId: activeRef.current,
+        name: patch.name !== undefined ? name : undefined,
+        region: patch.region,
+        description: patch.description,
+      });
+      return r.ok ? { ok: true, message: "모임 정보를 바꿨어요." } : r;
+    },
+    [runAction]
+  );
 
   const addPost = useCallback(
     async (content: string): Promise<ActionResult> => {
@@ -254,8 +277,43 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
 
   const cheer = useCallback(
     async (postId: string) => {
-      if (!activeRef.current) return;
-      await runAction({ action: "cheer", groupId: activeRef.current, postId });
+      const gid = activeRef.current;
+      if (!gid || cheerBusy.current.has(postId)) return;
+      // 연타로 요청이 꼬이지 않게 같은 글은 한 번만 보낸다.
+      cheerBusy.current.add(postId);
+
+      // 1) 먼저 화면을 0ms 로 바꾼다 — 하트 채우고 숫자 +1 (서버 응답을 기다리지 않는다)
+      let changed = false;
+      setPayload((prev) => {
+        if (!prev?.detail) return prev;
+        const posts = prev.detail.posts.map((p) => {
+          if (p.id !== postId || p.cheeredByMe) return p;
+          changed = true;
+          return { ...p, cheeredByMe: true, cheers: p.cheers + 1 };
+        });
+        return changed ? { ...prev, detail: { ...prev.detail, posts } } : prev;
+      });
+
+      try {
+        // 2) 서버에 저장하고, 돌아온 최종 값으로 맞춘다(실패하면 그 값이 곧 롤백).
+        const r = await runAction({ action: "cheer", groupId: gid, postId });
+        if (!r.ok && changed) {
+          setPayload((prev) => {
+            if (!prev?.detail) return prev;
+            return {
+              ...prev,
+              detail: {
+                ...prev.detail,
+                posts: prev.detail.posts.map((p) =>
+                  p.id === postId ? { ...p, cheeredByMe: false, cheers: Math.max(0, p.cheers - 1) } : p
+                ),
+              },
+            };
+          });
+        }
+      } finally {
+        cheerBusy.current.delete(postId);
+      }
     },
     [runAction]
   );
@@ -296,9 +354,10 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     create,
     join,
     leave,
+    updateGroup,
     addPost,
     cheer,
-    inviteLink: (id?: string) => inviteLinkFor(id || activeId || ""),
+    inviteLink: (id?: string) => inviteLinkFor(id || activeId || "", profile?.id),
     reload: () => void refresh(),
   };
 

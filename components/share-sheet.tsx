@@ -12,6 +12,8 @@ import {
 } from "@/lib/share";
 import { Badge, BigButton, Sheet, useToast } from "./ui";
 import { IconClose } from "./icons";
+import { useApp } from "@/lib/storage";
+import { withInviteRef } from "@/lib/groups";
 
 export type ShareSheetData = {
   /** 공유 카드 종류 — 색과 장식이 달라진다 */
@@ -75,6 +77,8 @@ export function SharePreviewSheet({
   sourceCanvas?: React.RefObject<HTMLCanvasElement | null>;
 }) {
   const { show } = useToast();
+  const { profile } = useApp();
+  const viewerId = profile?.id || "";
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [busy, setBusy] = useState<"kakao" | null>(null);
   const [hint, setHint] = useState<string>("");
@@ -98,8 +102,9 @@ export function SharePreviewSheet({
 
   const link = useCallback(() => {
     if (typeof window === "undefined") return "";
-    return data.link || window.location.origin;
-  }, [data.link]);
+    // 공유 링크에도 `ref=<내 id>` 를 붙인다 — 이 링크로 가입한 사람이 ‘초대왕’ 순위에 잡힌다.
+    return withInviteRef(data.link || window.location.origin, viewerId);
+  }, [data.link, viewerId]);
 
   const runKakao = useCallback(async () => {
     if (busy) return;

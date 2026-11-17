@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { AppProvider, useApp } from "@/lib/storage";
-import { ToastProvider, Sheet, BigButton, Divider, Badge, useToast } from "@/components/ui";
+import { ToastProvider, Sheet, BigButton, Divider, Badge, Avatar, useToast } from "@/components/ui";
 import { Onboarding } from "@/components/onboarding";
 import {
   DEFAULT_SIDO,
@@ -272,9 +272,14 @@ function Shell() {
           ) : (
             <div>
               <div className="flex items-center gap-3">
-                <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-light text-[1.2rem] font-black text-brand-dark">
-                  {profile.nickname.slice(0, 1)}
-                </span>
+                <Avatar
+                  name={profile.nickname}
+                  src={profile.avatarUrl || profile.avatar}
+                  size={56}
+                  background="bg-brand-light"
+                  className="text-brand-dark"
+                  alt={`${profile.nickname} 님 프로필 사진`}
+                />
                 <div>
                   <p className="text-[1.15rem] font-black">{profile.nickname} 님</p>
                   <p className="text-[0.9rem] font-semibold text-ink/55">
@@ -283,6 +288,15 @@ function Shell() {
                   <p className="mt-0.5 text-[0.86rem] font-semibold text-ink/45">
                     태어난 시간 · {birthTimeLabel(profile.birthTime)}
                   </p>
+                  {profile.avatarUrl || profile.avatar ? (
+                    <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#FEE500]/25 px-2 py-0.5 text-[0.78rem] font-extrabold text-[#3C1E1E]">
+                      💬 카카오톡 사진 연동됨 · 랭킹·모임에 보여요
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[0.78rem] font-semibold text-ink/40">
+                      카카오톡으로 로그인하면 내 사진이 랭킹·모임에 보여요
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="mt-3">

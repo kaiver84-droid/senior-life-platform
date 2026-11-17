@@ -4,6 +4,8 @@ import type { GroupsPayload } from "./types";
 
 /** 친구가 보낸 초대 링크(?group=XXXXXX)를 기억해 두는 키 */
 const INVITE_KEY = "seniorLife.pendingGroup";
+/** 친구가 보낸 초대 링크의 ?ref=<초대한 사람 id> 를 기억해 두는 키 */
+const REF_KEY = "seniorLife.inviteRef";
 /** 마지막으로 보던 모임 */
 export const ACTIVE_GROUP_KEY = "seniorLife.activeGroup";
 
@@ -17,11 +19,13 @@ export type MeStatsInput = {
 };
 
 export type GroupActionBody = {
-  action: "create" | "join" | "select" | "leave" | "post" | "cheer" | "ping";
+  action: "create" | "join" | "select" | "leave" | "post" | "cheer" | "ping" | "update";
   code: string;
   groupId?: string | null;
   name?: string;
   description?: string;
+  /** 모임 수정 — 지역(‘옥천군’ 처럼 짧게) */
+  region?: string;
   content?: string;
   postId?: string;
   me?: MeStatsInput;
@@ -41,26 +45,74 @@ export function siteOrigin(): string {
 }
 
 /** 모임 초대 링크 — 받은 사람은 로그인·초기 설정 직후 자동으로 모임에 들어온다 */
-export function inviteLinkFor(groupId: string): string {
-  return `${siteOrigin()}/?group=${encodeURIComponent(groupId)}`;
+export function inviteLinkFor(groupId: string, ref?: string): string {
+  const base = `${siteOrigin()}/?group=${encodeURIComponent(groupId)}`;
+  return withInviteRef(base, ref);
 }
 
 /**
- * 주소창의 ?group=XXXXXX 를 읽어 보관하고, 주소에서는 지운다.
+ * 초대 링크에 `ref=<내 id>` 를 붙인다 — 이 링크로 새로 가입한 사람이 몇 명인지 세어
+ * 랭킹의 ‘초대왕’ 순위가 만들어진다.
+ */
+export function withInviteRef(url: string, ref?: string): string {
+  if (!url || !ref) return url;
+  try {
+    const u = new URL(url, siteOrigin());
+    u.searchParams.set("ref", ref);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * 주소창의 ?group=XXXXXX · ?ref=내친구id 를 읽어 보관하고, 주소에서는 지운다.
  * (카카오 로그인 콜백의 ?code= 는 그대로 두어야 로그인이 이어진다)
  */
 export function captureInviteFromUrl() {
   if (typeof window === "undefined") return;
   try {
     const url = new URL(window.location.href);
-    const raw = (url.searchParams.get("group") || "").trim().toUpperCase();
-    if (!/^[A-Z0-9]{6}$/.test(raw)) return;
-    window.localStorage.setItem(INVITE_KEY, raw);
-    url.searchParams.delete("group");
+    const rawGroup = (url.searchParams.get("group") || "").trim().toUpperCase();
+    const rawRef = (url.searchParams.get("ref") || "").trim();
+    let changed = false;
+
+    if (/^[A-Z0-9]{6}$/.test(rawGroup)) {
+      window.localStorage.setItem(INVITE_KEY, rawGroup);
+      url.searchParams.delete("group");
+      changed = true;
+    }
+    if (rawRef) {
+      // 내부 id(u_xxx · kakao_xxx)만 받는다 — 이상한 값은 무시
+      if (/^[A-Za-z0-9_:-]{3,64}$/.test(rawRef)) window.localStorage.setItem(REF_KEY, rawRef);
+      url.searchParams.delete("ref");
+      changed = true;
+    }
+    if (!changed) return;
     const qs = url.searchParams.toString();
     window.history.replaceState({}, "", `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`);
   } catch {
     /* 주소를 읽지 못해도 화면은 그대로 */
+  }
+}
+
+/** 초대 링크로 들어온 사람을 초대한 사람의 id(없으면 null) */
+export function peekInviteRef(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = (window.localStorage.getItem(REF_KEY) || "").trim();
+    return v || null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearInviteRef() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(REF_KEY);
+  } catch {
+    /* 무시 */
   }
 }
 

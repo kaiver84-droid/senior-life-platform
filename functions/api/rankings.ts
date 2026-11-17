@@ -1,6 +1,7 @@
-import { buildGroupRanking, buildRanking } from "../../lib/rankings";
-import type { MyGroupInput } from "../../lib/rankings";
+import { buildGroupRanking, buildInviteRanking, buildRanking } from "../../lib/rankings";
+import type { InviterInput, MyGroupInput } from "../../lib/rankings";
 import { demoAttendedSet, demoPoints } from "../../lib/group-demo";
+import { normalizeAvatarUrl } from "../../lib/avatar";
 import { sbRequest, supabaseConfig } from "../../lib/db";
 import type { DbEnv } from "../../lib/db";
 import { kstDate, weekIdOf } from "../../lib/week";
@@ -25,6 +26,20 @@ async function sbGet<T>(env: DbEnv, path: string): Promise<T[]> {
 
 type GroupRow = { id: string; name: string; is_demo: boolean };
 type MemberRow = { group_id: string; user_code: string; name: string; role: string };
+
+/** 내 카카오톡 프로필 사진 — 순위표 '나' 칸에 원형 사진으로 보여 준다. */
+async function myAvatar(env: DbEnv, code: string): Promise<string | undefined> {
+  if (!code || !supabaseConfig(env).configured) return undefined;
+  try {
+    const rows = await sbGet<{ avatar_url?: string | null }>(
+      env,
+      `users?code=eq.${enc(code)}&select=avatar_url&limit=1`
+    );
+    return normalizeAvatarUrl(rows[0]?.avatar_url);
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * 실제 모임(groups · group_members) + 이번 주 퀴즈 점수 + 오늘 출석으로
@@ -84,10 +99,89 @@ async function groupsFromDb(
   return { myGroups: mine, total: groups.length };
 }
 
+/** 초대왕 재료 — users.invited_by 를 세어 초대한 사람별 성공 건수를 만든다. */
+async function invitersFromDb(
+  env: DbEnv,
+  code: string
+): Promise<{ inviters: InviterInput[]; myId: string; myName?: string; myInvites: number } | null> {
+  if (!supabaseConfig(env).configured) return null;
+
+  const meRows = code
+    ? await sbGet<{ external_id?: string | null; nickname?: string }>(
+        env,
+        `users?code=eq.${enc(code)}&select=external_id,nickname&limit=1`
+      )
+    : [];
+  const myId = meRows[0]?.external_id || "";
+  const myName = meRows[0]?.nickname || undefined;
+
+  const invited = await sbGet<{ invited_by: string }>(
+    env,
+    `users?invited_by=not.is.null&select=invited_by&limit=5000`
+  );
+  if (!invited.length) return { inviters: [], myId, myName, myInvites: 0 };
+
+  const counts = new Map<string, number>();
+  invited.forEach((r) => {
+    const id = (r.invited_by || "").trim();
+    if (!id) return;
+    counts.set(id, (counts.get(id) || 0) + 1);
+  });
+
+  const topIds = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([id]) => id);
+  if (!topIds.length) return { inviters: [], myId, myName, myInvites: counts.get(myId) || 0 };
+
+  const profiles = await sbGet<{ external_id?: string | null; nickname?: string; avatar_url?: string | null }>(
+    env,
+    `users?external_id=in.(${topIds.map(enc).join(",")})&select=external_id,nickname,avatar_url&limit=50`
+  ).catch(() => [] as { external_id?: string | null; nickname?: string; avatar_url?: string | null }[]);
+
+  const profileBy = new Map<string, { nickname?: string; avatar_url?: string | null }>();
+  profiles.forEach((p) => {
+    if (p.external_id) profileBy.set(p.external_id, p);
+  });
+
+  const inviters: InviterInput[] = topIds.map((id) => {
+    const prof = profileBy.get(id);
+    return {
+      name: prof?.nickname || "늘봄 친구",
+      invites: counts.get(id) || 0,
+      avatarUrl: normalizeAvatarUrl(prof?.avatar_url),
+      isMe: Boolean(myId) && id === myId,
+    };
+  });
+
+  return { inviters, myId, myName, myInvites: counts.get(myId) || 0 };
+}
+
 export const onRequestGet = async ({ request, env }: Ctx) => {
   const p = new URL(request.url).searchParams;
   const scopeParam = p.get("scope") || "region";
   const weekId = p.get("weekId") || weekIdOf();
+
+  // 초대왕 — 초대 링크로 새로 가입한 사람이 많은 순서
+  if (scopeParam === "invite") {
+    const code = p.get("code") || "";
+    let real: Awaited<ReturnType<typeof invitersFromDb>> = null;
+    let myAvatarUrl: string | undefined;
+    try {
+      real = await invitersFromDb(env, code);
+      myAvatarUrl = await myAvatar(env, code);
+    } catch {
+      real = null;
+    }
+    const result = buildInviteRanking({
+      weekId,
+      myName: real?.myName || p.get("name") || "나",
+      myInvites: real?.myInvites ?? 0,
+      myAvatarUrl,
+      inviters: real?.inviters || [],
+    });
+    return json({ ok: true, ...result });
+  }
 
   // 단체(모임)별 순위 — 모임 하나가 한 줄
   if (scopeParam === "groups") {
@@ -123,5 +217,11 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
     myStreak: Number(p.get("streak") || 0),
   });
 
-  return json({ ok: true, ...result });
+  // 순위표에 내가 보이면 그 줄에 카톡 사진을 붙여 준다(다른 줄은 예시 이름이라 사진이 없다).
+  const avatarUrl = await myAvatar(env, p.get("code") || "");
+  const rows = avatarUrl
+    ? result.rows.map((r) => (r.isMe ? { ...r, avatarUrl } : r))
+    : result.rows;
+
+  return json({ ok: true, ...result, rows });
 };

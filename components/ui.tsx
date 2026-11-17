@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconClose } from "./icons";
+import { normalizeAvatarUrl } from "@/lib/avatar";
 
 /* ---------------------------------------------------------------- */
 /* 버튼                                                              */
@@ -68,8 +69,16 @@ export function BigButton({
 /* 카드 · 배지                                                        */
 /* ---------------------------------------------------------------- */
 
-export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`card p-5 ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = "",
+  ...rest
+}: { children: React.ReactNode; className?: string } & Omit<React.HTMLAttributes<HTMLDivElement>, "children" | "className">) {
+  return (
+    <div className={`card p-5 ${className}`} {...rest}>
+      {children}
+    </div>
+  );
 }
 
 export function SectionTitle({
@@ -116,6 +125,80 @@ export function Badge({ children, tone = "brand" }: { children: React.ReactNode;
 
 export function Divider({ className = "" }: { className?: string }) {
   return <div className={`my-3.5 h-[1px] w-full bg-ink/8 ${className}`} />;
+}
+
+/* ---------------------------------------------------------------- */
+/* 프로필 사진 (카톡 사진 · 없으면 이름 첫 글자)                       */
+/* ---------------------------------------------------------------- */
+
+/**
+ * 원형 프로필 사진.
+ * - `src`(카카오톡 프로필 사진)가 있으면 원형 사진으로 보여 준다.
+ * - 사진이 없거나 불러오지 못하면 이름 첫 글자 원으로 안전하게 돌아간다.
+ */
+export function Avatar({
+  name,
+  src,
+  size = 44,
+  background = "bg-brand",
+  ring,
+  className = "",
+  alt,
+}: {
+  name?: string;
+  src?: string | null;
+  size?: number;
+  /** 사진을 못 불러왔을 때(그리고 사진이 없을 때) 원의 배경색 */
+  background?: string;
+  /** 테두리 강조 — 예: "ring-4 ring-gold/60" */
+  ring?: string;
+  className?: string;
+  alt?: string;
+}) {
+  const url = normalizeAvatarUrl(src);
+  const [failed, setFailed] = useState(false);
+  // 사진 주소가 바뀌면(다시 로그인 등) 실패 표시를 초기화한다.
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
+  const initial = (name || "?").trim().slice(0, 1) || "?";
+  const box = { width: size, height: size };
+  const shape = `shrink-0 rounded-full ${ring ?? ""} ${className}`;
+
+  if (url && !failed) {
+    return (
+      <span
+        data-avatar="photo"
+        className={`relative inline-block overflow-hidden ${background} ${shape}`}
+        style={box}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt={alt || (name ? `${name} 프로필 사진` : "프로필 사진")}
+          width={size}
+          height={size}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      data-avatar="initial"
+      className={`inline-grid place-items-center font-black leading-none ${background} ${shape}`}
+      style={{ ...box, fontSize: Math.max(11, Math.round(size * 0.42)) }}
+      aria-label={name ? `${name} 프로필 사진 없음` : undefined}
+    >
+      {initial}
+    </span>
+  );
 }
 
 /** 화면 위에 겹쳐 띄우는 알약형 탭 */

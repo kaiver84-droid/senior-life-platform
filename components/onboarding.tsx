@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { makeCode, useApp } from "@/lib/storage";
+import { clearInviteRef, peekInviteRef } from "@/lib/groups";
 import { kakaoAuthorizeNow, kakaoConfig, loadKakaoSdk, startKakaoLogin } from "@/lib/share";
 import { UNKNOWN_BIRTH_TIME } from "@/lib/birthtime";
 import { BigButton, Card, useToast } from "./ui";
@@ -23,6 +24,9 @@ type PendingLogin = {
   id: string;
   nickname: string;
   birthYear?: number;
+  /** 카카오톡 프로필 사진(https) */
+  avatarUrl?: string;
+  /** 예전 이름(avatarUrl 과 같은 값) */
   avatar?: string;
   source: "demo" | "kakao";
 };
@@ -87,6 +91,7 @@ export function Onboarding() {
         birthTime?: string;
         sido?: string;
         sigungu?: string;
+        avatarUrl?: string;
         profileCompleted?: boolean;
       } | null = null;
       try {
@@ -110,7 +115,8 @@ export function Onboarding() {
           sido: remote.sido || DEFAULT_SIDO,
           sigungu: remote.sigungu || DEFAULT_SIGUNGU,
           source: who.source,
-          avatar: who.avatar,
+          avatarUrl: remote.avatarUrl || who.avatarUrl || who.avatar,
+          avatar: remote.avatarUrl || who.avatarUrl || who.avatar,
           profileCompleted: true,
         });
         show(`${remote.nickname} 님, 다시 오셨네요!`);
@@ -197,12 +203,13 @@ export function Onboarding() {
           setLoginError("카카오 로그인에 실패했어요. 잠시 뒤 다시 눌러 주세요.");
           return;
         }
-        const p = j.profile as { id?: string; nickname?: string; birthYear?: number; avatar?: string };
+        const p = j.profile as { id?: string; nickname?: string; birthYear?: number; avatarUrl?: string; avatar?: string };
         const who: PendingLogin = {
           id: String(p.id || `kakao_${Date.now().toString(36)}`),
           nickname: String(p.nickname || "").trim(),
           birthYear: normalizeBirthYear(p.birthYear),
-          avatar: p.avatar,
+          avatarUrl: p.avatarUrl || p.avatar,
+          avatar: p.avatarUrl || p.avatar,
           source: "kakao",
         };
         void enterAfterLogin(who);
@@ -278,7 +285,8 @@ export function Onboarding() {
       sido: draft.sido,
       sigungu: draft.sigungu,
       source: pending.source,
-      avatar: pending.avatar,
+      avatarUrl: pending.avatarUrl || pending.avatar,
+      avatar: pending.avatarUrl || pending.avatar,
       profileCompleted: true,
     };
 
@@ -291,8 +299,14 @@ export function Onboarding() {
         body: JSON.stringify({
           code: makeCode(pending.id),
           profile: { ...profile, createdAt: new Date().toISOString() },
+          // 초대 링크(?ref=)로 들어온 경우, 처음 만든 계정에만 ‘누가 초대했는지’ 남긴다.
+          invitedBy: (() => {
+            const ref = peekInviteRef();
+            return ref && ref !== pending.id ? ref : undefined;
+          })(),
         }),
       });
+      clearInviteRef();
     } catch {
       /* 오프라인이어도 이 기기 저장으로 계속 */
     }

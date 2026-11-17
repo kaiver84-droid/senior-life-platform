@@ -9,6 +9,7 @@
  *
  * 저장은 Supabase(PostgREST, service_role) — 테이블 정의는 supabase/groups.sql.
  */
+import { normalizeAvatarUrl } from "../../lib/avatar";
 import { sbRequest, supabaseConfig } from "../../lib/db";
 import type { DbEnv } from "../../lib/db";
 import {
@@ -40,12 +41,14 @@ const json = (data: unknown, status = 200) =>
 
 const enc = encodeURIComponent;
 
-const GROUP_COLUMNS = "id,name,description,goal_score,weekly_goal,creator_code,is_demo";
+const GROUP_COLUMNS = "id,name,description,region,goal_score,weekly_goal,creator_code,is_demo";
 
 type GroupRow = {
   id: string;
   name: string;
   description: string;
+  /** 모임 지역 — ‘옥천군’ 처럼 짧게. 없으면 빈 값 */
+  region?: string | null;
   goal_score: number;
   weekly_goal: number;
   creator_code: string | null;
@@ -182,7 +185,7 @@ async function buildDetail(
   );
   const inList = realCodes.length ? `(${realCodes.map(enc).join(",")})` : null;
 
-  const [quizRows, visitRows, healthRows] = inList
+  const [quizRows, visitRows, healthRows, avatarRows] = inList
     ? await Promise.all([
         sbGet<QuizRow>(
           env,
@@ -197,8 +200,19 @@ async function buildDetail(
           env,
           `health_checks?check_date=eq.${today}&user_code=in.${inList}&select=user_code,challenges`
         ).catch(() => [] as HealthRow[]),
+        // 카카오톡 프로필 사진 — 출석 현황에 원형 사진으로 보여 준다.
+        sbGet<{ code: string; avatar_url?: string | null }>(
+          env,
+          `users?code=in.${inList}&select=code,avatar_url`
+        ).catch(() => [] as { code: string; avatar_url?: string | null }[]),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
+
+  const avatarBy = new Map<string, string>();
+  (avatarRows as { code: string; avatar_url?: string | null }[]).forEach((a) => {
+    const url = normalizeAvatarUrl(a.avatar_url);
+    if (url) avatarBy.set(a.code, url);
+  });
 
   const pointsBy = new Map<string, number>();
   const quizToday = new Set<string>();
@@ -261,6 +275,7 @@ async function buildDetail(
     return {
       code: m.user_code,
       name: m.name,
+      avatarUrl: avatarBy.get(m.user_code),
       isMe,
       isLeader: m.role === "leader",
       isDemo: false,
@@ -317,6 +332,7 @@ async function buildDetail(
     id: g.id,
     name: g.name,
     description: g.description || "",
+    region: g.region || "",
     isDemo: Boolean(g.is_demo),
     memberCount,
     onlineCount,
@@ -382,6 +398,7 @@ async function buildPayload(
         id: r.id,
         name: r.name,
         description: r.description || "",
+        region: r.region || "",
         isDemo: Boolean(r.is_demo),
         memberCount: countMap.get(r.id) || 0,
         onlineCount: Math.max(1, onlineMap.get(r.id) || 0),
@@ -445,6 +462,8 @@ type PostBody = {
   content?: string;
   postId?: string | number;
   description?: string;
+  /** 모임 수정 — 지역(‘옥천군’ 처럼 짧게) */
+  region?: string;
   goalScore?: number;
   me?: MeStats;
 };
@@ -501,6 +520,37 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
       return json({ ok: true, groupId: id, ...payload });
     }
 
+    if (action === "update") {
+      const groupId = (body.groupId || "").trim().toUpperCase();
+      if (!groupId) return json({ ok: false, error: "group_required" }, 400);
+      const rows = await sbGet<GroupRow>(
+        env,
+        `groups?id=eq.${enc(groupId)}&select=${GROUP_COLUMNS}&limit=1`
+      );
+      if (!rows.length) return json({ ok: false, error: "group_not_found" }, 404);
+      const member = await sbGet<{ user_code: string }>(
+        env,
+        `group_members?group_id=eq.${enc(groupId)}&user_code=eq.${enc(code)}&select=user_code&limit=1`
+      );
+      if (!member.length) return json({ ok: false, error: "not_member" }, 403);
+
+      const name = (body.name ?? rows[0].name).trim().slice(0, 20);
+      if (name.length < 2) return json({ ok: false, error: "name_too_short" }, 400);
+      const description = (body.description ?? rows[0].description ?? "").trim().slice(0, 80);
+      const region = (body.region ?? "").trim().slice(0, 20);
+
+      await sbWrite(
+        env,
+        `groups?id=eq.${enc(groupId)}`,
+        "PATCH",
+        { name, description, region },
+        "return=minimal"
+      );
+
+      const payload = await buildPayload(env, code, { groupId, me });
+      return json({ ok: true, groupId, ...payload });
+    }
+
     if (action === "join") {
       const groupId = (body.groupId || "").trim().toUpperCase();
       if (!groupId) return json({ ok: false, error: "group_required" }, 400);
@@ -554,6 +604,11 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     if (action === "leave") {
       const groupId = (body.groupId || "").trim().toUpperCase();
       if (!groupId) return json({ ok: false, error: "group_required" }, 400);
+      // 나가기 전에 내 역할을 기억해 둔다 — 모임장이 나갈 때만 다음 사람에게 넘긴다.
+      const mine = await sbGet<{ role?: GroupRole }>(
+        env,
+        `group_members?group_id=eq.${enc(groupId)}&user_code=eq.${enc(code)}&select=role&limit=1`
+      );
       await sbWrite(
         env,
         `group_members?group_id=eq.${enc(groupId)}&user_code=eq.${enc(code)}`,
@@ -561,19 +616,46 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
         undefined,
         "return=minimal"
       );
-      const left = await sbGet<{ user_code: string }>(
+      const left = await sbGet<{ user_code: string; role?: GroupRole; joined_at?: string }>(
         env,
-        `group_members?group_id=eq.${enc(groupId)}&select=user_code&limit=1`
+        `group_members?group_id=eq.${enc(groupId)}&select=user_code,role,joined_at&order=joined_at.asc`
       );
       const groupRow = await sbGet<GroupRow>(
         env,
         `groups?id=eq.${enc(groupId)}&select=id,is_demo&limit=1`
       );
-      if (!left.length && groupRow[0] && !groupRow[0].is_demo) {
+      if (left.length) {
+        // 모임장이 나갔는데 남은 사람이 있으면, 가장 먼저 들어온 모임원에게 모임장을 넘긴다.
+        if (mine[0]?.role === "leader" && !left.some((m) => m.role === "leader")) {
+          await sbWrite(
+            env,
+            `group_members?group_id=eq.${enc(groupId)}&user_code=eq.${enc(left[0].user_code)}`,
+            "PATCH",
+            { role: "leader" },
+            "return=minimal"
+          ).catch(() => null);
+        }
+      } else if (groupRow[0] && !groupRow[0].is_demo) {
+        // 아무도 남지 않은 모임은 정리한다(체험 모임은 그대로 둔다).
         await sbWrite(env, `groups?id=eq.${enc(groupId)}`, "DELETE", undefined, "return=minimal");
       }
-      const payload = await buildPayload(env, code, { me });
-      return json({ ok: true, ...payload });
+
+      // 내가 보고 있던 모임을 다른 모임으로 옮긴다(없으면 null).
+      const restMemberships = await sbGet<{ group_id: string }>(
+        env,
+        `group_members?user_code=eq.${enc(code)}&select=group_id&order=joined_at.asc&limit=1`
+      );
+      const nextGroup = restMemberships[0]?.group_id || null;
+      await sbWrite(
+        env,
+        `users?code=eq.${enc(code)}`,
+        "PATCH",
+        { active_group_id: nextGroup },
+        "return=minimal"
+      ).catch(() => null);
+
+      const payload = await buildPayload(env, code, { groupId: nextGroup, me });
+      return json({ ok: true, groupId: nextGroup, ...payload });
     }
 
     if (action === "ping") {
