@@ -14,8 +14,10 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
   if (!code) return json({ ok: false, error: "code_required", ...dbStatus(env) }, 400);
   try {
     const state = await getState(env, code);
-    if (!state) return json({ ok: false, error: "not_found", code, ...dbStatus(env) }, 404);
-    return json({ ok: true, state, ...dbStatus(env) });
+    // 아직 저장된 기록이 없는 번호(처음 로그인한 분)는 오류가 아니라 ‘빈 상태’다.
+    // 404 를 주면 브라우저 콘솔·네트워크에 빨간 오류가 남아, 화면이 멀쩡해도 고장처럼 보인다.
+    if (!state) return json({ ok: true, state: null, found: false, ...dbStatus(env) });
+    return json({ ok: true, state, found: true, ...dbStatus(env) });
   } catch (e) {
     return json({ ok: false, error: String(e).slice(0, 300), ...dbStatus(env) }, 500);
   }
@@ -63,6 +65,14 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
     return json({ ok: false, error: "invalid_json" }, 400);
   }
   if (!body.code || !body.profile) return json({ ok: false, error: "code_and_profile_required" }, 400);
+
+  // 잘못된 값(이름 없음·태어난 해 범위 밖)은 DB 오류(500)로 터지지 않게 미리 막는다.
+  // 화면에는 ‘무엇이 잘못됐는지’만 알려 주고, DB 오류 문구는 밖으로 내보내지 않는다.
+  const nick = String(body.profile.nickname ?? "").trim();
+  const birthYear = Number(body.profile.birthYear);
+  if (!nick || nick.length > 20 || !Number.isInteger(birthYear) || birthYear < 1900 || birthYear > 2020) {
+    return json({ ok: false, error: "invalid_profile", message: "이름과 태어난 해를 다시 확인해 주세요." }, 400);
+  }
 
   const today = body.today || new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const mode = dbStatus(env).supabase;

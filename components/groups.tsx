@@ -394,12 +394,17 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
               variant="ink"
               size="lg"
               full
+              disabled={busy}
               onClick={async () => {
+                // 모임을 불러오는 데 1~3초 걸린다 — 두 번 눌리지 않게 잠깐 잠그고 ‘들어가는 중’을 보여 준다.
+                if (busy) return;
+                setBusy(true);
                 const r = await join("FAM101");
+                setBusy(false);
                 show(r.ok ? "우리 가족 사랑방에 들어왔어요! 🎉" : "지금은 들어갈 수 없어요. 잠시 뒤 다시 눌러 주세요.");
               }}
             >
-              <IconUsers size={21} /> 체험 모임 들어가기 (FAM101)
+              <IconUsers size={21} /> {busy ? "모임에 들어가는 중이에요…" : "체험 모임 들어가기 (FAM101)"}
             </BigButton>
             <BigButton variant="white" full onClick={() => setSheet("create")}>
               <IconPlus size={20} /> 새 모임 만들기
@@ -895,7 +900,7 @@ function GroupSheet({
             <p className="mt-1 text-[0.8rem] font-semibold text-ink/45">두 글자 이상이면 만들어져요.</p>
           </div>
           <BigButton variant="ink" size="lg" full onClick={doCreate} disabled={busy || name.trim().length < 2}>
-            <IconPlus size={21} /> 모임 만들기
+            <IconPlus size={21} /> {busy ? "모임을 만드는 중이에요…" : "모임 만들기"}
           </BigButton>
           <p className="text-center text-[0.8rem] font-semibold leading-relaxed text-ink/45">
             만든 뒤 ‘카카오톡으로 초대하기’를 누르면
@@ -922,7 +927,7 @@ function GroupSheet({
             />
           </div>
           <BigButton variant="ink" size="lg" full onClick={() => doJoin(code)} disabled={busy || code.length !== 6}>
-            <IconUsers size={21} /> 모임 들어가기
+            <IconUsers size={21} /> {busy ? "모임을 찾는 중이에요…" : "모임 들어가기"}
           </BigButton>
           <div className="rounded-2xl bg-gold-light/70 px-4 py-3">
             <p className="text-[0.86rem] font-bold leading-snug text-[#7A5600]">
@@ -1015,7 +1020,7 @@ function GroupSheet({
             />
           </div>
           <BigButton variant="ink" size="lg" full onClick={doEdit} disabled={busy || editName.trim().length < 2}>
-            ✏️ 바꾼 내용 저장하기
+            {busy ? "저장하는 중이에요…" : "✏️ 바꾼 내용 저장하기"}
           </BigButton>
           <p className="text-center text-[0.8rem] font-semibold text-ink/45">
             모임원 모두에게 같은 내용이 보여요.
