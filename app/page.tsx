@@ -16,12 +16,13 @@ import { QuizTab } from "@/components/quiz";
 import { WelfareTab } from "@/components/welfare";
 import { ToolsTab } from "@/components/tools";
 import { FamilyTab } from "@/components/family";
-import { RankingTab } from "@/components/ranking";
+import { GradeSummaryRow, RankingTab } from "@/components/ranking";
 import { AlarmWatcher, CalendarScreen } from "@/components/calendar";
 import { InstallBanner, InstallGuide, InstallGuideRow } from "@/components/install-guide";
 import { NeulbomMark } from "@/components/art";
 import { GroupProvider, useGroup } from "@/lib/group-store";
 import { captureInviteFromUrl } from "@/lib/groups";
+import { captureDuelFromUrl } from "@/lib/duels";
 import { kakaoConfig, loadKakaoSdk } from "@/lib/share";
 import { GroupTab } from "@/components/groups";
 import {
@@ -37,6 +38,8 @@ import {
 
 // 친구가 보낸 모임 초대 링크(?group=XXXXXX)를 화면이 그려지기 전에 붙잡아 둔다.
 captureInviteFromUrl();
+// 친구가 보낸 1:1 대결 링크(?duel=XXXXXX)도 함께 붙잡아 둔다.
+captureDuelFromUrl();
 
 type TabKey = "home" | "group" | "quiz" | "ranking" | "welfare" | "more";
 
@@ -312,6 +315,7 @@ function Shell() {
                   )}
                 </div>
               </div>
+              <GradeSummaryRow />
               <div className="mt-3">
                 <BigButton variant="white" full onClick={startEdit}>
                   내 정보 고치기

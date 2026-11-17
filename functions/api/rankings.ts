@@ -1,4 +1,4 @@
-import { buildAreaRanking, buildGroupRanking } from "../../lib/rankings";
+import { buildAreaRanking, buildGroupBattle, buildGroupRanking } from "../../lib/rankings";
 import type { RankParticipant } from "../../lib/rankings";
 import { demoAttendedSet, demoPoints } from "../../lib/group-demo";
 import { normalizeAvatarUrl } from "../../lib/avatar";
@@ -13,7 +13,9 @@ import {
   weekDatesOf,
   type LeagueArea,
 } from "../../lib/league";
-import type { RankingRange } from "../../lib/types";
+import type { GroupBattleResult, RankingRange } from "../../lib/types";
+import { badgeCards, emptyStats, gradeChipOf, gradeOf, nextGradeMessage } from "../../lib/grades";
+import type { LifetimeStats } from "../../lib/grades";
 
 type Ctx = { request: Request; env: DbEnv };
 
@@ -55,6 +57,53 @@ function kstDayOf(iso?: string | null): string {
   const t = new Date(iso);
   if (Number.isNaN(t.getTime())) return "";
   return new Date(t.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+type LifetimeRow = {
+  code: string;
+  lifetime_points: number;
+  attend_days: number;
+  quiz_days: number;
+  quiz_correct: number;
+  health_days: number;
+  welfare_days: number;
+  group_days: number;
+  invite_count: number;
+  group_count: number;
+  group_mates: number;
+};
+
+/** 누적 점수(등급) — 모든 참여자의 누적 점수를 한 번에 받아 이름 옆 배지로 붙인다 */
+async function lifetimeMap(env: DbEnv): Promise<Map<string, LifetimeRow>> {
+  const map = new Map<string, LifetimeRow>();
+  try {
+    const rows = await sbGet<LifetimeRow>(
+      env,
+      `v_user_lifetime?select=code,lifetime_points,attend_days,quiz_days,quiz_correct,health_days,welfare_days,group_days,invite_count,group_count,group_mates&limit=2000`
+    );
+    rows.forEach((r) => map.set(r.code, r));
+  } catch {
+    /* 누적 점수 뷰가 없어도 순위표는 그대로 그린다 */
+  }
+  return map;
+}
+
+/** 이어진 연속 출석 일수 — 오늘(또는 어제)부터 거꾸로 센다 */
+function streakOf(dates: string[], today: string): number {
+  const set = new Set(dates);
+  const toDate = (s: string) => new Date(s + "T00:00:00Z").getTime();
+  let cursor = today;
+  if (!set.has(cursor)) {
+    const yesterday = new Date(toDate(today) - 86400000).toISOString().slice(0, 10);
+    if (!set.has(yesterday)) return 0;
+    cursor = yesterday;
+  }
+  let streak = 0;
+  while (set.has(cursor)) {
+    streak += 1;
+    cursor = new Date(toDate(cursor) - 86400000).toISOString().slice(0, 10);
+  }
+  return streak;
 }
 
 function parseArea(raw: string | null, scope: string): LeagueArea {
@@ -109,6 +158,8 @@ async function leagueAggregate(
     code: string;
     myDaily: number[] | null;
     visible: boolean;
+    /** 누적 점수(등급 배지) — 있으면 순위표 이름 옆에 붙인다 */
+    lifetime?: Map<string, LifetimeRow>;
   }
 ): Promise<LeagueAggregate> {
   const empty: LeagueAggregate = { others: [], me: null, invitesByDay: {} };
@@ -253,9 +304,11 @@ async function leagueAggregate(
       const acc = accuracy.get(u.code);
       me = {
         name: u.nickname || "나",
+        key: u.code,
         avatarUrl: normalizeAvatarUrl(u.avatar_url),
         isMe: true,
         daily,
+        grade: gradeChipOf(opts.lifetime?.get(u.code)?.lifetime_points),
         note:
           opts.area === "brain" && acc && acc.total > 0
             ? `정답률 ${Math.round((acc.correct / acc.total) * 100)}%`
@@ -267,8 +320,10 @@ async function leagueAggregate(
     const acc = accuracy.get(u.code);
     persons.push({
       name: u.nickname,
+      key: u.code,
       avatarUrl: normalizeAvatarUrl(u.avatar_url),
       daily,
+      grade: gradeChipOf(opts.lifetime?.get(u.code)?.lifetime_points),
       note:
         opts.area === "brain" && acc && acc.total > 0
           ? `정답률 ${Math.round((acc.correct / acc.total) * 100)}%`
@@ -346,6 +401,135 @@ async function groupsFromDb(
   return { myGroups: mine, total: groups.length };
 }
 
+
+/* ------------------------------------------------------------------ */
+/* 모임 대항전 — 모임별 이번 주 점수                                     */
+/* ------------------------------------------------------------------ */
+
+function weekScoreOf(flags: {
+  attend: boolean[];
+  quiz: boolean[];
+  health: number[];
+  welfare: boolean[];
+  group: boolean[];
+  invites: number[];
+}): number {
+  let total = 0;
+  for (let i = 0; i < flags.attend.length; i++) {
+    const raw =
+      (flags.attend[i] ? LEAGUE_POINTS.attend : 0) +
+      (flags.quiz[i] ? LEAGUE_POINTS.quiz : 0) +
+      ((flags.health[i] || 0) > 0 ? LEAGUE_POINTS.health : 0) +
+      (flags.welfare[i] ? LEAGUE_POINTS.welfare : 0) +
+      (flags.group[i] ? LEAGUE_POINTS.group : 0) +
+      Math.max(0, flags.invites[i] || 0) * LEAGUE_POINTS.invite;
+    total += Math.min(LEAGUE_DAILY_CAP, raw);
+  }
+  return total;
+}
+
+async function groupBattleScores(
+  env: DbEnv,
+  weekId: string,
+  today: string,
+  code: string
+): Promise<{ id: string; name: string; memberCount: number; score: number }[] | null> {
+  const dates = weekDatesOf(today);
+  const start = dates[0];
+  const end = dates[6];
+  const groups = await sbGet<{ id: string; name: string }>(env, `groups?select=id,name&limit=200`).catch(() => []);
+  if (!groups.length) return null;
+  const members = await sbGet<{ group_id: string; user_code: string; role: string }>(
+    env,
+    `group_members?select=group_id,user_code,role&limit=5000`
+  ).catch(() => []);
+  if (!members.length) return null;
+
+  const [users, visits, quiz, health, acts] = await Promise.all([
+    sbGet<UserRow>(
+      env,
+      `users?select=code,nickname,external_id,created_at&limit=1000`
+    ).catch(() => [] as UserRow[]),
+    sbGet<{ user_code: string; visit_date: string }>(
+      env,
+      `daily_visits?visit_date=gte.${start}&visit_date=lte.${end}&select=user_code,visit_date&limit=8000`
+    ).catch(() => [] as { user_code: string; visit_date: string }[]),
+    sbGet<{ user_code: string; quiz_date: string }>(
+      env,
+      `quiz_logs?week_id=eq.${enc(weekId)}&select=user_code,quiz_date&limit=8000`
+    ).catch(() => [] as { user_code: string; quiz_date: string }[]),
+    sbGet<{ user_code: string; check_date: string; challenges: string[] }>(
+      env,
+      `health_checks?check_date=gte.${start}&check_date=lte.${end}&select=user_code,check_date,challenges&limit=8000`
+    ).catch(() => [] as { user_code: string; check_date: string; challenges: string[] }[]),
+    sbGet<{ user_code: string; activity_date: string; kind: string }>(
+      env,
+      `activity_logs?activity_date=gte.${start}&activity_date=lte.${end}&select=user_code,activity_date,kind&limit=8000`
+    ).catch(() => [] as { user_code: string; activity_date: string; kind: string }[]),
+  ]);
+
+  const blank = () => ({
+    attend: new Array(7).fill(false) as boolean[],
+    quiz: new Array(7).fill(false) as boolean[],
+    health: new Array(7).fill(0) as number[],
+    welfare: new Array(7).fill(false) as boolean[],
+    group: new Array(7).fill(false) as boolean[],
+    invites: new Array(7).fill(0) as number[],
+  });
+  const flags = new Map<string, ReturnType<typeof blank>>();
+  const of = (c: string) => {
+    if (!flags.has(c)) flags.set(c, blank());
+    return flags.get(c)!;
+  };
+
+  visits.forEach((v) => {
+    const i = dates.indexOf(v.visit_date);
+    if (i >= 0) of(v.user_code).attend[i] = true;
+  });
+  quiz.forEach((q) => {
+    const i = dates.indexOf(q.quiz_date);
+    if (i >= 0) of(q.user_code).quiz[i] = true;
+  });
+  health.forEach((h) => {
+    const i = dates.indexOf(h.check_date);
+    if (i >= 0) of(h.user_code).health[i] = Array.isArray(h.challenges) ? h.challenges.length : 0;
+  });
+  acts.forEach((a) => {
+    const i = dates.indexOf(a.activity_date);
+    if (i < 0) return;
+    if (a.kind === "welfare") of(a.user_code).welfare[i] = true;
+    else if (a.kind === "group") of(a.user_code).group[i] = true;
+  });
+  const idToCode = new Map<string, string>();
+  users.forEach((u) => {
+    if (u.external_id) idToCode.set(u.external_id, u.code);
+  });
+  users.forEach((u) => {
+    const by = (u.invited_by || "").trim();
+    if (!by) return;
+    const inviter = idToCode.get(by);
+    if (!inviter) return;
+    const i = dates.indexOf(kstDayOf(u.created_at));
+    if (i >= 0) of(inviter).invites[i] += 1;
+  });
+
+  const pointsBy = new Map<string, number>();
+  flags.forEach((f, c) => pointsBy.set(c, weekScoreOf(f)));
+
+  return groups
+    .map((g) => {
+      const list = members.filter((m) => m.group_id === g.id);
+      if (!list.length) return null;
+      let score = 0;
+      list.forEach((m) => {
+        if (m.role === "demo") score += demoPoints(m.user_code, weekId);
+        else score += pointsBy.get(m.user_code) || 0;
+      });
+      return { id: g.id, name: g.name, memberCount: list.length, score };
+    })
+    .filter((x): x is { id: string; name: string; memberCount: number; score: number } => Boolean(x));
+}
+
 export const onRequestGet = async ({ request, env }: Ctx) => {
   const p = new URL(request.url).searchParams;
   const scopeParam = p.get("scope") || "";
@@ -369,6 +553,80 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
       totalMembers: real?.total,
     });
     return json({ ok: true, ...result });
+  }
+
+  // 내 등급·배지 요약 — 누적 점수(등급)·활동 배지·연속 출석
+  if (scopeParam === "profile" || scopeParam === "me") {
+    const code = p.get("code") || "";
+    let stats: LifetimeStats = emptyStats();
+    let sample = true;
+    try {
+      const rows = await sbGet<LifetimeRow>(
+        env,
+        `v_user_lifetime?code=eq.${enc(code)}&select=code,lifetime_points,attend_days,quiz_days,quiz_correct,health_days,welfare_days,group_days,invite_count,group_count,group_mates`
+      );
+      const row = rows[0];
+      if (row) {
+        const visits = await sbGet<{ visit_date: string }>(
+          env,
+          `daily_visits?user_code=eq.${enc(code)}&select=visit_date&order=visit_date.desc&limit=120`
+        ).catch(() => [] as { visit_date: string }[]);
+        stats = {
+          ...emptyStats(),
+          lifetimePoints: Math.max(0, Number(row.lifetime_points) || 0),
+          attendDays: Math.max(0, Number(row.attend_days) || 0),
+          streak: streakOf(visits.map((v) => v.visit_date), today),
+          quizCorrect: Math.max(0, Number(row.quiz_correct) || 0),
+          quizDays: Math.max(0, Number(row.quiz_days) || 0),
+          healthDays: Math.max(0, Number(row.health_days) || 0),
+          welfareDays: Math.max(0, Number(row.welfare_days) || 0),
+          groupDays: Math.max(0, Number(row.group_days) || 0),
+          inviteCount: Math.max(0, Number(row.invite_count) || 0),
+          groupMates: Math.max(0, Number(row.group_mates) || 0),
+          groupCount: Math.max(0, Number(row.group_count) || 0),
+        };
+        sample = false;
+      }
+    } catch {
+      sample = true;
+    }
+    const gv = gradeOf(stats.lifetimePoints);
+    return json({
+      ok: true,
+      totalPoints: stats.lifetimePoints,
+      grade: {
+        key: gv.grade.key,
+        level: gv.grade.level,
+        label: gv.grade.label,
+        emoji: gv.grade.emoji,
+        min: gv.grade.min,
+        remaining: gv.remaining,
+        percent: gv.percent,
+      },
+      next: gv.next ? { label: gv.next.label, emoji: gv.next.emoji, min: gv.next.min } : null,
+      badges: badgeCards(stats),
+      stats,
+      message: nextGradeMessage(gv),
+      sample,
+    });
+  }
+
+  // 모임 대항전 — 모임별 이번 주 점수와 공동 목표 진행률
+  if (scopeParam === "groupbattle") {
+    const code = p.get("code") || "";
+    let groups: { id: string; name: string; memberCount: number; score: number }[] = [];
+    let sample = true;
+    try {
+      const real = await groupBattleScores(env, weekId, today, code);
+      if (real) {
+        groups = real;
+        sample = false;
+      }
+    } catch {
+      groups = [];
+    }
+    const result: GroupBattleResult = buildGroupBattle({ weekId, groups, fill: true });
+    return json({ ok: true, ...result, sample: sample || result.sample });
   }
 
   const area = parseArea(p.get("area"), scopeParam);
@@ -410,6 +668,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
       code,
       myDaily: parseMyDaily(p.get("myd"), area),
       visible,
+      lifetime: await lifetimeMap(env),
     });
   } catch {
     agg = { others: [], me: null, invitesByDay: {} };

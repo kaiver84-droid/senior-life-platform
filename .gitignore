@@ -17,3 +17,6 @@ e2e/.local-api.mjs
 
 # 모임 API 테스트가 만드는 임시 번들
 e2e/.worker.mjs
+
+# 테스트 계정 정리 백업(개인정보가 남을 수 있어 저장소에는 두지 않는다)
+supabase/cleanup-*.json

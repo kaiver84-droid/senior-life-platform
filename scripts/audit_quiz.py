@@ -205,6 +205,15 @@ def main():
         if n > 1:
             errors.append(f"id 중복: {qid} x{n}")
 
+    # 질문 문장도 겹치면 안 된다(같은 문제가 두 번 나오는 것과 같다).
+    # 그림(spot) 문항은 ‘9개 중 다른 그림 찾기’로 안내 문장이 같고 그림만 다르다 — 검사에서 뺀다.
+    prompts = Counter(
+        re.sub(r"\s+", " ", q["prompt"]).strip() for q in everything if q["type"] != "spot"
+    )
+    for prompt, n in prompts.items():
+        if n > 1:
+            errors.append(f"질문 중복: {prompt[:40]!r} x{n}")
+
     groups = (("choseong", choseong), ("lyrics", lyrics), ("spot", spot), ("ox", ox), ("nonsense", nonsense))
     for q in everything:
         expect_type = next((name for name, items in groups if any(x is q for x in items)), "?")

@@ -1,4 +1,6 @@
 import type {
+  GroupBattleResult,
+  GroupBattleRow,
   GroupRankingResult,
   GroupRankingRow,
   RankingChange,
@@ -336,8 +338,14 @@ export function buildGroupRanking(input: {
 
 export type RankParticipant = {
   name: string;
+  /** 사람을 가르는 값(사용자 코드) — 이름이 같은 사람이 있어도 서로 덮어쓰지 않게 */
+  key?: string;
   avatarUrl?: string;
   isMe?: boolean;
+  /** 누적 점수로 정한 등급 배지 — 순위표 이름 옆에 작게 보여 준다 */
+  grade?: { key: string; label: string; emoji: string };
+  /** 누적 점수(등급 계산용) */
+  lifetime?: number;
   /** 월요일부터 날짜별 값(그 영역 기준 점수·개수) */
   daily: number[];
   /** 정답률 같은 덧붙임 */
@@ -378,7 +386,7 @@ export function buildAreaRanking(input: AreaRankingInput): RankingResult {
   const pool: RankParticipant[] = [];
   const seen = new Set<string>();
   const push = (p: RankParticipant) => {
-    const key = (p.name || "").trim();
+    const key = (p.key || p.name || "").trim();
     if (!key || seen.has(key)) return;
     seen.add(key);
     pool.push(p);
@@ -429,6 +437,7 @@ export function buildAreaRanking(input: AreaRankingInput): RankingResult {
       display: formatAreaValue(input.area, value),
       change,
       note: p.note,
+      grade: p.grade,
     };
   });
 
@@ -554,4 +563,100 @@ function sampleParticipants(input: {
     });
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* 모임 대항전 — 모임 vs 모임 (이번 주 공동 목표)                        */
+/* ------------------------------------------------------------------ */
+
+/** 실제 모임이 적을 때 대항전 순위표를 채우는 예시 모임 (단체 순위와 같은 이름) */
+const BATTLE_SAMPLES: { id: string; name: string; memberCount: number; perMember: number }[] = [
+  { id: "BATTLE-S1", name: "우리 가족 사랑방", memberCount: 10, perMember: 82 },
+  { id: "BATTLE-S2", name: "옥천 효도회", memberCount: 18, perMember: 76 },
+  { id: "BATTLE-S3", name: "청주 시니어 배움터", memberCount: 24, perMember: 71 },
+  { id: "BATTLE-S4", name: "서울 강남 실버합창단", memberCount: 15, perMember: 68 },
+  { id: "BATTLE-S5", name: "대전 둔산 경로당", memberCount: 12, perMember: 63 },
+  { id: "BATTLE-S6", name: "부산 해운대 친구들", memberCount: 9, perMember: 58 },
+  { id: "BATTLE-S7", name: "광주 빛고을 모임", memberCount: 7, perMember: 52 },
+];
+
+export type GroupBattleInput = {
+  weekId: string;
+  /** 실제 모임 — 서버가 모임원 점수를 모두 더해 준 값 */
+  groups?: { id: string; name: string; memberCount: number; score: number }[];
+  /** 모임이 하나도 없을 때도 화면이 비지 않게 예시를 채울지 */
+  fill?: boolean;
+};
+
+/**
+ * 모임 대항전 순위 — 이번 주 모임 점수를 겨루고, 우리 모임의 공동 목표 진행률을 함께 준다.
+ * 모임 점수는 모임원들의 이번 주 늘봄왕 점수 합계이고,
+ * 목표는 ‘모임원 한 사람에 100점’(최소 100점)이라 인원이 다른 모임도 같은 기준으로 겨룬다.
+ */
+export function buildGroupBattle(input: GroupBattleInput): GroupBattleResult {
+  const weekId = input.weekId;
+  const rnd = mulberry32(hashStr(`${weekId}|battle`));
+  const rows: Omit<GroupBattleRow, "rank">[] = [];
+
+  (input.groups || []).forEach((g) => {
+    const memberCount = Math.max(1, Math.round(g.memberCount));
+    const score = Math.max(0, Math.round(g.score));
+    const goal = Math.max(100, memberCount * 100);
+    rows.push({
+      id: g.id,
+      name: g.name,
+      memberCount,
+      score,
+      goal,
+      rate: Math.max(0, Math.min(100, Math.round((score / goal) * 100))),
+      isMine: true,
+      sample: false,
+    });
+  });
+
+  if (input.fill !== false) {
+    const used = new Set(rows.map((r) => r.name));
+    BATTLE_SAMPLES.forEach((s) => {
+      if (used.has(s.name) || rows.length >= 8) return;
+      const jitter = Math.floor(rnd() * 11) - 5; // -5 ~ +5
+      const perMember = Math.max(20, s.perMember + jitter);
+      const score = perMember * s.memberCount;
+      const goal = Math.max(100, s.memberCount * 100);
+      rows.push({
+        id: s.id,
+        name: s.name,
+        memberCount: s.memberCount,
+        score,
+        goal,
+        rate: Math.max(0, Math.min(100, Math.round((score / goal) * 100))),
+        isMine: false,
+        sample: true,
+      });
+    });
+  }
+
+  rows.sort((a, b) => b.score - a.score || b.rate - a.rate || a.name.localeCompare(b.name));
+  const ranked = rows.map((r, i) => ({ ...r, rank: i + 1 }));
+  const mine = ranked.find((r) => r.isMine) ?? null;
+  const first = ranked[0];
+  const gapToFirst = mine && first ? Math.max(0, first.score - mine.score) : 0;
+
+  let message = "모임에 들어가면 우리 모임도 대항전에 나가요";
+  if (mine && first) {
+    message =
+      mine.rank === 1
+        ? "우리 모임이 이번 주 1등이에요! 이 자리를 함께 지켜요 👏"
+        : `우리 모임이 1등까지 ${gapToFirst}점 남았어요! 오늘 퀴즈로 힘 보태기`;
+  }
+
+  return {
+    weekId,
+    periodLabel: periodLabel(),
+    rows: ranked,
+    myGroup: mine,
+    total: ranked.length,
+    gapToFirst,
+    message,
+    sample: ranked.some((r) => r.sample),
+  };
 }

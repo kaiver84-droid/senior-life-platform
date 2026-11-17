@@ -92,6 +92,8 @@ export type RankingRow = {
   change?: RankingChange;
   /** 정답률 같은 덧붙임 */
   note?: string;
+  /** 누적 점수로 정한 등급 배지 — 이름 옆에 작게 보여 준다 */
+  grade?: GradeBadge;
 };
 
 export type RankingResult = {
@@ -265,4 +267,105 @@ export type WelfareProgram = {
   url?: string;
   deadline?: string;
   tags: string[];
+};
+
+/* ------------------------------------------------------------------ */
+/* 랭킹 고도화 2차 — 등급·배지 · 1:1 대결 · 모임 대항전                  */
+/* ------------------------------------------------------------------ */
+
+/** 순위표 한 줄에 붙는 작은 등급 표시 */
+export type GradeBadge = {
+  key: string;
+  label: string;
+  emoji: string;
+};
+
+/** 내 등급·배지 요약 (/api/rankings?scope=profile) */
+export type GradeProfile = {
+  totalPoints: number;
+  grade: { key: string; level: number; label: string; emoji: string; min: number; remaining: number; percent: number };
+  next: { label: string; emoji: string; min: number } | null;
+  badges: {
+    id: string;
+    label: string;
+    emoji: string;
+    how: string;
+    goal: number;
+    unit: string;
+    value: number;
+    earned: boolean;
+    left: number;
+    percent: number;
+  }[];
+  stats: {
+    attendDays: number;
+    streak: number;
+    quizCorrect: number;
+    quizDays: number;
+    healthDays: number;
+    welfareDays: number;
+    groupDays: number;
+    inviteCount: number;
+    groupMates: number;
+    groupCount: number;
+  };
+  sample?: boolean;
+};
+
+/** 친구와 1:1 대결 한 건 */
+export type DuelInfo = {
+  id: string;
+  kind: "quiz" | "total";
+  kindLabel: string;
+  status: "pending" | "accepted" | "declined";
+  iAmChallenger: boolean;
+  otherName: string;
+  myName: string;
+  myScore: number;
+  otherScore: number;
+  /** 내가 이기고 있는지 — 'win' | 'lose' | 'tie' */
+  lead: "win" | "lose" | "tie";
+  /** 화면에 그대로 보여 주는 따뜻한 한 줄 */
+  message: string;
+  fromLink: boolean;
+  createdAt: string;
+  duelDate: string;
+};
+
+export type DuelPayload = {
+  ok: boolean;
+  today: string;
+  myCode: string;
+  myName: string;
+  duels: DuelInfo[];
+  incoming: DuelInfo[];
+  outgoing: DuelInfo[];
+  /** 함께 겨룰 수 있는 모임원(나 제외, 체험 회원 제외) */
+  partners: { code: string; name: string; groupName: string }[];
+};
+
+/** 모임 대항전 순위 한 줄 */
+export type GroupBattleRow = {
+  id: string;
+  rank: number;
+  name: string;
+  memberCount: number;
+  score: number;
+  goal: number;
+  /** 공동 목표 진행률(%) */
+  rate: number;
+  isMine: boolean;
+  sample: boolean;
+};
+
+export type GroupBattleResult = {
+  weekId: string;
+  periodLabel: string;
+  rows: GroupBattleRow[];
+  myGroup: GroupBattleRow | null;
+  total: number;
+  /** 1등까지 남은 점수 */
+  gapToFirst: number;
+  message: string;
+  sample: boolean;
 };

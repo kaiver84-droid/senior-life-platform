@@ -4,6 +4,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { buildAreaRanking, buildGroupRanking } from "@/lib/rankings";
 import type {
   AppState,
+  DuelInfo,
+  DuelPayload,
+  GradeProfile,
+  GroupBattleResult,
   GroupRankingResult,
   GroupRankingRow,
   RankingChange,
@@ -30,7 +34,16 @@ import {
   weekDatesOf,
   type LeagueArea,
 } from "@/lib/league";
-import { Avatar, Badge, BigButton, Card, SectionTitle } from "./ui";
+import { Avatar, Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
+import { badgeCards, gradeOf, localLifetime, nextGradeMessage } from "@/lib/grades";
+import {
+  DUEL_KIND_LABEL,
+  clearPendingDuel,
+  duelLinkFor,
+  fetchDuels,
+  peekPendingDuel,
+  postDuel,
+} from "@/lib/duels";
 import { IconChevron, IconQuiz, IconSparkle, IconTrophy, IconUsers } from "./icons";
 import { GroupRankingBanner } from "./groups";
 
@@ -404,7 +417,10 @@ function Podium({ rows, area }: { rows: RankingResult["rows"]; area: LeagueArea 
       >
         {row ? row.name : "-"}
       </p>
-      {row ? <ChangeBadge change={row.change} /> : null}
+      <span className="mt-0.5 flex items-center gap-1">
+        {row ? <ChangeBadge change={row.change} /> : null}
+        <GradeMark grade={row?.grade} />
+      </span>
       <p className={`tabular mt-0.5 text-center text-[0.82rem] font-extrabold ${place === 1 ? "text-gold-dark" : "text-ink/55"}`}>
         {value(row)}
       </p>
@@ -466,6 +482,7 @@ function RestList({ rows, area }: { rows: RankingResult["rows"]; area: LeagueAre
                   {row.isMe ? <span className="ml-1 text-[0.74rem] font-extrabold text-brand">(나)</span> : null}
                 </span>
                 <ChangeBadge change={row.change} />
+                <GradeMark grade={row.grade} />
               </span>
               {row.note ? <span className="block text-[0.76rem] font-semibold text-ink/40">{row.note}</span> : null}
             </span>
@@ -496,6 +513,8 @@ function MyRankCard({
 }) {
   const { rankingVisible, setRankingVisible } = useApp();
   const info = areaInfo(area);
+  // 훅은 조건 없이 늘 같은 순서로 불러야 한다(참여 OFF 여도 계산만 해 둔다).
+  const myGrade = useGradeProfile().grade;
 
   if (!rankingVisible) {
     return (
@@ -522,7 +541,15 @@ function MyRankCard({
     <Card className="bg-gradient-to-br from-brand-light/70 to-white p-4" data-rank-me="on">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[0.8rem] font-bold text-ink/50">내 순위</p>
+          <p className="flex items-center gap-1.5 text-[0.8rem] font-bold text-ink/50">
+            내 순위
+            <span
+              data-my-grade={myGrade.label}
+              className="inline-flex items-center gap-0.5 rounded-full bg-white/90 px-2 py-0.5 text-[0.74rem] font-black text-brand-deep"
+            >
+              <span aria-hidden>{myGrade.emoji}</span> {myGrade.label}
+            </span>
+          </p>
           <p className="mt-0.5 text-[1.5rem] font-black leading-none text-brand-deep">
             {rank ? (
               <>
@@ -609,6 +636,7 @@ function GroupRankingBoard({
 
   return (
     <div className="space-y-3">
+      <GroupBattleCard onGo={(a) => onNavigate?.(a === "brain" ? "quiz" : "group")} />
       <div
         data-podium
         className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card"
@@ -795,6 +823,7 @@ function GroupsBoard({ onNavigate, loading }: { onNavigate?: (tab: string) => vo
 
   return (
     <div className="space-y-3" data-group-rank>
+      <GroupBattleCard onGo={() => onNavigate?.("quiz")} />
       <div
         data-podium
         className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card"
@@ -946,6 +975,7 @@ function useAreaRanking(area: LeagueArea, range: RankingRange, band: number) {
         me: rankingVisible
           ? {
               name: profile?.nickname || "나",
+              key: code || undefined,
               avatarUrl: profile?.avatarUrl || profile?.avatar,
               isMe: true,
               daily: myDaily,
@@ -1034,6 +1064,7 @@ function AreaBoard({
   return (
     <div className="space-y-3" data-area-board={area}>
       {area === "all" ? <LeagueMissionCard invitesByDay={invites} onGo={onGo} /> : null}
+      {area === "all" ? <GroupBattleCard onGo={onGo} /> : null}
       <div
         data-podium
         className="overflow-hidden rounded-[1.6rem] bg-gradient-to-b from-[#FFF9EA] via-white to-[#F3FAF8] p-4 shadow-card"
@@ -1220,6 +1251,7 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
 
   // 친구 초대 성공(+50점/명)은 서버만 안다 — 날짜별 초대 수를 한 번 받아 온다.
   const [invitesByDay, setInvitesByDay] = useState<Record<string, number> | undefined>(undefined);
+  const [badgeOpen, setBadgeOpen] = useState(false);
   useEffect(() => {
     if (!code) return;
     const params = new URLSearchParams({
@@ -1265,7 +1297,13 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
         ) : null}
       </section>
 
+      <GradeCard onOpenBadges={() => setBadgeOpen(true)} />
+
+      <DuelSection onNavigate={onNavigate} />
+
       <RankingBoard onNavigate={onNavigate} invitesByDay={invitesByDay} />
+
+      <BadgeCollectionSheet open={badgeOpen} onClose={() => setBadgeOpen(false)} />
 
       <div className="grid grid-cols-1 gap-2">
         <BigButton variant={todayDaily?.done ? "white" : "teal"} size="lg" full onClick={() => onNavigate("quiz")}>
@@ -1276,5 +1314,697 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
         </BigButton>
       </div>
     </div>
+  );
+}
+
+/* ================================================================== */
+/* 랭킹 고도화 2차 — 등급 · 배지 컬렉션                                */
+/* ================================================================== */
+
+/** 순위표 이름 옆에 붙는 작은 등급 배지 (🌱 ☀️ 🌸 👑 🏆) */
+function GradeMark({ grade }: { grade?: { emoji: string; label: string } }) {
+  if (!grade) return null;
+  return (
+    <span
+      data-grade-chip={grade.label}
+      title={`누적 점수 등급 · ${grade.label}`}
+      aria-label={`등급 ${grade.label}`}
+      className="inline-flex shrink-0 items-center text-[0.82rem] leading-none"
+    >
+      {grade.emoji}
+    </span>
+  );
+}
+
+/** 내 등급·배지 요약 — 누적 점수로 정한 5단계 등급과 다음 등급까지 남은 점수 */
+function useGradeProfile() {
+  const { code, today, state, streak } = useApp();
+  const [data, setData] = useState<GradeProfile | null>(null);
+
+  const stateKey = `${(state.visits ?? []).length}|${(state.quizLogs ?? []).length}|${JSON.stringify(
+    state.health ?? {}
+  )}|${JSON.stringify(state.missions ?? {})}`;
+
+  useEffect(() => {
+    if (!code) return;
+    let alive = true;
+    const q = new URLSearchParams({ scope: "profile", code, today });
+    fetch(`/api/rankings?${q.toString()}`, { headers: { accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive && j?.ok && j?.grade) setData(j as GradeProfile);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // stateKey — 오늘 활동이 바뀌면 등급 카드를 다시 받아 온다
+  }, [code, today, stateKey]);
+
+  // 서버를 못 보면 이 기기 기록으로 같은 규칙을 계산해 화면이 비지 않게 한다.
+  const local = useMemo<GradeProfile>(() => {
+    const stats = localLifetime({ ...state, missions: state.missions ?? {} }, { today, streak });
+    const gv = gradeOf(stats.lifetimePoints);
+    const cards = badgeCards(stats);
+    return {
+      totalPoints: stats.lifetimePoints,
+      grade: {
+        key: gv.grade.key,
+        level: gv.grade.level,
+        label: gv.grade.label,
+        emoji: gv.grade.emoji,
+        min: gv.grade.min,
+        remaining: gv.remaining,
+        percent: gv.percent,
+      },
+      next: gv.next ? { label: gv.next.label, emoji: gv.next.emoji, min: gv.next.min } : null,
+      badges: cards.map((b) => ({
+        id: b.id,
+        label: b.label,
+        emoji: b.emoji,
+        how: b.how,
+        goal: b.goal,
+        unit: b.unit,
+        value: b.value,
+        earned: b.earned,
+        left: b.left,
+        percent: b.percent,
+      })),
+      stats: {
+        attendDays: stats.attendDays,
+        streak: stats.streak,
+        quizCorrect: stats.quizCorrect,
+        quizDays: stats.quizDays,
+        healthDays: stats.healthDays,
+        welfareDays: stats.welfareDays,
+        groupDays: stats.groupDays,
+        inviteCount: stats.inviteCount,
+        groupMates: stats.groupMates,
+        groupCount: stats.groupCount,
+      },
+      sample: true,
+    };
+  }, [state, today, streak]);
+
+  return data ?? local;
+}
+
+function GradeCard({ onOpenBadges }: { onOpenBadges: () => void }) {
+  const profile = useGradeProfile();
+  const earned = profile.badges.filter((b) => b.earned).length;
+  const g = profile.grade;
+  const tone =
+    g.key === "sprout"
+      ? "from-leaf-light"
+      : g.key === "sun"
+        ? "from-sun-light"
+        : g.key === "happy"
+          ? "from-coral-light"
+          : g.key === "gold"
+            ? "from-gold-light"
+            : "from-plum-light";
+
+  return (
+    <Card
+      className={`bg-gradient-to-br ${tone} via-white to-white p-4`}
+      data-grade-card
+      data-grade-key={g.key}
+      data-grade-points={profile.totalPoints}
+      data-grade-next={profile.next ? profile.next.label : "none"}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white text-[1.9rem] leading-none shadow-soft"
+          aria-hidden
+        >
+          {g.emoji}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[0.8rem] font-bold text-ink/50">내 등급 · 누적 점수</p>
+          <p className="mt-0.5 text-[1.22rem] font-black leading-tight text-ink" data-grade-label={g.label}>
+            {g.label}
+            <span className="ml-1.5 text-[0.86rem] font-extrabold text-ink/45">{profile.totalPoints}점</span>
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[0.78rem] font-black text-ink/60">
+          {g.level} / 5 등급
+        </span>
+      </div>
+
+      <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-ink/8">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-brand to-leaf transition-all duration-500"
+          style={{ width: `${g.percent}%` }}
+        />
+      </div>
+      <p className="mt-1.5 rounded-xl bg-white/85 px-3 py-2 text-center text-[0.9rem] font-bold leading-snug text-brand-deep" data-grade-next-text>
+        {nextGradeMessage(gradeOf(profile.totalPoints))}
+      </p>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="text-[0.84rem] font-extrabold text-ink/55">
+          활동 배지 <span className="text-brand-dark">{earned}</span> / {profile.badges.length} 개
+        </p>
+        <button
+          type="button"
+          data-badge-open
+          onClick={onOpenBadges}
+          className="flex min-h-[44px] items-center gap-1 rounded-full bg-white px-3.5 text-[0.88rem] font-black text-brand-dark shadow-soft active:bg-paper"
+        >
+          배지 컬렉션 보기
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/** 내 프로필(설정) 시트에 넣는 등급 한 줄 — 등급 배지와 다음 등급까지 남은 점수 */
+export function GradeSummaryRow() {
+  const profile = useGradeProfile();
+  const g = profile.grade;
+  return (
+    <div
+      data-profile-grade
+      data-grade-key={g.key}
+      data-grade-points={profile.totalPoints}
+      className="mt-3 flex items-center gap-2.5 rounded-2xl bg-brand-light/60 px-3 py-2.5"
+    >
+      <span aria-hidden className="text-[1.6rem] leading-none">
+        {g.emoji}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.94rem] font-black leading-tight text-brand-deep">
+          내 등급 · {g.label}
+          <span className="ml-1.5 text-[0.8rem] font-extrabold text-ink/50">누적 {profile.totalPoints}점</span>
+        </p>
+        <p className="mt-0.5 text-[0.78rem] font-semibold leading-snug text-ink/50">
+          {nextGradeMessage(gradeOf(profile.totalPoints))}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BadgeCollectionSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const profile = useGradeProfile();
+  const earned = profile.badges.filter((b) => b.earned).length;
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="활동 배지 컬렉션"
+      subtitle={`${earned} / ${profile.badges.length} 개를 모았어요`}
+    >
+      <div data-badge-sheet>
+        <div className="mb-3 rounded-2xl bg-white p-3.5 shadow-soft">
+          <p className="flex items-center gap-2 text-[1rem] font-black text-ink">
+            <span aria-hidden className="text-[1.3rem]">
+              {profile.grade.emoji}
+            </span>
+            지금 등급 · {profile.grade.label}
+          </p>
+          <p className="mt-1 text-[0.86rem] font-semibold leading-relaxed text-ink/55">
+            누적 {profile.totalPoints}점 · {nextGradeMessage(gradeOf(profile.totalPoints))}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {profile.badges.map((b) => (
+            <div
+              key={b.id}
+              data-badge={b.id}
+              data-badge-earned={b.earned ? "1" : "0"}
+              className={`rounded-2xl border-2 p-3 ${
+                b.earned ? "border-leaf bg-leaf-light/70" : "border-ink/8 bg-white"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className={`text-[1.35rem] leading-none ${b.earned ? "" : "opacity-35 grayscale"}`}
+                >
+                  {b.emoji}
+                </span>
+                <p className={`min-w-0 text-[0.9rem] font-black leading-tight ${b.earned ? "text-leaf-dark" : "text-ink/70"}`}>
+                  {b.label}
+                </p>
+              </div>
+              <p className="mt-1 text-[0.76rem] font-semibold leading-snug text-ink/50">
+                {b.earned ? "획득했어요 ✅" : `${b.left}${b.unit} 더 하면 받아요`}
+              </p>
+              <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/8">
+                <div
+                  className={`h-full rounded-full ${b.earned ? "bg-leaf" : "bg-brand/60"}`}
+                  style={{ width: `${b.percent}%` }}
+                />
+              </div>
+              {b.earned ? null : (
+                <p className="mt-1 text-[0.72rem] font-semibold leading-snug text-ink/40">{b.how}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-3 rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
+          배지는 한 번 받으면 그대로 남아요. 오늘 하나씩 해 보시면 어느새 다 모이실 거예요.
+        </p>
+      </div>
+    </Sheet>
+  );
+}
+
+/* ================================================================== */
+/* 친구와 1:1 대결                                                     */
+/* ================================================================== */
+
+function scoreBars(d: DuelInfo) {
+  const max = Math.max(10, d.myScore, d.otherScore);
+  return {
+    mine: Math.round((d.myScore / max) * 100),
+    other: Math.round((d.otherScore / max) * 100),
+  };
+}
+
+function DuelSection({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+  const { code, today, profile } = useApp();
+  const { detail, active } = useGroup();
+  const { show } = useToast();
+  const [data, setData] = useState<DuelPayload | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const [kind, setKind] = useState<"quiz" | "total">("total");
+  const [pendingLink, setPendingLink] = useState<ReturnType<typeof peekPendingDuel>>(null);
+
+  const load = React.useCallback(async () => {
+    if (!code) return;
+    const next = await fetchDuels(code, today);
+    if (next) setData(next);
+  }, [code, today]);
+
+  useEffect(() => {
+    void load();
+    // 친구가 퀴즈를 풀면 점수가 바뀐다 — 20초마다 조용히 다시 받아 온다.
+    const t = window.setInterval(() => void load(), 20000);
+    return () => window.clearInterval(t);
+  }, [load]);
+
+  useEffect(() => {
+    setPendingLink(peekPendingDuel());
+  }, []);
+
+  const run = async (fn: () => Promise<DuelPayload | null>, okMessage: string) => {
+    if (busy) return;
+    setBusy(true);
+    const next = await fn();
+    setBusy(false);
+    if (next) {
+      setData(next);
+      show(okMessage);
+      return true;
+    }
+    show("지금은 처리하지 못했어요. 잠시 뒤 다시 눌러 주세요.");
+    return false;
+  };
+
+  const challenge = async (partnerCode: string, name: string) => {
+    const ok = await run(
+      () => postDuel({ action: "create", code, today, opponentCode: partnerCode, kind }),
+      `${name} 님에게 대결을 신청했어요!`
+    );
+    if (ok) setSheet(false);
+  };
+
+  const acceptLink = async () => {
+    if (!pendingLink) return;
+    const ok = await run(
+      () => postDuel({ action: "link", code, today, challengerCode: pendingLink.code, kind: pendingLink.kind }),
+      "1:1 대결을 시작해요!"
+    );
+    if (ok) {
+      clearPendingDuel();
+      setPendingLink(null);
+    }
+  };
+
+  const partners = useMemo(() => {
+    const fromServer = (data?.partners ?? []).map((p) => ({ code: p.code, name: p.name, groupName: p.groupName }));
+    if (fromServer.length) return fromServer;
+    return (detail?.members ?? [])
+      .filter((m) => !m.isMe && !m.isDemo)
+      .map((m) => ({ code: m.code, name: m.name, groupName: active?.name || "우리 모임" }));
+  }, [data?.partners, detail?.members, active?.name]);
+
+  const duels = data?.duels ?? [];
+  const myLink = code ? duelLinkFor(code, profile?.nickname, kind) : "";
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(myLink);
+      show("대결 링크를 복사했어요. 카톡으로 붙여 넣어 보내세요.");
+    } catch {
+      show("링크를 길게 눌러 복사해 주세요.");
+    }
+  };
+
+  return (
+    <div className="space-y-2" data-duel-section>
+      {pendingLink ? (
+        <Card className="bg-gradient-to-br from-sun-light via-white to-white p-4" data-duel-link-banner>
+          <p className="text-[1rem] font-black text-ink">
+            ⚔️ {pendingLink.name || "친구"} 님이 1:1 대결을 신청했어요
+          </p>
+          <p className="mt-1 text-[0.86rem] font-semibold leading-relaxed text-ink/55">
+            {DUEL_KIND_LABEL[pendingLink.kind]}로 오늘 하루 겨뤄요. 수락만 누르면 시작돼요.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <BigButton variant="teal" onClick={acceptLink} disabled={busy}>
+              수락하고 겨루기
+            </BigButton>
+            <BigButton
+              variant="white"
+              onClick={() => {
+                clearPendingDuel();
+                setPendingLink(null);
+              }}
+            >
+              다음에 할게요
+            </BigButton>
+          </div>
+        </Card>
+      ) : null}
+
+      {duels.length ? (
+        <Card className="p-4" data-duel-list>
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-[1.02rem] font-black text-ink">
+              <span aria-hidden>⚔️</span> 오늘의 1:1 대결
+            </p>
+            <span className="rounded-full bg-brand-light px-2.5 py-1 text-[0.76rem] font-black text-brand-deep">
+              {duels.length}건
+            </span>
+          </div>
+
+          <div className="mt-2 space-y-2">
+            {duels.map((d) => {
+              const bars = scoreBars(d);
+              const waiting = d.status === "pending";
+              return (
+                <div
+                  key={d.id}
+                  data-duel-card
+                  data-duel-id={d.id}
+                  data-duel-status={d.status}
+                  data-duel-kind={d.kind}
+                  data-duel-my-score={d.myScore}
+                  data-duel-other-score={d.otherScore}
+                  className="rounded-2xl border-2 border-ink/8 bg-paper px-3 py-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0 text-[0.96rem] font-black leading-tight text-ink">
+                      {d.otherName} 님과 {d.kindLabel}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[0.72rem] font-black ${
+                        d.status === "accepted"
+                          ? "bg-leaf text-white"
+                          : d.status === "declined"
+                            ? "bg-ink/10 text-ink/50"
+                            : "bg-sun text-ink"
+                      }`}
+                    >
+                      {d.status === "accepted" ? "겨루는 중" : d.status === "declined" ? "다음에" : "수락 기다림"}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-white px-2.5 py-1.5">
+                      <p className="text-[0.74rem] font-bold text-ink/45">나</p>
+                      <p className="tabular text-[1.1rem] font-black text-brand-dark">{d.myScore}점</p>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/8">
+                        <div className="h-full rounded-full bg-brand" style={{ width: `${bars.mine}%` }} />
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white px-2.5 py-1.5">
+                      <p className="truncate text-[0.74rem] font-bold text-ink/45">{d.otherName}</p>
+                      <p className="tabular text-[1.1rem] font-black text-ink/70">{d.otherScore}점</p>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/8">
+                        <div className="h-full rounded-full bg-coral/70" style={{ width: `${bars.other}%` }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <p
+                    data-duel-message
+                    className={`mt-1.5 text-[0.84rem] font-bold leading-snug ${
+                      d.lead === "win" ? "text-leaf-dark" : d.lead === "lose" ? "text-ink/60" : "text-brand-deep"
+                    }`}
+                  >
+                    {d.message}
+                  </p>
+
+                  {waiting && !d.iAmChallenger ? (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <BigButton
+                        variant="teal"
+                        height={48}
+                        disabled={busy}
+                        onClick={() => void run(() => postDuel({ action: "accept", code, today, id: d.id }), "대결을 시작해요!")}
+                      >
+                        수락하기
+                      </BigButton>
+                      <BigButton
+                        variant="white"
+                        height={48}
+                        disabled={busy}
+                        onClick={() => void run(() => postDuel({ action: "decline", code, today, id: d.id }), "오늘은 다음에 겨루기로 했어요.")}
+                      >
+                        다음에
+                      </BigButton>
+                    </div>
+                  ) : null}
+                  {waiting && d.iAmChallenger ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void run(() => postDuel({ action: "cancel", code, today, id: d.id }), "대결 신청을 거두었어요.")}
+                      className="mt-2 min-h-[44px] w-full rounded-full border-2 border-ink/10 bg-white text-[0.86rem] font-extrabold text-ink/55"
+                    >
+                      신청 취소
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
+      <Card className="p-4" data-duel-invite>
+        <p className="flex items-center gap-1.5 text-[1rem] font-black text-ink">
+          <span aria-hidden>🤝</span> 친구와 1:1 대결
+        </p>
+        <p className="mt-1 text-[0.86rem] font-semibold leading-relaxed text-ink/55">
+          오늘 퀴즈 점수나 하루 종합 점수로 겨뤄요. 이겨도 지고도 서로 웃으며 끝나는 따뜻한 겨루기예요.
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <span data-duel-open className="contents">
+            <BigButton variant="ink" height={52} onClick={() => setSheet(true)}>
+              모임원에게 신청
+            </BigButton>
+          </span>
+          <span data-duel-link-copy className="contents">
+            <BigButton variant="white" height={52} onClick={() => void copyLink()}>
+              대결 링크 복사
+            </BigButton>
+          </span>
+        </div>
+        <p className="mt-1.5 break-all rounded-xl bg-paper px-2.5 py-1.5 text-[0.72rem] font-semibold leading-snug text-ink/45" data-duel-link={myLink}>
+          {myLink}
+        </p>
+      </Card>
+
+      <Sheet
+        open={sheet}
+        onClose={() => setSheet(false)}
+        title="누구와 겨룰까요?"
+        subtitle="모임원을 고르면 바로 대결을 신청해요"
+      >
+        <div data-duel-sheet>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            {(["total", "quiz"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                data-duel-kind-tab={k}
+                aria-pressed={kind === k}
+                onClick={() => setKind(k)}
+                className={`min-h-[56px] rounded-2xl text-[0.94rem] font-extrabold ${
+                  kind === k ? "bg-ink text-white shadow-cta" : "bg-white text-ink/60 shadow-soft"
+                }`}
+              >
+                {DUEL_KIND_LABEL[k]}로 겨루기
+              </button>
+            ))}
+          </div>
+
+          {partners.length ? (
+            <div className="space-y-2">
+              {partners.map((p) => (
+                <button
+                  key={p.code}
+                  type="button"
+                  data-duel-partner={p.code}
+                  disabled={busy}
+                  onClick={() => void challenge(p.code, p.name)}
+                  className="flex min-h-[64px] w-full items-center gap-3 rounded-2xl bg-white px-3.5 py-2 text-left shadow-soft active:bg-paper"
+                >
+                  <Avatar name={p.name} size={38} background="bg-brand-light" className="text-brand-dark" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[1rem] font-black text-ink">{p.name}</span>
+                    <span className="block text-[0.76rem] font-semibold text-ink/45">{p.groupName}</span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-brand-light px-2.5 py-1 text-[0.78rem] font-black text-brand-deep">
+                    신청
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-white p-4 text-center shadow-soft">
+              <p className="text-[0.98rem] font-black text-ink">아직 함께 겨룰 모임원이 없어요</p>
+              <p className="mt-1 text-[0.86rem] font-semibold leading-relaxed text-ink/55">
+                모임에 들어가면 가족·친구에게 바로 신청할 수 있어요.
+                <br />
+                또는 대결 링크를 카톡으로 보내면 받은 사람이 수락해요.
+              </p>
+              <div className="mt-2.5">
+                <BigButton variant="ink" full onClick={() => onNavigate?.("group")}>
+                  우리 모임 보러 가기
+                </BigButton>
+              </div>
+            </div>
+          )}
+
+          <p className="mt-3 break-all rounded-2xl bg-white/70 px-3 py-2 text-center text-[0.74rem] font-semibold leading-snug text-ink/45">
+            대결 링크 · {myLink}
+          </p>
+        </div>
+      </Sheet>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/* 모임 대항전                                                         */
+/* ================================================================== */
+
+function GroupBattleCard({ onGo }: { onGo: (area: LeagueArea) => void }) {
+  const { code, today, weekId } = useApp();
+  const [battle, setBattle] = useState<GroupBattleResult | null>(null);
+
+  useEffect(() => {
+    if (!code) return;
+    let alive = true;
+    const q = new URLSearchParams({ scope: "groupbattle", code, today, weekId });
+    fetch(`/api/rankings?${q.toString()}`, { headers: { accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive && j?.ok && Array.isArray(j.rows)) setBattle(j as GroupBattleResult);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [code, today, weekId]);
+
+  const mine = battle?.myGroup ?? null;
+  const rows = battle?.rows ?? [];
+  const top = rows.slice(0, 3);
+
+  return (
+    <Card
+      className="bg-gradient-to-br from-plum-light via-white to-white p-4"
+      data-group-battle
+      data-battle-rank={mine ? mine.rank : 0}
+      data-battle-rate={mine ? mine.rate : 0}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-[1.02rem] font-black text-ink">
+            <span aria-hidden>🏅</span> 모임 대항전
+          </p>
+          <p className="mt-0.5 text-[0.8rem] font-semibold text-ink/50">
+            이번 주 모임원 점수를 모두 더해 겨뤄요 · {periodLabel()}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[0.76rem] font-black text-plum-dark">
+          {battle ? `참가 ${battle.total}개 모임` : "불러오는 중"}
+        </span>
+      </div>
+
+      {mine ? (
+        <div className="mt-2.5">
+          <div className="flex items-end justify-between gap-2">
+            <p className="min-w-0 truncate text-[1rem] font-black text-ink">{mine.name}</p>
+            <p className="shrink-0 tabular text-[0.9rem] font-black text-plum-dark">
+              {mine.score} / {mine.goal}점
+            </p>
+          </div>
+          <div className="mt-1.5 h-3 w-full overflow-hidden rounded-full bg-ink/8" data-battle-bar>
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-plum to-[#5B4FA8] transition-all duration-500"
+              style={{ width: `${mine.rate}%` }}
+            />
+          </div>
+          <p className="mt-1 flex items-center justify-between text-[0.78rem] font-bold text-ink/45">
+            <span>공동 목표 진행률 {mine.rate}%</span>
+            <span>
+              {mine.rank}위 / {battle?.total ?? rows.length}개 모임
+            </span>
+          </p>
+          <p
+            data-battle-message
+            className="mt-1.5 rounded-xl bg-white/90 px-3 py-2 text-center text-[0.9rem] font-bold leading-snug text-plum-dark"
+          >
+            {battle?.message}
+          </p>
+          <div className="mt-2">
+            <BigButton variant="teal" full height={52} onClick={() => onGo("brain")}>
+              오늘 퀴즈로 힘 보태기
+            </BigButton>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2.5 rounded-2xl bg-white/85 px-3 py-2.5 text-center">
+          <p className="text-[0.92rem] font-black text-ink">모임에 들어가면 대항전에 나갈 수 있어요</p>
+          <p className="mt-0.5 text-[0.82rem] font-semibold leading-snug text-ink/55">
+            가족·친구와 함께 이번 주 1등에 도전해 보세요.
+          </p>
+        </div>
+      )}
+
+      {top.length ? (
+        <div className="mt-2.5 space-y-1">
+          {top.map((r) => (
+            <div
+              key={r.id}
+              data-battle-row={r.rank}
+              className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 ${
+                r.isMine ? "bg-plum-light/70" : "bg-white/70"
+              }`}
+            >
+              <span className="w-5 shrink-0 text-center text-[0.86rem] font-black text-ink/45">{r.rank}</span>
+              <span className="min-w-0 flex-1 truncate text-[0.88rem] font-extrabold text-ink/80">{r.name}</span>
+              <span className="shrink-0 tabular text-[0.82rem] font-black text-plum-dark">{r.score}점</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <p className="mt-2 text-center text-[0.74rem] font-semibold leading-relaxed text-ink/40">
+        모임원 한 사람에 100점이 공동 목표예요. 매주 월요일 0시에 새로 시작해요.
+      </p>
+    </Card>
   );
 }

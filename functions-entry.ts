@@ -10,6 +10,7 @@ import { onRequestGet as stateGet, onRequestPost as statePost } from "./function
 import { onRequestGet as localNewsGet } from "./functions/api/local-news";
 import { onRequestGet as weatherGet } from "./functions/api/weather";
 import { onRequestGet as kakaoGet, onRequestPost as kakaoPost } from "./functions/api/auth/kakao";
+import { onRequestGet as duelsGet, onRequestPost as duelsPost } from "./functions/api/duels";
 
 type Env = Record<string, unknown> & { ASSETS?: { fetch: (r: Request) => Promise<Response> } };
 type Ctx = { request: Request; env: any };
@@ -30,6 +31,9 @@ export default {
       }
       if (path === "/api/state") {
         return request.method === "POST" ? await statePost(ctx) : await stateGet(ctx);
+      }
+      if (path === "/api/duels") {
+        return request.method === "POST" ? await duelsPost(ctx) : await duelsGet(ctx);
       }
       if (path === "/api/auth/kakao") {
         return request.method === "POST" ? await kakaoPost(ctx) : await kakaoGet(ctx);
