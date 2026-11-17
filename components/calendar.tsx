@@ -640,7 +640,7 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                         {dayTitle(u.date)} · {ddayLabel(u.days)}
                       </span>
                       {isLunarEvent(u.event) ? (
-                        <span className="block truncate text-[0.76rem] font-extrabold text-plum-dark">
+                        <span className="mt-0.5 block text-[0.8rem] font-extrabold leading-snug text-plum-dark">
                           🌙 {lunarBadgeText(u.event, u.date)}
                         </span>
                       ) : null}
@@ -987,7 +987,7 @@ export function CalendarScreen({ open, onClose }: { open: boolean; onClose: () =
                             {r.event.repeatYearly ? " · 매년" : ""}
                           </span>
                           {isLunarEvent(r.event) ? (
-                            <span className="mt-0.5 block truncate text-[0.78rem] font-extrabold text-plum-dark">
+                            <span className="mt-0.5 block text-[0.8rem] font-extrabold leading-snug text-plum-dark">
                               🌙 {lunarBadgeText(r.event, r.date)}
                             </span>
                           ) : null}
@@ -1235,7 +1235,7 @@ export function FamilyCalendarCard({ onOpen }: { onOpen: () => void }) {
                 </span>
               </div>
               {isLunarEvent(u.event) ? (
-                <p className="mt-0.5 pl-6 text-[0.76rem] font-extrabold text-plum-dark">
+                <p className="mt-0.5 pl-6 text-[0.8rem] font-extrabold leading-snug text-plum-dark">
                   🌙 {lunarBadgeText(u.event, u.date)}
                 </p>
               ) : null}

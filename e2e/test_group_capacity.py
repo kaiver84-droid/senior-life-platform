@@ -26,8 +26,10 @@ MAX = 100
 
 ID_T = "902100455"          # 모임장(화면 확인용 테스트 계정)
 ID_B = "902100466"          # 정원이 찬 뒤 들어오려는 사람
+ID_C = "902100477"          # 초대 링크(?group=)로 들어오려는 새 사람
 CODE_T = js_make_code(f"kakao_{ID_T}")
 CODE_B = js_make_code(f"kakao_{ID_B}")
+CODE_C = js_make_code(f"kakao_{ID_C}")
 NICK = "정원점검"
 
 results = {}
@@ -45,7 +47,17 @@ def api(body: dict) -> tuple[int, dict]:
     req = urllib.request.Request(
         f"{BASE}/api/groups",
         data=json.dumps(body).encode(),
-        headers={"content-type": "application/json"},
+        headers={
+            "content-type": "application/json",
+            "accept": "application/json",
+            "origin": BASE,
+            "referer": BASE + "/",
+            # Cloudflare 가 브라우저가 아닌 요청을 막지 않도록 실제 브라우저와 같은 표시를 보낸다
+            "user-agent": (
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 "
+                "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+            ),
+        },
         method="POST",
     )
     try:
@@ -60,7 +72,7 @@ def api(body: dict) -> tuple[int, dict]:
 
 
 def cleanup():
-    codes = f"'{CODE_T}','{CODE_B}'"
+    codes = f"'{CODE_T}','{CODE_B}','{CODE_C}'"
     for q in [
         f"delete from public.group_cheers where user_code in ({codes});",
         f"delete from public.group_posts where user_code in ({codes});",
@@ -142,6 +154,9 @@ def main():
         )
         group_id = body.get("groupId")
         check(status == 200 and bool(group_id), "/api/groups create", f"{status} {str(body)[:80]}")
+        if not group_id:
+            print("모임을 만들지 못해 검증을 멈춥니다.")
+            return
         check(body.get("maxMembers") == MAX, "모임 목록 응답에 maxMembers: 100", str(body.get("maxMembers")))
         groups = body.get("groups") or []
         check(bool(groups) and groups[0].get("maxMembers") == MAX, "모임 목록에도 정원 정보", str(groups[0].get("memberCount")) if groups else "없음")
@@ -149,7 +164,7 @@ def main():
         # ---------- 2) 99명 더 채워 정원(100명) 만들기 ----------
         sql(
             "insert into public.group_members (group_id, user_code, name, role) "
-            "select '%s', 'CAPM' || g, '정원점검' || g, 'member' from generate_series(1, 99) g "
+            "select '%s', 'CAPM' || g::text, '정원점검' || g::text, 'member' from generate_series(1, 99) g "
             "on conflict do nothing;" % group_id
         )
         rows = sql(f"select count(*) as n from public.group_members where group_id = '{group_id}';")
@@ -214,14 +229,15 @@ def main():
         status, body = api({"action": "join", "code": CODE_B, "groupId": group_id, "name": "정원점검B", "me": {"name": "정원점검B"}})
         check(status == 200, "이미 가입한 사람의 재요청은 통과", f"{status}")
 
-        # ---------- 6) 화면에서도 정원 초과 안내가 그대로 보이는지 (B 계정) ----------
-        #     (한 명 나간 뒤라 다시 100명으로 채운 다음 확인한다)
+        # ---------- 6) 초대 링크(?group=)로 들어온 새 사람 — 화면에 정원 초과 안내 ----------
+        #     (한 명 나간 자리를 다시 채워 100명으로 만든 뒤 확인한다)
+        sql(f"delete from public.group_members where group_id = '{group_id}' and user_code = '{CODE_B}';")
         sql(
             "insert into public.group_members (group_id, user_code, name, role) "
-            "select '%s', 'CAPN' || g, '정원점검N' || g, 'member' from generate_series(1, 1) g "
-            "on conflict do nothing;" % group_id
+            "select '%s', 'CAPN' || g::text, '정원점검N' || g::text, 'member' "
+            "from generate_series(1, (select %d - count(*) from public.group_members where group_id = '%s')) g "
+            "on conflict do nothing;" % (group_id, MAX, group_id)
         )
-        sql(f"delete from public.group_members where group_id = '{group_id}' and user_code = '{CODE_B}';")
         rows = sql(f"select count(*) as n from public.group_members where group_id = '{group_id}';")
         check((rows[0]["n"] if rows else -1) == MAX, "화면 확인 전 100명 유지", str(rows[0]["n"] if rows else "?"))
         with sync_playwright() as p:
@@ -235,20 +251,27 @@ def main():
                 timezone_id="Asia/Seoul",
             )
             page = ctx.new_page()
-            page.route("**/api/auth/kakao**", kakao_stub(ID_B, "정원점검B"))
-            login(page, ID_B, "정원점검B")
-            page.locator("nav[aria-label='주요 메뉴']").get_by_role("button", name=re.compile("모임")).first.click()
-            page.wait_for_timeout(2200)
-            page.get_by_role("button", name=re.compile("초대 번호로 모임 추가")).first.click()
-            page.wait_for_timeout(900)
-            page.fill("#group-code", group_id)
-            page.get_by_role("button", name=re.compile("모임 들어가기")).first.click()
-            page.wait_for_timeout(2500)
-            toast = page.get_by_text(re.compile("정원\\(100명\\)이 다 찼어요"))
-            check(toast.count() > 0, "화면에 정원 초과 한국어 안내", toast.first.inner_text()[:60] if toast.count() else "")
+            page.route("**/api/auth/kakao**", kakao_stub(ID_C, "정원점검C"))
+            # 초대 링크로 들어온다 → 로그인·초기설정 뒤 자동 가입 시도
+            page.goto(f"{BASE}/?group={group_id}", wait_until="domcontentloaded")
+            page.wait_for_selector("text=카카오톡으로 시작하기", timeout=30000)
+            page.get_by_role("button", name="카카오톡으로 시작하기").click()
+            page.wait_for_selector("#setup-nick", timeout=30000)
+            page.fill("#setup-nick", "정원점검C")
+            page.select_option("#setup-birth", "1955")
+            page.click('[data-birthtime="묘시"]')
+            page.select_option("#setup-sido", "충청북도")
+            page.select_option("#setup-sigungu", "옥천군")
+            page.get_by_role("button", name="저장하고 늘봄 시작하기").click()
+            page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
+            page.wait_for_timeout(4000)
+            body_text = page.inner_text("body")
+            check("정원(100명)이 다 찼어요" in body_text, "초대 링크 자동 가입도 정원에서 막힘 + 한국어 안내", "")
             page.screenshot(path=f"{SHOT}/_capacity_join_blocked.png")
             shots.append(f"{SHOT}/_capacity_join_blocked.png")
             browser.close()
+        rows = sql(f"select count(*) as n from public.group_members where group_id = '{group_id}' and user_code = '{CODE_C}';")
+        check((rows[0]["n"] if rows else -1) == 0, "정원이 찬 모임에 새 사람이 들어가지 않음", str(rows[0]["n"] if rows else "?"))
 
     finally:
         cleanup()
@@ -256,7 +279,7 @@ def main():
         left = rows[0]["n"] if rows else 0
         g = sql(f"select count(*) as n from public.groups where id = '{group_id}';") if group_id else []
         left_g = g[0]["n"] if g else 0
-        u = sql(f"select count(*) as n from public.users where code in ('{CODE_T}','{CODE_B}');")
+        u = sql(f"select count(*) as n from public.users where code in ('{CODE_T}','{CODE_B}','{CODE_C}');")
         check(left == 0 and left_g == 0 and (u[0]["n"] if u else 0) == 0, "테스트 데이터 0건 정리", f"members={left} groups={left_g} users={u[0]['n'] if u else '?'}")
 
     try:
