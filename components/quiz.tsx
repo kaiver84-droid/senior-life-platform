@@ -150,6 +150,12 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
             하루 3문제 · 이번 주 {weekPoints}점 {streak > 0 ? `· 🔥 ${streak}일 연속` : ""}
           </p>
+          <p
+            data-quiz-bank={QUIZ_TOTAL_COUNT}
+            className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[0.76rem] font-extrabold text-brand-dark shadow-soft"
+          >
+            📚 지금 {QUIZ_TOTAL_COUNT}문제가 준비돼 있어요
+          </p>
         </div>
         <span className="grid h-11 w-11 place-items-center rounded-full bg-gold-light text-gold-dark">
           <IconTrophy size={24} />
@@ -211,6 +217,12 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
             <p className="text-[0.92rem] font-extrabold text-ink/65">주제 골라 바로 풀기</p>
             <p className="mt-0.5 text-[0.78rem] font-semibold text-ink/45">
               점수와 상관없이 좋아하는 주제로 3문제를 풀어 볼 수 있어요.
+            </p>
+            <p
+              data-quiz-bank={QUIZ_TOTAL_COUNT}
+              className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[0.76rem] font-extrabold text-brand-dark shadow-soft"
+            >
+              📚 지금 {QUIZ_TOTAL_COUNT}문제가 준비돼 있어요
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5" data-quiz-topics>
               {QUIZ_TYPE_ORDER.map((t) => (

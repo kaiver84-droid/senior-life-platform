@@ -1349,14 +1349,19 @@ function useGradeProfile() {
     if (!code) return;
     let alive = true;
     const q = new URLSearchParams({ scope: "profile", code, today });
-    fetch(`/api/rankings?${q.toString()}`, { headers: { accept: "application/json" } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (alive && j?.ok && j?.grade) setData(j as GradeProfile);
-      })
-      .catch(() => {});
+    const load = () =>
+      fetch(`/api/rankings?${q.toString()}`, { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (alive && j?.ok && j?.grade) setData(j as GradeProfile);
+        })
+        .catch(() => {});
+    void load();
+    // 기기 기록은 바로 바뀌지만 서버 저장은 1.2초 뒤에 끝난다 — 한 번 더 받아 최신 누적 점수를 맞춘다.
+    const t = window.setTimeout(() => void load(), 2600);
     return () => {
       alive = false;
+      window.clearTimeout(t);
     };
     // stateKey — 오늘 활동이 바뀌면 등급 카드를 다시 받아 온다
   }, [code, today, stateKey]);
@@ -1406,7 +1411,9 @@ function useGradeProfile() {
     };
   }, [state, today, streak]);
 
-  return data ?? local;
+  // 서버를 아직 못 읽었거나, 방금 한 활동이 서버에 저장되기 전이면 기기 계산값이 더 앞선다.
+  if (data && data.totalPoints >= local.totalPoints) return data;
+  return local;
 }
 
 function GradeCard({ onOpenBadges }: { onOpenBadges: () => void }) {
@@ -1440,13 +1447,15 @@ function GradeCard({ onOpenBadges }: { onOpenBadges: () => void }) {
           {g.emoji}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.8rem] font-bold text-ink/50">내 등급 · 누적 점수</p>
-          <p className="mt-0.5 text-[1.22rem] font-black leading-tight text-ink" data-grade-label={g.label}>
-            {g.label}
-            <span className="ml-1.5 text-[0.86rem] font-extrabold text-ink/45">{profile.totalPoints}점</span>
+          <p className="text-[0.78rem] font-bold text-ink/50">내 등급</p>
+          <p className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 leading-tight">
+            <span className="text-[1.22rem] font-black text-ink" data-grade-label={g.label}>
+              {g.label}
+            </span>
+            <span className="text-[0.86rem] font-extrabold text-ink/45">누적 {profile.totalPoints}점</span>
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[0.78rem] font-black text-ink/60">
+        <span className="shrink-0 self-start rounded-full bg-white/90 px-2.5 py-1 text-[0.76rem] font-black text-ink/60">
           {g.level} / 5 등급
         </span>
       </div>
@@ -1559,9 +1568,9 @@ function BadgeCollectionSheet({ open, onClose }: { open: boolean; onClose: () =>
                   style={{ width: `${b.percent}%` }}
                 />
               </div>
-              {b.earned ? null : (
+              {!b.earned && b.value === 0 ? (
                 <p className="mt-1 text-[0.72rem] font-semibold leading-snug text-ink/40">{b.how}</p>
-              )}
+              ) : null}
             </div>
           ))}
         </div>
@@ -1935,7 +1944,7 @@ function GroupBattleCard({ onGo }: { onGo: (area: LeagueArea) => void }) {
             <span aria-hidden>🏅</span> 모임 대항전
           </p>
           <p className="mt-0.5 text-[0.8rem] font-semibold text-ink/50">
-            이번 주 모임원 점수를 모두 더해 겨뤄요 · {periodLabel()}
+            모임원 점수를 모두 더해 겨뤄요 · {periodLabel()}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[0.76rem] font-black text-plum-dark">
@@ -1969,7 +1978,7 @@ function GroupBattleCard({ onGo }: { onGo: (area: LeagueArea) => void }) {
           >
             {battle?.message}
           </p>
-          <div className="mt-2">
+          <div className="mt-2" data-battle-join>
             <BigButton variant="teal" full height={52} onClick={() => onGo("brain")}>
               오늘 퀴즈로 힘 보태기
             </BigButton>
