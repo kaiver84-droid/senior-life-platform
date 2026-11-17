@@ -266,6 +266,9 @@ export function HomeTab({
       {/* 오늘의 건강생활 챌린지 — 원터치 완료 도장 */}
       <HealthChallengeCard where="home" />
 
+      {/* 가족 안부 달력 — 생일·기념일과 동네 소식을 오늘의 운세보다 위에 둔다 */}
+      <HomeCalendarBanner onOpen={() => onOpenCalendar?.()} />
+
       {/* 오늘의 운세 */}
       <button
         type="button"
@@ -311,8 +314,6 @@ export function HomeTab({
         </span>
         <IconChevron size={22} className="shrink-0 text-ink/30" />
       </button>
-
-      <HomeCalendarBanner onOpen={() => onOpenCalendar?.()} />
 
       {/* 2×3 바로가기 */}
       <section className="fade-up">

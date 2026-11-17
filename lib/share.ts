@@ -4,8 +4,11 @@
  * 카카오톡 공유 · 휴대폰 공유창 · 링크/이미지 복사 폴백.
  *
  * 2단계 고도화 내용
- * - 만든 카드 이미지를 Kakao.Share.uploadImage 로 먼저 올려 **내 카드 그대로** 카톡 피드에 보낸다.
- *   (업로드가 막힌 앱이면 사이트 대표 이미지로 자동 대체)
+ * - 버튼 클릭과 **같은 작업(콜스택) 안에서** Kakao.Share.sendDefault 를 동기로 부른다.
+ *   (iOS Safari·SFSafariViewController 는 클릭 직후 동기 실행이 끊기면 kakaolink:// 앱 전환을 막는다.
+ *    예전에는 uploadImage 를 await 한 뒤 보내서 '카카오톡이 실행되지 않나요? 다운로드' 화면으로 튕겼다.)
+ * - 카드 이미지는 미리 만들어 둔 정적 대표 이미지(`/share-card.png`)를 즉시 쓴다.
+ * - `installTalk: false` — 카카오톡이 없거나 전환이 막혀도 talk-apps.kakao.com 안내로 이동하지 않는다.
  * - SDK 미설정·도메인 미등록(4019)·카톡 인앱브라우저·공유 취소를 구분해
  *   `ShareOutcome` 으로 돌려주고 화면이 알맞은 안내를 보여 줄 수 있게 한다.
  * - 어느 단계에서 막혀도 마지막에는 이미지 저장 + 링크 복사로 반드시 끝난다.
@@ -24,7 +27,6 @@ type KakaoSdk = {
   init: (key: string) => void;
   Share: {
     sendDefault: (payload: unknown) => unknown;
-    uploadImage?: (settings: { file: File }) => Promise<{ infos?: { original?: { url?: string } } }>;
   };
   Auth?: {
     authorize?: (settings: { redirectUri: string; throughTalk?: boolean; prompt?: string }) => void;
@@ -62,6 +64,34 @@ export function loadKakaoSdk(): Promise<boolean> {
     document.head.appendChild(s);
   });
   return sdkLoading;
+}
+
+/**
+ * 카카오 공유를 **지금 이 순간** 동기로 실행할 수 있는 상태인지 확인한다.
+ * SDK 가 없으면 대신 불러오기만 하고(다음 클릭을 위해) false 를 돌려준다.
+ */
+export function isKakaoShareReady(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as KakaoWindow;
+  if (w.Kakao && typeof w.Kakao.Share?.sendDefault === "function") {
+    if (w.Kakao.isInitialized()) return true;
+    const { jsKey } = kakaoConfig();
+    if (!jsKey) return false;
+    try {
+      w.Kakao.init(jsKey);
+      return w.Kakao.isInitialized();
+    } catch {
+      return false;
+    }
+  }
+  void loadKakaoSdk();
+  return false;
+}
+
+/** 공유 피드에 쓸 기본 카드 이미지 주소 — 클릭 순간에 인터넷을 기다리지 않는다 */
+export function defaultCardImageUrl(): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/share-card.png`;
 }
 
 /**
@@ -196,21 +226,6 @@ export function saveImage(canvas: HTMLCanvasElement, filename: string): boolean 
   }
 }
 
-/** 카카오에 카드 이미지를 올려 공개 주소를 받는다(실패하면 null → 대표 이미지 사용) */
-async function uploadKakaoImage(canvas: HTMLCanvasElement, filename: string): Promise<string | null> {
-  const w = window as KakaoWindow;
-  if (!w.Kakao?.Share?.uploadImage) return null;
-  const file = await canvasToFile(canvas, filename);
-  if (!file) return null;
-  try {
-    const res = await w.Kakao.Share.uploadImage({ file });
-    const url = res?.infos?.original?.url;
-    return url && /^https?:\/\//.test(url) ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 /* ------------------------------------------------------------------ */
 /* 카카오 피드 보내기                                                   */
 /* ------------------------------------------------------------------ */
@@ -223,10 +238,16 @@ export type ShareLinkOptions = {
   imageUrl?: string;
 };
 
-async function kakaoSendFeed(opts: ShareLinkOptions, imageUrl: string): Promise<ShareOutcome> {
+/**
+ * 카카오 피드를 **동기로** 보낸다 — await 없이 호출되어야 클릭과 같은 작업이 된다.
+ * sendDefault 가 돌려준 Promise 는 기다리지 않고, 거부되면 onReject 로 알려만 준다.
+ */
+function kakaoSendFeed(opts: ShareLinkOptions, imageUrl: string, onReject?: (outcome: ShareOutcome) => void): ShareOutcome {
   const w = window as KakaoWindow;
+  const send = w.Kakao?.Share?.sendDefault;
+  if (typeof send !== "function") return { kind: "failed", reason: "sdk_absent", message: "" };
   try {
-    const ret = w.Kakao?.Share.sendDefault({
+    const ret = send({
       objectType: "feed",
       content: {
         title: opts.title,
@@ -242,36 +263,51 @@ async function kakaoSendFeed(opts: ShareLinkOptions, imageUrl: string): Promise<
           link: { mobileWebUrl: opts.link, webUrl: opts.link },
         },
       ],
-      installTalk: true,
+      // 카카오톡이 없거나 kakaolink:// 전환이 막혀도 talk-apps.kakao.com '다운로드' 화면으로
+      // 튕기지 않게 한다(예전 installTalk: true 가 그 화면으로 보내던 원인).
+      installTalk: false,
     });
-    if (ret && typeof (ret as Promise<unknown>).then === "function") await ret;
-    return { kind: "kakao", reason: "ok", message: shareOutcomeMessage({ kind: "kakao", reason: "ok", message: "" }), imageUrl };
+    if (ret && typeof (ret as Promise<unknown>).then === "function") {
+      void (ret as Promise<unknown>).catch((err) => {
+        onReject?.({ kind: "failed", reason: kakaoReason(err), message: "" });
+      });
+    }
+    return {
+      kind: "kakao",
+      reason: "ok",
+      message: shareOutcomeMessage({ kind: "kakao", reason: "ok", message: "" }),
+      imageUrl,
+    };
   } catch (err) {
-    const reason = kakaoReason(err);
-    return { kind: "failed", reason, message: "" };
+    return { kind: "failed", reason: kakaoReason(err), message: "" };
   }
 }
 
 /**
+ * 클릭 처리 함수 안에서 그대로 부르는 동기 전송.
+ * SDK 가 아직 없으면 null — 부른 쪽이 (비동기) 예비 길로 넘어간다.
+ */
+export function kakaoSendNow(
+  opts: ShareLinkOptions,
+  onReject?: (outcome: ShareOutcome) => void
+): ShareOutcome | null {
+  if (!isKakaoShareReady()) return null;
+  return kakaoSendFeed(opts, opts.imageUrl || defaultCardImageUrl(), onReject);
+}
+
+/**
  * 카드 이미지를 카카오톡으로 보낸다.
- * 1) Kakao.Share.uploadImage 로 내 카드 이미지를 올려 피드 카드로 전송
- * 2) 업로드가 막히면 사이트 대표 이미지로 피드 카드 전송
- * 3) SDK 가 없거나 도메인 미등록(4019)이면 실패를 그대로 알려 준다(화면이 다음 길로 안내)
+ * 1) SDK 가 준비돼 있으면 클릭과 같은 작업 안에서 즉시 전송(동기) — iOS 앱 전환 유지
+ * 2) SDK 가 없을 때만 1회 로드한 뒤 다시 시도(그 사이 사용자 제스처는 끊길 수 있다)
+ * 3) 그래도 안 되면 실패를 그대로 알려 준다(화면이 공유창·저장으로 안내)
  */
 export async function sendKakaoCard(opts: ShareLinkOptions & { canvas?: HTMLCanvasElement; filename?: string }): Promise<ShareOutcome> {
+  const now = kakaoSendNow(opts);
+  if (now) return now;
+
   const loaded = await loadKakaoSdk();
   if (!loaded) return { kind: "failed", reason: "sdk_absent", message: "" };
-
-  let imageUrl = opts.imageUrl || "";
-  if (opts.canvas) {
-    const uploaded = await uploadKakaoImage(opts.canvas, opts.filename || "neulbom-card.png");
-    if (uploaded) imageUrl = uploaded;
-  }
-  if (!imageUrl) {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    imageUrl = `${origin}/share-card.png`;
-  }
-  return kakaoSendFeed(opts, imageUrl);
+  return kakaoSendNow(opts) ?? { kind: "failed", reason: "sdk_absent", message: "" };
 }
 
 /* ------------------------------------------------------------------ */
@@ -337,9 +373,15 @@ export async function smartShare(input: SmartShareInput): Promise<ShareOutcome> 
     imageUrl: input.imageUrl,
   };
 
-  const kakao = await sendKakaoCard({ ...feed, canvas: input.canvas, filename: input.filename });
-  if (kakao.kind === "kakao") return kakao;
+  // 1) 클릭과 같은 콜스택에서 먼저 시도 — iOS Safari 는 이때만 카카오톡 앱으로 넘겨 준다.
+  let kakao = kakaoSendNow(feed);
+  if (!kakao) {
+    const loaded = await loadKakaoSdk();
+    if (loaded) kakao = kakaoSendNow(feed);
+  }
+  if (kakao?.kind === "kakao") return kakao;
 
+  // 2) 카카오가 안 되면 휴대폰 공유창 → 3) 이미지 저장 + 글 복사
   const device = await shareViaDevice({
     title: input.title,
     text: input.text,
@@ -353,7 +395,7 @@ export async function smartShare(input: SmartShareInput): Promise<ShareOutcome> 
   const saved = input.canvas ? saveImage(input.canvas, input.filename || "neulbom-card.png") : false;
   const copied = await copyText(`${input.text}\n${link}`);
   if (saved) {
-    return { kind: "saved", reason: kakao.reason === "ok" ? "share_absent" : kakao.reason, message: "" };
+    return { kind: "saved", reason: kakao?.reason ?? "sdk_absent", message: "" };
   }
   if (copied) return { kind: "copied", reason: "copy_failed", message: "" };
   return { kind: "failed", reason: "copy_failed", message: "" };

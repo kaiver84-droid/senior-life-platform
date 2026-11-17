@@ -6,6 +6,8 @@ import { renderShareCard } from "@/lib/canvas";
 import {
   isKakaoInAppBrowser,
   kakaoConfig,
+  kakaoSendNow,
+  loadKakaoSdk,
   shareOutcomeMessage,
   smartShare,
   type ShareReason,
@@ -82,6 +84,7 @@ export function SharePreviewSheet({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [busy, setBusy] = useState<"kakao" | null>(null);
   const [hint, setHint] = useState<string>("");
+  const sent = useRef(false);
   const inApp = typeof navigator !== "undefined" ? isKakaoInAppBrowser() : false;
 
   const card = useMemo<ShareCardInput>(
@@ -106,25 +109,60 @@ export function SharePreviewSheet({
     return withInviteRef(data.link || window.location.origin, viewerId);
   }, [data.link, viewerId]);
 
-  const runKakao = useCallback(async () => {
-    if (busy) return;
-    setBusy("kakao");
+  /**
+   * 보내기 — **클릭과 같은 콜스택에서** Kakao.Share.sendDefault 를 동기로 부른다.
+   * iOS Safari·SFSafariViewController 는 클릭 직후 동기 실행이 끊기면 kakaolink:// 전환을 막고,
+   * 그 전에는 installTalk: true 라 talk-apps.kakao.com '다운로드' 화면으로 튕겼다.
+   */
+  const runKakao = useCallback(() => {
+    if (sent.current) return;
     const canvas = canvasRef.current ?? undefined;
-    const outcome = await smartShare({
+    const feed = {
       title: data.title || data.headline,
       description: data.description || data.sub || data.message || "",
       link: link(),
       buttonTitle: data.buttonTitle || "늘봄 열기",
-      text: data.text,
-      canvas,
-      filename: data.filename,
+    };
+
+    // 1) SDK 가 준비돼 있으면 즉시(동기) 전송 — 여기서 await 하지 않는 것이 핵심
+    const immediate = kakaoSendNow(feed, (failed) => {
+      // 카카오가 나중에 거부한 경우(도메인 미등록 등) — 실패를 조용히 삼키지 않는다
+      setHint(hintFor(failed.reason, failed.kind));
+      show(shareOutcomeMessage(failed));
     });
-    setBusy(null);
-    setHint(hintFor(outcome.reason, outcome.kind));
-    show(shareOutcomeMessage(outcome));
-    // 보내기를 누르면 안내 박스에만 머물지 않고 시트를 깔끔히 닫는다(결과는 위 토스트로 알려 준다)
-    onClose();
-  }, [busy, data, link, onClose, show]);
+    if (immediate?.kind === "kakao") {
+      sent.current = true;
+      setHint(hintFor(immediate.reason, immediate.kind));
+      show(shareOutcomeMessage(immediate));
+      onClose();
+      return;
+    }
+
+    // 2) SDK 미준비이거나 카카오가 바로 거부 → 공유창 · 이미지 저장 + 글 복사로 이어진다
+    sent.current = true;
+    setBusy("kakao");
+    void (async () => {
+      const outcome = await smartShare({
+        ...feed,
+        text: data.text,
+        canvas,
+        filename: data.filename,
+      });
+      setBusy(null);
+      setHint(hintFor(outcome.reason, outcome.kind));
+      show(shareOutcomeMessage(outcome));
+      onClose();
+    })();
+  }, [data, link, onClose, show]);
+
+  // 시트를 여는 순간 SDK 를 미리 불러 둔다 — 버튼을 누를 때는 이미 준비돼 있어야
+  // 클릭과 같은 작업 안에서 동기로 보낼 수 있다.
+  useEffect(() => {
+    if (!open) return;
+    sent.current = false;
+    if (!kakaoConfig().configured) return;
+    void loadKakaoSdk();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -218,7 +256,7 @@ export function SharePreviewSheet({
               variant="sun"
               size="lg"
               full
-              onClick={() => void runKakao()}
+              onClick={runKakao}
               disabled={busy === "kakao"}
               height={76}
               className="rounded-[1.3rem] !text-[1.16rem]"
@@ -238,7 +276,8 @@ export function SharePreviewSheet({
           <p className="mt-1 text-[0.8rem] font-semibold leading-relaxed text-ink/55">
             ‘카카오톡으로 바로 보내기’를 누르면 카카오톡이 열려요. 보낼 사람(단톡방)을 고르면 돼요.
             <br />
-            카카오톡이 열리지 않으면 사진과 글을 대신 준비해 드려요.
+            카카오톡이 열리지 않으면 사진과 글을 대신 준비해 드려요. 피클·카톡 안에서 연 화면에서는 앱 이동이
+            막힐 수 있으니, 그럴 때는 사파리로 열거나 저장한 사진을 대화창에 붙여넣어 주세요.
           </p>
         </div>
       </div>
