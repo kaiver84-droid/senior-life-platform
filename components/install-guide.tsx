@@ -227,8 +227,14 @@ export function InstallGuide() {
       <Sheet
         open={open}
         onClose={closeGuide}
-        title="📱 늘봄 앱으로 설치하고 시작해요"
-        subtitle="홈 화면에 추가하면 주소창 없이 앱처럼 바로 열려요"
+        title="📱 늘봄 앱 설치하기"
+        subtitle="홈 화면에 추가하면 앱처럼 열려요"
+        hideBottomClose
+        footer={
+          <BigButton variant="white" full onClick={closeGuide} height={54}>
+            <IconClose size={20} /> 나중에 보기
+          </BigButton>
+        }
       >
         <div data-install-guide data-platform={platform} className="space-y-3">
           {platform === "kakao" ? (
@@ -237,7 +243,7 @@ export function InstallGuide() {
                 카카오톡 안에서는 설치 메뉴가 없어요
               </p>
               <p className="mt-1 text-[0.94rem] font-semibold leading-relaxed text-[#8A6100]/85">
-                아래 버튼을 누르면 {os === "android" ? "크롬" : "사파리"}(으)로 열려요. 그다음 아래 순서대로 하시면 돼요.
+                아래 버튼을 누르면 {os === "android" ? "크롬" : "Safari"}로 열려요. 그다음 아래 순서대로 하시면 돼요.
               </p>
               <div className="mt-3">
                 <BigButton
@@ -327,9 +333,6 @@ export function InstallGuide() {
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            <BigButton variant="white" full onClick={closeGuide}>
-              <IconClose size={20} /> 나중에 보기
-            </BigButton>
             <button
               type="button"
               onClick={dismissForever}
