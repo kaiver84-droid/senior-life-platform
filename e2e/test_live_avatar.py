@@ -356,7 +356,7 @@ def main():
 
         nav_button(page, "모임").click()
         page.wait_for_timeout(1800)
-        page.get_by_role("button", name=re.compile("모임 탈퇴하기")).first.click()
+        page.get_by_role("button", name=re.compile("모임 탈퇴")).first.click()
         page.wait_for_selector("text=모임에서 탈퇴하기", timeout=15000)
         page.wait_for_timeout(600)
         check("정말 이 모임에서 나갈까요?" in page.inner_text("body"), "탈퇴 확인 안내 표시", "")
