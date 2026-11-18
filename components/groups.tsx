@@ -640,10 +640,10 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             </SectionTitle>
             <p className="mb-2 text-[0.84rem] font-semibold text-ink/50">한 줄 안부와 응원을 남겨 보세요.</p>
 
-            <div className="flex items-end gap-2">
+            <div className="group-post flex items-end gap-2">
               <input
                 className="field flex-1"
-                placeholder="오늘 한마디 (예: 다들 좋은 하루 보내세요!)"
+                placeholder="오늘 한마디"
                 value={text}
                 maxLength={80}
                 onChange={(e) => setText(e.target.value)}
@@ -705,12 +705,13 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             </div>
           </Card>
 
-          <div className="grid grid-cols-2 gap-2">
+          {/* 두 버튼은 어떤 글씨 크기에서도 한 줄 · 같은 높이 (globals.css `.group-action`) */}
+          <div className="group-action grid grid-cols-2 gap-2">
             <BigButton variant="white" full height={52} onClick={() => setSheet("edit")}>
               ✏️ 모임 수정
             </BigButton>
             <BigButton variant="ghost" full height={52} onClick={() => setSheet("leave")}>
-              🚪 모임 탈퇴하기
+              🚪 모임 탈퇴
             </BigButton>
           </div>
 

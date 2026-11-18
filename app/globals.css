@@ -125,6 +125,40 @@ button {
   transform: translateY(2px) scale(0.995);
 }
 
+/* 모임 수정 · 탈퇴 버튼 — ‘글씨 크게/더 크게’에서도 두 버튼 모두 한 줄, 같은 높이로 선다.
+   .touch-btn 기본값(폰트 1.05rem · 좌우 여백 1.1rem)은 좁은 2열 칸에서 두 줄로 넘어가므로
+   이 묶음(.group-action) 안에서만 글씨를 조금 줄이고 여백을 좁혀 한 줄에 맞춘다. */
+.group-action .touch-btn {
+  white-space: nowrap;
+  padding: 0 0.625rem;
+  gap: 0.35rem;
+  font-size: 0.94rem;
+  line-height: 1.25;
+}
+
+/* 아이폰 SE 등 아주 좁은 화면(≤350px)에서도 넘치지 않게 */
+@media (max-width: 350px) {
+  .group-action .touch-btn {
+    padding: 0 0.3rem;
+    gap: 0.25rem;
+    font-size: 0.82rem;
+  }
+}
+
+/* 게시판 입력줄 — ‘남기기’ 버튼이 넓어 입력칸이 좁아지지 않게 */
+.group-post .touch-btn {
+  padding: 0 0.7rem;
+  gap: 0.3rem;
+  font-size: 0.98rem;
+}
+/* .field 의 width:100% 가 flex 칸을 넘보지 않게 — 남는 폭을 입력칸이 모두 쓴다 */
+.group-post .field {
+  width: auto;
+  flex: 1 1 0%;
+  min-width: 0;
+  padding: 0 0.6rem;
+}
+
 .card {
   background: #fff;
   border-radius: 1.5rem;
