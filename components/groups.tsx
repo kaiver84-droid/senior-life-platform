@@ -665,7 +665,9 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             <div className="mt-3 space-y-2">
               {posts.length === 0 ? (
                 <p className="rounded-2xl bg-paper px-4 py-5 text-center text-[0.9rem] font-semibold text-ink/45">
-                  첫 안부를 남겨 보세요. 가족이 함께 볼 수 있어요.
+                  첫 안부를 남겨 보세요.
+                  <br />
+                  가족이 함께 볼 수 있어요.
                 </p>
               ) : (
                 posts.map((p) => (

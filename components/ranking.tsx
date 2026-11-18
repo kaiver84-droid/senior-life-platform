@@ -1573,7 +1573,6 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
 
 export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { profile, streak, state, today, todayDaily, rankingVisible, code } = useApp();
-  const { active } = useGroup();
 
   // 친구 초대 성공(+50점/명)은 서버만 안다 — 날짜별 초대 수를 한 번 받아 온다.
   const [invitesByDay, setInvitesByDay] = useState<Record<string, number> | undefined>(undefined);
@@ -1609,7 +1608,7 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
           <Badge tone="brand">{periodLabel()}</Badge>
         </div>
         <h1 className="t-title mt-1.5 text-ink">{profile?.nickname} 님의 이번 주 순위</h1>
-        {/* 부제는 조각마다 통째로 줄바꿈되게 — ‘· 안녕하세요’만 다음 줄로 떨어지지 않게 */}
+        {/* 부제는 조각마다 통째로 줄바꿈되게 */}
         <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="whitespace-nowrap rounded-full bg-white/80 px-2.5 py-0.5 text-[0.92rem] font-bold leading-tight text-ink/60">
             🔥 {streak}일 연속 출석
@@ -1620,11 +1619,6 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
               {week.total}점
             </span>
           </span>
-          {active ? (
-            <span className="whitespace-nowrap rounded-full bg-white/80 px-2.5 py-0.5 text-[0.85rem] font-extrabold leading-tight text-ink/55">
-              🏠 {active.name}
-            </span>
-          ) : null}
         </div>
         {!rankingVisible ? (
           <p className="mt-1.5 rounded-xl bg-white/80 px-3 py-2 text-[0.82rem] font-bold text-ink/55">
