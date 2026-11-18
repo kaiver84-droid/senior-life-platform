@@ -171,7 +171,7 @@ export function HomeTab({
               "linear-gradient(to right, #E8F5FC 0%, #E8F5FC 40%, rgba(232,245,252,0.94) 52%, rgba(232,245,252,0.55) 64%, rgba(232,245,252,0) 80%)",
           }}
         />
-        <div className="relative px-4 py-2.5">
+        <div className="relative px-4 py-2">
           <p className="truncate text-[1.1rem] font-black leading-tight tracking-tight text-ink">
             {profile?.nickname}님,
           </p>
@@ -266,7 +266,7 @@ export function HomeTab({
           recordMission("group");
           onNavigate("quiz");
         }}
-        className="fade-up relative block w-full overflow-hidden rounded-[1.4rem] p-3 text-left shadow-soft active:scale-[0.995]"
+        className="fade-up relative block w-full overflow-hidden rounded-[1.4rem] px-3 py-2.5 text-left shadow-soft active:scale-[0.995]"
         style={{ background: "linear-gradient(135deg, #FFE9CB 0%, #FFD6A6 55%, #FFC98C 100%)" }}
       >
         <span className="flex items-center justify-between gap-2">
@@ -292,7 +292,7 @@ export function HomeTab({
             className="shrink-0 drop-shadow-[0_8px_14px_rgba(180,83,10,0.3)]"
           />
         </span>
-        <span className="mt-1.5 flex min-h-[42px] items-center justify-center gap-1 rounded-full bg-[#EE7413] text-[0.94rem] font-black text-white shadow-cta">
+        <span className="mt-1.5 flex min-h-[40px] items-center justify-center gap-1 rounded-full bg-[#EE7413] text-[0.94rem] font-black text-white shadow-cta">
           ▶ {todayDaily?.done ? "오늘 결과 보기" : "지금 바로 참여하기"} <IconChevron size={16} />
         </span>
       </button>
@@ -313,7 +313,7 @@ export function HomeTab({
             </span>
             <IconChevron size={15} className="shrink-0 text-plum-dark/40" />
           </span>
-          <span className="mt-1 block min-h-[2.4rem] text-[0.78rem] font-bold leading-snug text-ink/60">
+          <span className="mt-1 block min-h-[2.2rem] text-[0.78rem] font-bold leading-snug text-ink/60">
             {nextEvent
               ? `${nextEvent.event.title} ${ddayLabel(nextEvent.days)}`
               : "생일·기념일을 챙겨 보세요"}
@@ -337,7 +337,7 @@ export function HomeTab({
             </span>
             <IconChevron size={15} className="shrink-0 text-leaf-dark/40" />
           </span>
-          <span className="mt-1 block min-h-[2.4rem] text-[0.78rem] font-bold leading-snug text-ink/60">
+          <span className="mt-1 block min-h-[2.2rem] text-[0.78rem] font-bold leading-snug text-ink/60">
             {fortune.headline}
           </span>
           <span className="mt-auto flex min-h-[36px] items-center justify-center rounded-full bg-leaf text-[0.82rem] font-black text-white">
@@ -350,7 +350,7 @@ export function HomeTab({
       <button
         type="button"
         onClick={() => setStudio({ open: true, autoShare: false })}
-        className="fade-up flex w-full items-center gap-2.5 rounded-[1.25rem] bg-white px-3 py-2 text-left shadow-soft active:scale-[0.995]"
+        className="fade-up flex w-full items-center gap-2.5 rounded-[1.25rem] bg-white px-3 py-1.5 text-left shadow-soft active:scale-[0.995]"
       >
         <span
           aria-hidden
@@ -376,7 +376,7 @@ export function HomeTab({
         type="button"
         data-home-end
         onClick={() => onNavigate("welfare")}
-        className="fade-up flex w-full items-center gap-2.5 rounded-[1.25rem] bg-white px-3 py-2 text-left shadow-soft active:scale-[0.995]"
+        className="fade-up flex w-full items-center gap-2.5 rounded-[1.25rem] bg-white px-3 py-1.5 text-left shadow-soft active:scale-[0.995]"
       >
         <span
           aria-hidden

@@ -134,7 +134,7 @@ def main():
         banner = page.locator("[data-install-banner]")
         install_ok = banner.count() > 0
         print(f"  {'OK ' if install_ok else 'BAD'} 첫 사용자 설치 안내 배너")
-        if LOCAL and install_ok:
+        if install_ok:
             banner.click()
             page.wait_for_timeout(1200)
             page.keyboard.press("Escape")
