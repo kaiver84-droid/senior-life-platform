@@ -182,6 +182,9 @@ export function InstallGuide() {
     return () => window.clearTimeout(t);
   }, []);
 
+  /** 카톡 인앱에서도 그 기기(아이폰/안드로이드)의 설치 단계를 그대로 보여 준다 */
+  const guideOS: Platform = platform === "kakao" ? (os === "other" ? "other" : os) : platform;
+
   /** 닫기(나중에 보기) — 한 번 봤으면 다시 자동으로 뜨지 않게 기억한다 */
   const closeGuide = useCallback(() => {
     markInstallGuideSeen();
@@ -281,13 +284,13 @@ export function InstallGuide() {
 
           <div className="rounded-[1.4rem] bg-white p-4 shadow-soft">
             <p className="mb-2.5 text-[1.02rem] font-black text-ink">
-              {platform === "ios"
+              {guideOS === "ios"
                 ? "아이폰은 이렇게 해요"
-                : platform === "android"
+                : guideOS === "android"
                   ? "안드로이드는 이렇게 해요"
                   : "휴대폰은 이렇게 해요"}
             </p>
-            {platform === "ios" ? (
+            {guideOS === "ios" ? (
               <ol className="space-y-2.5">
                 <Step n={1}>
                   사파리 <b>아래 가운데 공유 버튼</b>
@@ -303,7 +306,7 @@ export function InstallGuide() {
                   오른쪽 위 <b>‘추가’</b>를 누르면 끝! 홈 화면의 늘봄을 눌러 여세요.
                 </Step>
               </ol>
-            ) : platform === "android" ? (
+            ) : guideOS === "android" ? (
               <ol className="space-y-2.5">
                 <Step n={1}>
                   오른쪽 위 <b>⋮</b> 메뉴를 누르세요.
