@@ -192,7 +192,7 @@ function LeagueMissionCard({
 
   return (
     <Card
-      className="p-4"
+      className="!p-3"
       data-league-missions
       data-league-today={score.total}
       data-league-week={week.total}
@@ -236,25 +236,28 @@ function LeagueMissionCard({
               data-league-done={done ? "1" : "0"}
               aria-pressed={done}
               onClick={() => onGo(m.area)}
-              className={`flex min-h-[56px] w-full items-center gap-2 rounded-2xl border-2 px-2.5 py-2 text-left transition active:scale-[0.995] ${
+              className={`flex w-full flex-col justify-center gap-0.5 rounded-2xl border-2 px-3 py-2 text-left transition active:scale-[0.995] ${
                 done ? "border-leaf bg-leaf-light" : "border-ink/8 bg-paper"
               }`}
             >
-              <span aria-hidden className="text-[1.2rem] leading-none">
-                {m.emoji}
-              </span>
-              <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <span aria-hidden className="shrink-0 text-[min(1.05rem,25px)] leading-none">
+                  {m.emoji}
+                </span>
                 <span
-                  className={`block whitespace-nowrap text-[0.92rem] font-black leading-tight ${done ? "text-leaf-dark" : "text-ink"}`}
+                  data-mission-title
+                  className={`min-w-0 flex-1 whitespace-nowrap text-[min(0.92rem,20px)] font-black leading-tight ${done ? "text-leaf-dark" : "text-ink"}`}
                 >
                   {m.label}
                 </span>
-                <span className="mt-0.5 block whitespace-nowrap text-[0.74rem] font-semibold text-ink/45">{m.note}</span>
+                <span className="shrink-0 whitespace-nowrap text-[min(0.78rem,20px)] font-black text-brand-dark">+{m.points}점</span>
               </span>
-              <span className="shrink-0 text-right">
-                <span className="block whitespace-nowrap text-[0.82rem] font-black text-brand-dark">+{m.points}점</span>
-                <span className="block text-[0.74rem] font-extrabold text-ink/40">
-                  {done ? "완료 ✅" : "눌러서 가기"}
+              <span className="flex items-center justify-between gap-2">
+                <span data-mission-note className="min-w-0 whitespace-nowrap text-[min(0.72rem,19px)] font-semibold text-ink/45">
+                  {m.note}
+                </span>
+                <span className="shrink-0 text-[min(0.72rem,19px)] font-extrabold text-ink/40">
+                  {done ? "✅" : <IconChevron size={16} />}
                 </span>
               </span>
             </button>
@@ -262,18 +265,22 @@ function LeagueMissionCard({
         })}
         <div
           data-league-mission="invite"
-          className="flex min-h-[52px] items-center gap-2 rounded-2xl border-2 border-ink/8 bg-paper px-2.5 py-2"
+          className="flex flex-col justify-center gap-0.5 rounded-2xl border-2 border-ink/8 bg-paper px-3 py-2"
         >
-          <span aria-hidden className="text-[1.2rem] leading-none">
-            🎁
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="shrink-0 text-[min(1.05rem,25px)] leading-none">
+              🎁
+            </span>
+            <span data-mission-title className="min-w-0 flex-1 whitespace-nowrap text-[min(0.92rem,20px)] font-black leading-tight text-ink">
+              친구 초대 성공
+            </span>
+            <span className="shrink-0 whitespace-nowrap text-[min(0.78rem,20px)] font-black text-brand-dark">+{LEAGUE_POINTS.invite}점</span>
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block whitespace-nowrap text-[0.92rem] font-black leading-tight text-ink">친구 초대 성공</span>
-            <span className="mt-0.5 block whitespace-nowrap text-[0.74rem] font-semibold text-ink/45">
+          <span className="flex items-center justify-between gap-2">
+            <span data-mission-note className="min-w-0 whitespace-nowrap text-[min(0.72rem,19px)] font-semibold text-ink/45">
               한 명마다 · 오늘 {invitesToday}명 초대
             </span>
           </span>
-          <span className="shrink-0 whitespace-nowrap text-[0.82rem] font-black text-brand-dark">+{LEAGUE_POINTS.invite}점</span>
         </div>
       </div>
     </Card>
