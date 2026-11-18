@@ -1,5 +1,9 @@
 """모임 초대 동선 점검 — ① 생성 직후 초대 시트 자동 열림 ② 상단·목록 초대 버튼 ③ 1인 모임 초대 안내.
 
+※ 2026-11-18 사용자 요청(중간 부연설명·미리보기 제거) 이후: 모임 초대 버튼은 시트를 거치지 않고
+   바로 카카오톡으로 연결된다. 이 파일의 ②·③ 단계(버튼 → 초대 시트)와 초대 링크 박스 확인은
+   구 UX 기준이라 지금은 실패한다. 새 흐름 검증은 e2e/check_direct_invite.py 를 쓴다.
+
 로컬:  python3 e2e/check_group_invite_flow.py
 라이브: BASE=https://senior-life-platform.pages.dev python3 e2e/check_group_invite_flow.py
 

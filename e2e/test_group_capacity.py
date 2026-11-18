@@ -199,14 +199,15 @@ def main():
             page.screenshot(path=f"{SHOT}/_capacity_full.png")
             shots.append(f"{SHOT}/_capacity_full.png")
 
-            # 초대 시트 안내문
+            # 초대 버튼 — 2026-11-18부터 정원 안내 시트 없이 바로 카카오톡으로 연결된다
             invite = page.locator("[data-group-invite-top]").first
             if invite.count():
                 invite.click()
                 page.wait_for_timeout(1200)
-                invite_cap = page.locator("[data-group-invite-capacity]").first
-                invite_text = invite_cap.inner_text().strip() if invite_cap.count() else ""
-                check("100" in invite_text and "정원" in invite_text, "초대 시트 정원 안내", invite_text)
+                check(
+                    page.locator("[data-group-invite-capacity]").count() == 0,
+                    "초대에 정원 부연설명 시트 없음",
+                )
                 page.screenshot(path=f"{SHOT}/_capacity_invite.png")
                 shots.append(f"{SHOT}/_capacity_invite.png")
             browser.close()

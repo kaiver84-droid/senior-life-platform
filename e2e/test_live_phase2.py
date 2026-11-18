@@ -314,16 +314,11 @@ def main():
         check(re.search(r"\d+/\d+명\s*함께했어요", group_main) is not None, "모임 함께 참여 인원")
         check("이번 주 모임 달성률" in group_main and "모임 게시판" in group_main, "모임 출석·게시판 유지")
 
-        # 모임 초대 공유 미리보기(회귀 + 신규)
+        # 모임 초대 — 2026-11-18부터 중간 시트·미리보기 없이 바로 카카오톡으로 연결된다
         page.get_by_role("button", name=re.compile("초대하기")).first.click()
-        page.wait_for_selector("text=카카오톡으로 모임 초대", timeout=15000)
-        page.get_by_role("button", name=re.compile("카카오톡으로 초대장 보내기")).click()
-        page.wait_for_selector("[data-share-sheet]", timeout=15000)
         page.wait_for_timeout(900)
-        check("FAM101" in page.inner_text("[data-share-sheet]"), "모임 초대 카드(코드 포함)")
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(300)
-        page.keyboard.press("Escape")
+        check(page.locator("[data-share-sheet]").count() == 0, "모임 초대에 미리보기 시트 없음")
+        check(page.locator("[data-group-invite-sheet]").count() == 0, "모임 초대에 중간 시트 없음")
         page.wait_for_timeout(600)
 
         # ---------- 6) 기존 기능 회귀 ----------
