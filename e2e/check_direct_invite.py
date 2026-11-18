@@ -94,11 +94,10 @@ def kakao_stub():
 KAKAO_STUB_JS = """
 window.__shareCalls = [];
 window.__clickStack = false;
-document.addEventListener('click', () => {
-  window.__clickStack = true;
-  // 클릭 처리의 동기 구간이 끝나는 즉시(마이크로태스크) 끈다 — await 뒤 호출이면 false 로 잡힌다
-  queueMicrotask(() => { window.__clickStack = false; });
-}, true);
+// 클릭 이벤트 전파가 시작될 때 켜고, 전파가 끝나는 순간(window 버블 = 마지막) 끈다.
+// 같은 작업(sendDefault 동기 호출)이면 true, await 뒤(다음 마이크로태스크·작업)면 false 로 잡힌다.
+document.addEventListener('click', () => { window.__clickStack = true; }, true);
+window.addEventListener('click', () => { window.__clickStack = false; }, false);
 window.Kakao = {
   isInitialized: () => true,
   init: () => {},

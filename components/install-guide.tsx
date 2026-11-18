@@ -28,6 +28,8 @@ declare global {
 }
 
 const DISMISS_KEY = "neulbom.installGuide.dismissed.v1";
+/** 첫 진입에서 설치 안내를 한 번 띄웠는지 — 닫은 뒤에는 다시 자동으로 뜨지 않는다 */
+const FIRST_RUN_KEY = "neulbom.installGuide.seen.v1";
 export const INSTALL_GUIDE_EVENT = "neulbom:install-guide";
 
 /** 더보기/설정 어디서든 안내를 다시 열 수 있게 */
@@ -84,6 +86,35 @@ function readDismissed(): string | null {
   }
 }
 
+/** 첫 진입 자동 안내를 이미 보여 줬는지 */
+export function hasSeenInstallGuide(): boolean {
+  try {
+    return localStorage.getItem(FIRST_RUN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markInstallGuideSeen() {
+  try {
+    localStorage.setItem(FIRST_RUN_KEY, "1");
+  } catch {
+    /* 저장하지 못해도 안내는 계속 쓸 수 있다 */
+  }
+}
+
+/** 기기 OS — 카톡 안에서도 ‘Safari/크롬으로 열기’를 골라 안내하기 위해 따로 본다 */
+function detectOS(): "ios" | "android" | "other" {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent;
+  const nav = navigator as Navigator & { maxTouchPoints?: number };
+  if (/android/i.test(ua)) return "android";
+  if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && (nav.maxTouchPoints || 0) > 1)) {
+    return "ios";
+  }
+  return "other";
+}
+
 /** 안내를 띄울지 판단 — 이미 앱으로 열렸거나 ‘다시 안 보기’면 띄우지 않는다 */
 export function shouldOfferInstall(): boolean {
   if (typeof window === "undefined") return false;
@@ -108,6 +139,7 @@ const DISMISS_EVENT = "neulbom:install-dismissed";
 export function InstallGuide() {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>("other");
+  const [os, setOs] = useState<"ios" | "android" | "other">("other");
   const [canInstall, setCanInstall] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -117,11 +149,13 @@ export function InstallGuide() {
 
   useEffect(() => {
     setPlatform(detectPlatform());
+    setOs(detectOS());
     refreshAvailability();
     const onAvail = () => refreshAvailability();
     window.addEventListener("neulbom:install-available", onAvail);
     const onOpen = () => {
       setPlatform(detectPlatform());
+      setOs(detectOS());
       setOpen(true);
     };
     window.addEventListener(INSTALL_GUIDE_EVENT, onOpen);
@@ -130,6 +164,29 @@ export function InstallGuide() {
       window.removeEventListener(INSTALL_GUIDE_EVENT, onOpen);
     };
   }, [refreshAvailability]);
+
+  /**
+   * 첫 사용자(온보딩을 막 마치고 처음 들어온 사람)에게 설치 안내를 한 번 자동으로 띄운다.
+   * - 이미 홈 화면 앱(standalone)으로 열렸거나, 한 번 봤거나 ‘다시 안 보기’면 띄우지 않는다.
+   * - 컴퓨터 브라우저(other)에서는 자동으로 띄우지 않는다(휴대폰 설치 안내라서).
+   */
+  useEffect(() => {
+    const p = detectPlatform();
+    if (p !== "ios" && p !== "android" && p !== "kakao") return;
+    if (!shouldOfferInstall() || hasSeenInstallGuide()) return;
+    const t = window.setTimeout(() => {
+      markInstallGuideSeen();
+      // 이벤트로 열면 홈의 설치 배너도 함께 사라져 같은 안내를 두 번 보여 주지 않는다
+      openInstallGuide();
+    }, 1400);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  /** 닫기(나중에 보기) — 한 번 봤으면 다시 자동으로 뜨지 않게 기억한다 */
+  const closeGuide = useCallback(() => {
+    markInstallGuideSeen();
+    setOpen(false);
+  }, []);
 
   const dismissForever = useCallback(() => {
     try {
@@ -169,9 +226,9 @@ export function InstallGuide() {
     <>
       <Sheet
         open={open}
-        onClose={() => setOpen(false)}
-        title="📱 주소창 없이 앱처럼 쓰기"
-        subtitle="홈 화면에 늘봄을 추가하면 앱처럼 열려요"
+        onClose={closeGuide}
+        title="📱 늘봄 앱으로 설치하고 시작해요"
+        subtitle="홈 화면에 추가하면 주소창 없이 앱처럼 바로 열려요"
       >
         <div data-install-guide data-platform={platform} className="space-y-3">
           {platform === "kakao" ? (
@@ -180,9 +237,24 @@ export function InstallGuide() {
                 카카오톡 안에서는 설치 메뉴가 없어요
               </p>
               <p className="mt-1 text-[0.94rem] font-semibold leading-relaxed text-[#8A6100]/85">
-                오른쪽 위 <b>⋮</b>(또는 아래 <b>···</b>)를 눌러 <b>‘다른 브라우저로 열기’</b>를 골라 주세요.
-                <br />
-                그다음 아래 순서대로 하시면 돼요.
+                아래 버튼을 누르면 {os === "android" ? "크롬" : "사파리"}(으)로 열려요. 그다음 아래 순서대로 하시면 돼요.
+              </p>
+              <div className="mt-3">
+                <BigButton
+                  variant="ink"
+                  size="lg"
+                  full
+                  onClick={() => {
+                    // 카톡 인앱브라우저는 설치 메뉴가 없다 — 기본 브라우저(사파리/크롬)로 넘긴다
+                    const url = window.location.href;
+                    window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(url)}`;
+                  }}
+                >
+                  🧭 {os === "android" ? "크롬으로 열기" : "Safari로 열기"}
+                </BigButton>
+              </div>
+              <p className="mt-2 text-[0.84rem] font-bold leading-snug text-[#8A6100]/80">
+                버튼이 안 되면 오른쪽 위 <b>⋮</b>(혹은 아래 <b>···</b>) → <b>‘다른 브라우저로 열기’</b>를 눌러 주세요.
               </p>
             </div>
           ) : null}
@@ -195,7 +267,7 @@ export function InstallGuide() {
               </p>
               <div className="mt-3">
                 <BigButton variant="teal" size="lg" full onClick={() => void installNow()} disabled={busy}>
-                  📲 바탕화면에 앱으로 바로 설치하기
+                  📲 늘봄 앱 바로 설치하기
                 </BigButton>
               </div>
             </div>
@@ -255,8 +327,8 @@ export function InstallGuide() {
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            <BigButton variant="white" full onClick={() => setOpen(false)}>
-              <IconClose size={20} /> 닫기
+            <BigButton variant="white" full onClick={closeGuide}>
+              <IconClose size={20} /> 나중에 보기
             </BigButton>
             <button
               type="button"
@@ -278,13 +350,16 @@ export function InstallBanner() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    setShow(shouldOfferInstall());
+    const refresh = () => setShow(shouldOfferInstall() && !hasSeenInstallGuide());
+    refresh();
     const hide = () => setShow(false);
     window.addEventListener("appinstalled", hide);
     window.addEventListener(DISMISS_EVENT, hide);
+    window.addEventListener(INSTALL_GUIDE_EVENT, hide);
     return () => {
       window.removeEventListener("appinstalled", hide);
       window.removeEventListener(DISMISS_EVENT, hide);
+      window.removeEventListener(INSTALL_GUIDE_EVENT, hide);
     };
   }, []);
 
