@@ -486,11 +486,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                           : `멤버 ${g.memberCount} / ${g.maxMembers ?? GROUP_MAX_MEMBERS}명 · 번호 ${g.id}`}
                       </span>
                     </span>
-                    {on ? (
-                      <span className="shrink-0 whitespace-nowrap rounded-full bg-white/80 px-2 py-0.5 text-[0.76rem] font-black text-brand-dark">
-                        보는 중
-                      </span>
-                    ) : (
+                    {on ? null : (
                       <span className="shrink-0 text-[0.8rem] font-extrabold text-brand-dark">전환 ›</span>
                     )}
                   </button>
