@@ -33,7 +33,7 @@ STUB = """
     speak: (u) => {
       spoken.push({ text: u.text, voice: u.voice ? u.voice.name : null, rate: u.rate, pitch: u.pitch, lang: u.lang });
       fake.speaking = true;
-      if (typeof u.onend === 'function') setTimeout(() => { fake.speaking = false; u.onend(); }, 1200);
+      if (typeof u.onend === 'function') setTimeout(() => { fake.speaking = false; u.onend(); }, 60000);
     },
     cancel: () => { fake.speaking = false; },
     resume: () => {}, pause: () => {},
