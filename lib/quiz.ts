@@ -4587,6 +4587,40 @@ export function practiceQuestions(excludeIds: string[] = [], only?: QuizType): Q
   return shuffled.map((t) => pickRandom(QUIZ_POOLS[t], avoid));
 }
 
+/** 문제 순서를 섞는다(Fisher–Yates) — 누를 때마다 다른 순서로 나오게 */
+export function shuffleQuestions<T>(list: T[]): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * ‘주제 골라 바로 풀기’ 무한 연습용 문제 순환기.
+ * - 주제를 주면 그 주제 풀을(초성 75 · 노래 82 · 그림 32 · OX 74 · 넌센스 55),
+ *   주지 않으면 전체 318문항을 섞어 순서대로 낸다.
+ * - 같은 문제가 바로 연달아 나오지 않고, 풀을 다 쓰면 다시 섞어 끝없이 이어 간다.
+ */
+export function createEndlessQueue(only?: QuizType): () => Question {
+  const base = only ? QUIZ_POOLS[only] : ALL_QUESTIONS;
+  let deck: Question[] = [];
+  let last: Question | null = null;
+  return () => {
+    if (deck.length === 0) {
+      deck = shuffleQuestions(base);
+      // 다시 섞은 맨 앞이 방금 푼 문제면 뒤쪽 문제와 자리를 바꿔 연달아 나오지 않게 한다
+      if (last && deck.length > 1 && deck[0].id === last.id) {
+        const swap = 1 + Math.floor(Math.random() * (deck.length - 1));
+        [deck[0], deck[swap]] = [deck[swap], deck[0]];
+      }
+    }
+    last = deck.shift() as Question;
+    return last;
+  };
+}
+
 export function calcPoints(correct: number, total: number, seconds: number): number {
   const base = correct * 10;
   const perfect = correct === total && total > 0 ? 20 : 0;

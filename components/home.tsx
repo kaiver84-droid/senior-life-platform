@@ -400,7 +400,7 @@ export function HomeTab({
       </button>
 
       {/* 오늘의 건강생활 챌린지 — 원터치 완료 도장 */}
-      <HealthChallengeCard where="home" />
+      <HealthChallengeCard />
 
       <p className="flex items-center justify-center gap-1.5 pb-1 pt-1 text-[0.76rem] font-semibold text-ink/35">
         <span className="t-notice flex items-center gap-1.5">

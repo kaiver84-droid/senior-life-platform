@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   dailyQuestions,
   practiceQuestions,
+  createEndlessQueue,
   calcPoints,
   QUIZ_TYPE_LABEL,
   QUIZ_TYPE_EMOJI,
@@ -65,6 +66,14 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   const [correctCount, setCorrectCount] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const startedAt = useRef<number>(0);
+  /** 무한 연습(주제 골라 바로 풀기) 중인지 — 끝이 없으니 ‘그만 풀기’로 마친다 */
+  const [endless, setEndless] = useState(false);
+  /** 무한 연습을 시작한 주제 (null 이면 섞어서 풀기) */
+  const [endlessOnly, setEndlessOnly] = useState<QuizType | null>(null);
+  /** 실제로 답까지 확인한 문제 수 — 무한 연습 결과에 쓴다 */
+  const [answered, setAnswered] = useState(0);
+  /** 다음 문제를 꺼내는 순환기 (풀을 다 쓰면 다시 섞는다) */
+  const endlessNext = useRef<(() => Question) | null>(null);
 
   useEffect(() => {
     setMode(todayDaily?.done ? "done" : "intro");
@@ -81,14 +90,20 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 
   const startSet = (list: Question[], practice: boolean) => {
     startedAt.current = Date.now();
+    endlessNext.current = null;
     setQs(list);
     setIsPractice(practice);
+    setEndless(false);
+    setEndlessOnly(null);
     setIndex(0);
     setPicked(null);
     setChecked(false);
     setCorrectCount(0);
+    setAnswered(0);
     setSeconds(0);
     setMode("play");
+    // 주제 버튼은 화면 아래쪽에 있어서, 문제를 펼쳐도 진행 표시·첫 문제가 보이게 위로 올린다
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const start = () => startSet(dailyQs, false);
@@ -102,6 +117,28 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
     startSet(practiceQuestions(exclude, only), true);
   };
 
+  /**
+   * 무한 연습 — 주제(또는 전체) 문제를 섞어 하나씩 계속 낸다.
+   * `only` 를 주면 그 주제에서만, 주지 않으면 전체에서 섞어서 낸다.
+   */
+  const startEndless = (only?: QuizType) => {
+    const queue = createEndlessQueue(only);
+    endlessNext.current = queue;
+    startedAt.current = Date.now();
+    setQs([queue()]);
+    setIsPractice(true);
+    setEndless(true);
+    setEndlessOnly(only ?? null);
+    setIndex(0);
+    setPicked(null);
+    setChecked(false);
+    setCorrectCount(0);
+    setAnswered(0);
+    setSeconds(0);
+    setMode("play");
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const q: Question | undefined = qs[index];
 
   const choose = (i: number) => {
@@ -112,11 +149,20 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   const confirm = () => {
     if (picked === null || checked || !q) return;
     setChecked(true);
+    setAnswered((n) => n + 1);
     if (picked === q.answer) setCorrectCount((c) => c + 1);
   };
 
   const next = () => {
     if (!q) return;
+    if (endless) {
+      const nq = endlessNext.current ? endlessNext.current() : q;
+      setQs((prev) => [...prev, nq]);
+      setIndex((i) => i + 1);
+      setPicked(null);
+      setChecked(false);
+      return;
+    }
     if (index + 1 >= qs.length) {
       if (isPractice) {
         setMode("practiceDone");
@@ -163,13 +209,10 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       </section>
 
       {activeGroup && groupDetail ? (
-        <div className="fade-up flex items-center justify-between gap-2 rounded-2xl bg-white px-3.5 py-2.5 shadow-soft">
+        <div className="fade-up flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-2xl bg-white px-3.5 py-2.5 shadow-soft">
           <Badge tone="coral">👥 우리 모임 공동 퀴즈</Badge>
-          <p className="text-[0.84rem] font-extrabold text-ink/60">
-            우리 모임 참여자{" "}
-            <span className="tabular text-brand-dark">
-              {groupDetail.todayAttended} / {groupDetail.memberCount}명
-            </span>
+          <p className="ml-auto whitespace-nowrap text-[0.82rem] font-extrabold leading-tight text-ink/60">
+            참여자 <span className="tabular text-brand-dark">{groupDetail.todayAttended}/{groupDetail.memberCount}명</span>
           </p>
         </div>
       ) : null}
@@ -184,9 +227,6 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
               오늘의 3문제가
               <br />
               준비됐어요
-            </p>
-            <p className="mt-1 text-[0.9rem] font-semibold text-ink/55">
-              초성 · 옛날 노래 · 틀린 그림 · OX · 넌센스
             </p>
           </div>
 
@@ -208,41 +248,38 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
               퀴즈 시작하기 <IconChevron size={20} />
             </BigButton>
           </div>
-          <p className="mt-2 text-center text-[0.8rem] font-medium text-ink/45">
-            하루 3문제는 점수에 들어가요. 다 푼 뒤에는 연습 모드로 더 즐길 수 있어요.
-          </p>
 
-          {/* 주제 골라 바로 풀기 — OX·넌센스를 오늘 바로 만나 볼 수 있다 */}
-          <div className="mt-4 border-t border-ink/8 pt-3.5">
+          {/* 주제 골라 바로 풀기 — 고른 주제로 문제를 끝없이 이어서 낸다(점수·순위와 무관) */}
+          <div className="mt-5">
             <p className="text-[0.92rem] font-extrabold text-ink/65">주제 골라 바로 풀기</p>
             <p className="mt-0.5 text-[0.78rem] font-semibold text-ink/45">
-              점수와 상관없이 좋아하는 주제로 3문제를 풀어 볼 수 있어요.
+              점수와 상관없이 좋아하는 주제로 계속 풀어 볼 수 있어요.
             </p>
-            <p
-              data-quiz-bank={QUIZ_TOTAL_COUNT}
-              className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[0.76rem] font-extrabold text-brand-dark shadow-soft"
-            >
-              📚 지금 {QUIZ_TOTAL_COUNT}문제가 준비돼 있어요
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5" data-quiz-topics>
+            <div className="mt-2.5 grid grid-cols-2 gap-2.5" data-quiz-topics>
               {QUIZ_TYPE_ORDER.map((t) => (
                 <button
                   key={t}
                   type="button"
                   data-quiz-topic={t}
-                  onClick={() => startPractice(undefined, t)}
-                  className="flex min-h-[42px] items-center gap-1 rounded-full border-2 border-ink/10 bg-white px-3 text-[0.84rem] font-extrabold text-ink/75"
+                  onClick={() => startEndless(t)}
+                  className="flex min-h-[54px] w-full items-center gap-1.5 rounded-2xl border-2 border-ink/10 bg-white px-3 py-2 text-left text-[0.86rem] font-extrabold leading-tight text-ink/75"
                 >
-                  <span aria-hidden>{QUIZ_TYPE_EMOJI[t]}</span>
-                  {QUIZ_TYPE_LABEL[t]}
+                  <span aria-hidden className="shrink-0 text-[1.05rem]">
+                    {QUIZ_TYPE_EMOJI[t]}
+                  </span>
+                  <span className="min-w-0 break-words">{QUIZ_TYPE_LABEL[t]}</span>
                 </button>
               ))}
               <button
                 type="button"
-                onClick={() => startPractice()}
-                className="flex min-h-[42px] items-center gap-1 rounded-full border-2 border-brand/30 bg-brand-light px-3 text-[0.84rem] font-extrabold text-brand-dark"
+                data-quiz-topic="mix"
+                onClick={() => startEndless()}
+                className="flex min-h-[54px] w-full items-center gap-1.5 rounded-2xl border-2 border-brand/30 bg-brand-light px-3 py-2 text-left text-[0.86rem] font-extrabold leading-tight text-brand-dark"
               >
-                <span aria-hidden>🎲</span> 섞어서 3문제
+                <span aria-hidden className="shrink-0 text-[1.05rem]">
+                  🎲
+                </span>
+                <span className="min-w-0 break-words">섞어서 풀기</span>
               </button>
             </div>
           </div>
@@ -251,29 +288,48 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 
       {mode === "play" && q ? (
         <div className="fade-up space-y-3">
-          {/* 진행 바 */}
-          <div className="flex items-center gap-3 rounded-full bg-ink px-4 py-2.5 shadow-cta">
-            <span className="tabular whitespace-nowrap text-[0.9rem] font-extrabold text-white">
-              {index + 1} / {qs.length} 문제
-            </span>
-            <span className="flex flex-1 items-center justify-center gap-1.5">
-              {qs.map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-2.5 rounded-full transition-all ${
-                    i === index ? "w-4 bg-sun" : i < index ? "w-2.5 bg-white/75" : "w-2.5 bg-white/25"
-                  }`}
-                />
-              ))}
-            </span>
-            {checked ? (
-              <span className="flex items-center gap-0.5 text-[0.78rem] font-bold text-white/70">
-                <IconClock size={14} />
-                {seconds}초
+          {/* 진행 표시 — 무한 연습은 ‘N문제째’로 보여 주고 언제든 그만둘 수 있게 한다 */}
+          {endless ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-ink px-3.5 py-2 shadow-cta">
+              <span className="text-[0.86rem] font-extrabold leading-tight text-white">
+                무한 연습 · <span className="tabular">{index + 1}</span>문제째
               </span>
-            ) : null}
-            <IconTrophy size={20} className="shrink-0 text-sun" />
-          </div>
+              <span data-quiz-solved className="tabular text-[0.78rem] font-bold text-white/60">
+                정답 {correctCount}개
+              </span>
+              <button
+                type="button"
+                data-quiz-stop
+                onClick={() => setMode("practiceDone")}
+                className="ml-auto shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-[0.82rem] font-extrabold text-white"
+              >
+                그만 풀기
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-full bg-ink px-4 py-2.5 shadow-cta">
+              <span className="tabular whitespace-nowrap text-[0.9rem] font-extrabold text-white">
+                {index + 1} / {qs.length} 문제
+              </span>
+              <span className="flex flex-1 items-center justify-center gap-1.5">
+                {qs.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2.5 rounded-full transition-all ${
+                      i === index ? "w-4 bg-sun" : i < index ? "w-2.5 bg-white/75" : "w-2.5 bg-white/25"
+                    }`}
+                  />
+                ))}
+              </span>
+              {checked ? (
+                <span className="flex items-center gap-0.5 text-[0.78rem] font-bold text-white/70">
+                  <IconClock size={14} />
+                  {seconds}초
+                </span>
+              ) : null}
+              <IconTrophy size={20} className="shrink-0 text-sun" />
+            </div>
+          )}
 
           <Card className="p-4">
             <div className="flex items-center justify-between">
@@ -442,7 +498,13 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
                 </div>
                 <div className="mt-3">
                   <BigButton variant="ink" size="lg" full onClick={next}>
-                    {index + 1 >= qs.length ? (isPractice ? "연습 결과 보기" : "결과 보기") : "다음 문제"}
+                    {endless
+                      ? "다음 문제"
+                      : index + 1 >= qs.length
+                        ? isPractice
+                          ? "연습 결과 보기"
+                          : "결과 보기"
+                        : "다음 문제"}
                   </BigButton>
                 </div>
               </div>
@@ -467,8 +529,9 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       {mode === "practiceDone" ? (
         <PracticeResult
           correct={correctCount}
-          total={qs.length}
-          onAgain={() => startPractice(qs)}
+          total={endless ? answered : qs.length}
+          endless={endless}
+          onAgain={() => (endless ? startEndless(endlessOnly ?? undefined) : startPractice(qs))}
           onBack={() => setMode(todayDaily?.done ? "done" : "intro")}
         />
       ) : null}
@@ -499,47 +562,69 @@ function QuizCheerBanner() {
 function PracticeResult({
   correct,
   total,
+  endless,
   onAgain,
   onBack,
 }: {
   correct: number;
   total: number;
+  endless?: boolean;
   onAgain: () => void;
   onBack: () => void;
 }) {
   const praise =
-    correct === total
-      ? "완벽해요! 머리가 아주 맑으시네요"
-      : correct > 0
-        ? "잘하셨어요! 한 세트 더 해 볼까요?"
-        : "괜찮아요. 한 번 더 하면 금방 익숙해져요";
+    total === 0
+      ? "여기까지 함께했어요. 다음에 또 봐요"
+      : correct === total
+        ? "완벽해요! 머리가 아주 맑으시네요"
+        : correct > 0
+          ? endless
+            ? "잘하셨어요! 오늘 머리를 아주 많이 쓰셨어요"
+            : "잘하셨어요! 한 세트 더 해 볼까요?"
+          : "괜찮아요. 한 번 더 하면 금방 익숙해져요";
 
   return (
     <Card className="fade-up overflow-hidden border-2 border-brand/30 bg-gradient-to-br from-white via-sky to-[#EDF5FB] p-5 text-center">
       <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white text-[1.8rem] shadow-soft">
         🧠
       </span>
-      <p className="mt-2 text-[0.88rem] font-extrabold text-brand-dark/80">연습 모드 결과</p>
-      <p className="mt-1 text-[2.4rem] font-black leading-none text-ink">
-        {correct}
-        <span className="text-[1.2rem] font-extrabold text-ink/45"> / {total}</span>
+      <p className="mt-2 text-[0.88rem] font-extrabold text-brand-dark/80">
+        {endless ? "무한 연습 결과" : "연습 모드 결과"}
       </p>
+      {total > 0 ? (
+        <p className="mt-1 text-[2.4rem] font-black leading-none text-ink">
+          {correct}
+          <span className="text-[1.2rem] font-extrabold text-ink/45"> / {total}</span>
+        </p>
+      ) : null}
       <p className="mt-1 text-[1rem] font-black text-brand-deep">{praise}</p>
       <p className="mt-2 text-[0.85rem] font-semibold leading-relaxed text-ink/55">
-        연습 모드는 점수와 순위에 들어가지 않아요.
-        <br />
-        마음 편히 기억 훈련으로 즐겨 주세요.
+        {endless ? (
+          <>
+            여기까지 {total}문제를 풀었어요.
+            <br />
+            점수와 순위에는 들어가지 않아요.
+          </>
+        ) : (
+          <>
+            연습 모드는 점수와 순위에 들어가지 않아요.
+            <br />
+            마음 편히 기억 훈련으로 즐겨 주세요.
+          </>
+        )}
       </p>
       <div className="mt-4 space-y-2">
         <BigButton variant="ink" size="lg" full onClick={onAgain}>
-          다른 문제 더 풀어보기 <IconChevron size={20} />
+          {endless ? "계속 더 풀기" : "다른 문제 더 풀어보기"} <IconChevron size={20} />
         </BigButton>
         <BigButton variant="white" full onClick={onBack}>
-          오늘의 퀴즈로 돌아가기
+          {endless ? "퀴즈 홈으로 돌아가기" : "오늘의 퀴즈로 돌아가기"}
         </BigButton>
       </div>
       <p className="mt-2 text-[0.78rem] font-medium text-ink/40">
-        전체 {QUIZ_TOTAL_COUNT}문제 중에서 새로 골라 드려요
+        {endless
+          ? `전체 ${QUIZ_TOTAL_COUNT}문제를 섞어서 계속 내드려요`
+          : `전체 ${QUIZ_TOTAL_COUNT}문제 중에서 새로 골라 드려요`}
       </p>
     </Card>
   );

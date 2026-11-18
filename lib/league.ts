@@ -7,7 +7,7 @@
 import type { AppState } from "./types";
 import { addDays, kstDate, weekIdOf, weekRange } from "./week";
 
-/** 7개 영역 — 늘봄왕(종합) 이 첫 번째(기본) 영역이다. */
+/** 6개 영역 — 늘봄왕(종합)이 첫 번째(기본) 영역이고, 나머지 5개는 분야별 순위다. */
 export type LeagueArea = "all" | "brain" | "health" | "attend" | "group" | "share" | "save";
 
 /** 하루에 모을 수 있는 최대 점수 — 반복 조작·점수 독점 방지 */
@@ -93,25 +93,62 @@ export type LeagueAreaInfo = {
   label: string;
   emoji: string;
   desc: string;
+  /** 분야 카드처럼 좁은 자리에 쓰는 짧은 설명 */
+  short?: string;
   /** 이 영역 순위표 아래 큰 버튼 이름 */
   action: string;
 };
 
-/** 7개 영역 탭 — 첫 칸(늘봄왕)이 기본·대표 랭킹이다. */
+/** 6개 영역 탭 — 첫 칸(늘봄왕)이 기본·대표 랭킹이고, 건강왕은 화면에서 뺐다. */
 export const LEAGUE_AREAS: LeagueAreaInfo[] = [
   {
     key: "all",
     label: "늘봄왕",
+    short: "이번 주 활동 모두 합친 순위",
     emoji: "🌟",
-    desc: "출석·퀴즈·건강·모임·나눔·절약을 모두 합친 주간 종합 리그",
+    desc: "이번 주 활동을 모두 합친 종합 순위",
     action: "오늘의 종합 미션 보기",
   },
-  { key: "brain", label: "기억왕", emoji: "🧠", desc: "이번 주 퀴즈 점수와 정답률로 겨루는 순위", action: "오늘의 추가 퀴즈 풀기" },
-  { key: "health", label: "건강왕", emoji: "🏃", desc: "건강 미션을 많이 실천한 사람 순위", action: "건강 미션 하러 가기" },
-  { key: "attend", label: "출석왕", emoji: "🔥", desc: "이번 주에 출석한 날이 많은 사람 순위", action: "출석 체크하기" },
-  { key: "group", label: "모임왕", emoji: "👥", desc: "우리 모임과 단체별 참여 순위", action: "우리 모임 미션 보기" },
-  { key: "share", label: "나눔왕", emoji: "🎁", desc: "친구·가족을 많이 초대한 사람 순위", action: "친구 초대하기" },
-  { key: "save", label: "알뜰왕", emoji: "💰", desc: "복지·생활정보를 많이 확인한 사람 순위", action: "복지·혜택 보러 가기" },
+  {
+    key: "brain",
+    label: "퀴즈왕",
+    short: "퀴즈 점수 · 정답률",
+    emoji: "🧠",
+    desc: "이번 주 퀴즈 점수와 정답률로 겨루는 순위",
+    action: "오늘의 추가 퀴즈 풀기",
+  },
+  {
+    key: "attend",
+    label: "출석왕",
+    short: "이번 주 출석 일수",
+    emoji: "🔥",
+    desc: "이번 주에 출석한 날이 많은 사람 순위",
+    action: "출석 체크하기",
+  },
+  {
+    key: "group",
+    label: "모임왕",
+    short: "모임 참여 순위",
+    emoji: "👥",
+    desc: "우리 모임과 단체별 참여 순위",
+    action: "우리 모임 미션 보기",
+  },
+  {
+    key: "share",
+    label: "초대왕",
+    short: "친구 초대 인원",
+    emoji: "🎁",
+    desc: "친구·가족을 많이 초대한 사람 순위",
+    action: "친구 초대하기",
+  },
+  {
+    key: "save",
+    label: "지식왕",
+    short: "생활정보 확인 수",
+    emoji: "📚",
+    desc: "복지·생활정보를 많이 확인한 사람 순위",
+    action: "복지·혜택 보러 가기",
+  },
 ];
 
 export function areaInfo(area: LeagueArea): LeagueAreaInfo {
@@ -241,7 +278,7 @@ export function formatAreaValue(area: LeagueArea, value: number): string {
   }
 }
 
-/** 이번 주 내 영역 값 (나눔왕은 서버가 알려 주는 초대 수를 넘긴다) */
+/** 이번 주 내 영역 값 (초대왕은 서버가 알려 주는 초대 수를 넘긴다) */
 export function myAreaValue(
   area: LeagueArea,
   state: Pick<AppState, "visits" | "quizLogs" | "daily" | "health"> & { missions?: Record<string, string[]> },

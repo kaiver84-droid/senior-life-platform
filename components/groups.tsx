@@ -6,7 +6,6 @@ import { GROUP_MAX_MEMBERS, timeAgo } from "@/lib/groups";
 import { copyText, kakaoSendNow, loadKakaoSdk, shareOutcomeMessage } from "@/lib/share";
 import { kstDate } from "@/lib/week";
 import { useApp } from "@/lib/storage";
-import { HealthChallengeCard } from "./health";
 import { Avatar, Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import {
   IconChevron,
@@ -416,24 +415,18 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                 지금 {active.onlineCount ?? detail?.onlineCount ?? 1}명 접속 중
               </span>
             ) : null}
-            {detail ? (
+            {detail && detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS) ? (
               <p
-                data-group-capacity={detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS) ? "full" : "open"}
-                className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.8rem] font-black ${
-                  detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
-                    ? "bg-coral-light text-coral-dark"
-                    : "bg-paper text-ink/60"
-                }`}
+                data-group-capacity="full"
+                className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-coral-light px-2.5 py-1 text-[0.8rem] font-black text-coral-dark"
               >
-                {detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
-                  ? `정원이 다 찼어요 (${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명)`
-                  : `정원 ${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명`}
+                정원이 다 찼어요 ({detail.memberCount}/{detail.maxMembers ?? GROUP_MAX_MEMBERS}명)
               </p>
             ) : null}
           </div>
           {active ? (
+            /* 초대는 상단 한 곳에만 — 모임 전환은 바로 아래 ‘내 모임’ 목록에서 한다 */
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              {/* 평소에도 한눈에 보이는 초대 버튼 — 누르면 바로 카카오톡으로 초대장을 보낸다 */}
               <button
                 type="button"
                 data-group-invite-top
@@ -442,13 +435,6 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                 className="flex min-h-[50px] items-center gap-1.5 rounded-full bg-sun px-4 text-[0.96rem] font-black text-ink shadow-sun active:bg-sun-dark"
               >
                 💌 초대
-              </button>
-              <button
-                type="button"
-                onClick={() => setSheet("switch")}
-                className="flex items-center gap-1 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-[0.78rem] font-black text-ink/70 shadow-soft"
-              >
-                모임 바꾸기 <IconChevron size={14} className="rotate-90" />
               </button>
             </div>
           ) : null}
@@ -461,7 +447,13 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
         <Card className="fade-up p-3.5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[0.94rem] font-black text-ink">내 모임 {groups.length}개</p>
-            <p className="text-[0.76rem] font-bold text-ink/40">눌러서 바로 전환</p>
+            <button
+              type="button"
+              onClick={() => setSheet("switch")}
+              className="flex items-center gap-1 rounded-full bg-paper px-2.5 py-1 text-[0.76rem] font-black text-ink/55 active:bg-ink/5"
+            >
+              모임 바꾸기 <IconChevron size={12} className="rotate-90" />
+            </button>
           </div>
           <div className="mt-2 space-y-1.5">
             {groups.map((g) => {
@@ -478,9 +470,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                     data-group-row={g.id}
                     aria-pressed={on}
                     onClick={() => void switchTo(g.id)}
-                    className={`flex min-h-[56px] w-full items-center gap-2.5 rounded-2xl py-2 pl-3 text-left ${
-                      on ? "pr-[92px]" : "pr-3"
-                    }`}
+                    className="flex min-h-[56px] w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left"
                   >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand-dark shadow-soft">
                       <IconUsers size={18} />
@@ -496,22 +486,14 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                           : `멤버 ${g.memberCount} / ${g.maxMembers ?? GROUP_MAX_MEMBERS}명 · 번호 ${g.id}`}
                       </span>
                     </span>
-                    {on ? null : (
+                    {on ? (
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-white/80 px-2 py-0.5 text-[0.76rem] font-black text-brand-dark">
+                        보는 중
+                      </span>
+                    ) : (
                       <span className="shrink-0 text-[0.8rem] font-extrabold text-brand-dark">전환 ›</span>
                     )}
                   </button>
-                  {/* 지금 보고 있는 모임은 목록 맨 위에서도 바로 초대할 수 있게 */}
-                  {on ? (
-                    <button
-                      type="button"
-                      data-group-row-invite={g.id}
-                      onClick={inviteNow}
-                      aria-label={`${g.name}에 초대하기`}
-                      className="absolute right-2 top-1/2 flex min-h-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-sun px-3 text-[0.84rem] font-black text-ink shadow-sun active:bg-sun-dark"
-                    >
-                      💌 초대
-                    </button>
-                  ) : null}
                 </div>
               );
             })}
@@ -599,9 +581,6 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
 
           {/* 오늘의 모임 미션 — 홈과 같은 카드. 랭킹 ‘모임왕 → 우리 모임 미션’이 여기로 온다 */}
           <GroupMissionBanner onJoin={() => onNavigate("quiz")} />
-
-          {/* 오늘의 건강 챌린지 — 모임원과 함께 원터치 체크인 */}
-          <HealthChallengeCard where="group" />
 
           {/* 오늘 출석 */}
           <Card className="fade-up p-4">

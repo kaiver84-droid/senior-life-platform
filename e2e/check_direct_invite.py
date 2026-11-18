@@ -229,7 +229,7 @@ def main():
         click_and_check(page.locator("[data-group-invite-top]"), "상단 💌 초대")
         page.screenshot(path=f"{SHOT}/_direct_invite_top_click.png")
         shots.append(f"{SHOT}/_direct_invite_top_click.png")
-        click_and_check(page.locator("[data-group-row-invite]"), "내 모임 줄 💌 초대")
+        # 2026-11-18: ‘보는 중’ 줄의 초대 버튼은 중복이라 삭제 — 상단 버튼 하나로 일원화
         click_and_check(page.get_by_role("button", name=re.compile("카카오톡으로 바로 초대하기")), "1인 모임 바로 초대")
         click_and_check(page.get_by_role("button", name=re.compile("카카오톡으로 우리 모임 초대하기")), "모임 초대 큰 버튼")
 

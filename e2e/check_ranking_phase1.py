@@ -5,7 +5,7 @@
 라이브: BASE=https://senior-life-platform.pages.dev python3 e2e/check_ranking_phase1.py
 
 확인하는 것
-1) 7개 영역 탭(늘봄왕·기억왕·건강왕·출석왕·모임왕·나눔왕·알뜰왕)이 모두 열리고 390px에서 넘치지 않는다
+1) 6개 영역 탭(늘봄왕·퀴즈왕·출석왕·모임왕·초대왕·지식왕)이 모두 열리고 390px에서 넘치지 않는다
 2) 늘봄왕 점수가 쌓인다 — 출석(+10) → 건강(+20) → 복지 확인(+10) → 퀴즈(+30)
 3) 하루 최대 140점 상한이 서버에서도 적용된다(큰 값을 보내도 140점/일을 넘지 않는다)
 4) 순위 행마다 변동 배지(▲/▼/신규/－)가 있고, 내 요약 카드에 순위·격차 문구가 나온다
@@ -31,7 +31,7 @@ os.environ.setdefault(
     "LD_LIBRARY_PATH", "/workspace/.libs/usr/lib/x86_64-linux-gnu:/workspace/work/.tools/browser-libs"
 )
 NICK = "랭킹점검"
-AREA_KEYS = ["all", "brain", "health", "attend", "group", "share", "save"]
+AREA_KEYS = ["all", "brain", "attend", "group", "share", "save"]  # 2026-11-18 건강왕 탭 삭제
 KST = timezone(timedelta(hours=9))
 TODAY = datetime.now(KST).strftime("%Y-%m-%d")
 WEEKDAY = datetime.now(KST).isoweekday()  # 월=1 … 일=7
@@ -176,7 +176,7 @@ def active_tab(page):
     return (el.inner_text() if el else "").strip()
 
 
-# 모임 준비 — 모임왕·나눔왕 바로가기를 확인하려면 모임이 하나 있어야 한다
+# 모임 준비 — 모임왕·초대왕 바로가기를 확인하려면 모임이 하나 있어야 한다
 
 def ensure_group(page):
     nav(page, "모임")
@@ -225,9 +225,9 @@ def main():
             page.route("**/api/auth/kakao**", kakao_stub())
 
         login(page)
-        # 모임왕·나눔왕 바로가기를 확인할 수 있게 체험 모임에 먼저 들어간다.
+        # 모임왕·초대왕 바로가기를 확인할 수 있게 체험 모임에 먼저 들어간다.
         has_group = ensure_group(page)
-        check(has_group, "모임 준비(체험 모임 참여) — 모임왕·나눔왕 확인용", str(has_group))
+        check(has_group, "모임 준비(체험 모임 참여) — 모임왕·초대왕 확인용", str(has_group))
 
         nav(page, "랭킹")
         page.wait_for_selector("[data-league-missions]", timeout=20000)
@@ -238,9 +238,9 @@ def main():
             "els => els.map(e => [e.getAttribute('data-area-tab'), e.innerText.replace(/\\n/g,' ').trim()])",
         )
         keys = [t[0] for t in tabs]
-        check(keys == AREA_KEYS, "7개 영역 탭(늘봄왕·기억왕·건강왕·출석왕·모임왕·나눔왕·알뜰왕)", str(keys))
+        check(keys == AREA_KEYS, "6개 영역 탭(늘봄왕·퀴즈왕·출석왕·모임왕·초대왕·지식왕)", str(keys))
         labels = " ".join(t[1] for t in tabs)
-        check(all(k in labels for k in ["늘봄왕", "기억왕", "건강왕", "출석왕", "모임왕", "나눔왕", "알뜰왕"]),
+        check(all(k in labels for k in ["늘봄왕", "퀴즈왕", "출석왕", "모임왕", "초대왕", "지식왕"]),
               "영역 이름이 잘리지 않고 보임", labels)
         check(no_overflow(page) <= 0, "랭킹 탭 가로 넘침 없음", str(no_overflow(page)))
         check(not overflowing(page), "화면 밖으로 삐져나온 요소 없음", str(overflowing(page)[:2]))
@@ -376,7 +376,7 @@ def main():
             )
             check(bool(board), f"{key} 영역 순위표가 그려짐")
             check(page.query_selector(f"[data-area-mission='{key}']") is not None, f"{key} 미션 바로가기 버튼")
-            if key in ("brain", "health", "group"):
+            if key in ("brain", "group"):
                 podium = page.query_selector("[data-podium]")
                 if podium:
                     podium.scroll_into_view_if_needed()
@@ -384,25 +384,15 @@ def main():
                 page.screenshot(path=f"{SHOT}/_rank_p1_{key}.png")
                 shots.append(f"{SHOT}/_rank_p1_{key}.png")
 
-        # 기억왕 → 퀴즈
+        # 퀴즈왕 → 퀴즈
         page.locator("[data-area-tab='brain']").first.click()
         page.wait_for_timeout(900)
         page.locator("[data-area-mission='brain'] button").first.click()
         page.wait_for_timeout(1500)
-        check("퀴즈" in active_tab(page), "기억왕 → 퀴즈 화면", active_tab(page))
+        check("퀴즈" in active_tab(page), "퀴즈왕 → 퀴즈 화면", active_tab(page))
         nav(page, "랭킹")
 
-        # 건강왕 → 건강 미션
-        page.locator("[data-area-tab='health']").first.click()
-        page.wait_for_timeout(900)
-        page.locator("[data-area-mission='health'] button").first.click()
-        page.wait_for_timeout(1600)
-        check(
-            "홈" in active_tab(page) and page.query_selector("[data-health-card]") is not None,
-            "건강왕 → 건강 미션 카드",
-            active_tab(page),
-        )
-        nav(page, "랭킹")
+        # 건강왕 탭은 2026-11-18 삭제됨 — 바로가기 확인 생략
 
         # 출석왕 → 홈
         page.locator("[data-area-tab='attend']").first.click()
@@ -416,19 +406,19 @@ def main():
         )
         nav(page, "랭킹")
 
-        # 알뜰왕 → 복지·혜택
+        # 지식왕 → 복지·혜택
         page.locator("[data-area-tab='save']").first.click()
         page.wait_for_timeout(900)
         page.locator("[data-area-mission='save'] button").first.click()
         page.wait_for_timeout(1600)
         check(
             "혜택" in active_tab(page) and page.query_selector("[data-welfare-filters]") is not None,
-            "알뜰왕 → 복지·혜택 화면",
+            "지식왕 → 복지·혜택 화면",
             active_tab(page),
         )
         nav(page, "랭킹")
 
-        # 나눔왕 → 친구 초대(초대 시트)
+        # 초대왕 → 친구 초대(초대 시트)
         page.locator("[data-area-tab='share']").first.click()
         page.wait_for_timeout(900)
         page.locator("[data-area-mission='share'] button").first.click()
@@ -437,7 +427,7 @@ def main():
         create_sheet = page.get_by_text("새 모임 만들기", exact=False).first.is_visible()
         check(
             "모임" in active_tab(page) and (invite_sheet or create_sheet),
-            "나눔왕 → 친구 초대 시트",
+            "초대왕 → 친구 초대 시트",
             f"tab={active_tab(page)} invite={invite_sheet} create={create_sheet}",
         )
         page.get_by_role("button", name="닫기").last.click()

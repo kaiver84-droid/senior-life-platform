@@ -29,11 +29,17 @@ import {
   IconChevron,
   IconGear,
   IconGift,
+  IconGiftFill,
   IconHome,
+  IconHomeFill,
   IconMore,
+  IconMoreFill,
   IconQuiz,
+  IconQuizFill,
   IconTrophy,
+  IconTrophyFill,
   IconUsers,
+  IconUsersFill,
 } from "@/components/icons";
 
 // 친구가 보낸 모임 초대 링크(?group=XXXXXX)를 화면이 그려지기 전에 붙잡아 둔다.
@@ -44,13 +50,14 @@ if (ENABLE_DUELS) captureDuelFromUrl();
 
 type TabKey = "home" | "group" | "quiz" | "ranking" | "welfare" | "more";
 
+/** 하단 메뉴 — 시안처럼 채움형(duotone) 아이콘을 쓴다 */
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: "home", label: "홈", icon: <IconHome size={24} /> },
-  { key: "group", label: "모임", icon: <IconUsers size={24} /> },
-  { key: "quiz", label: "퀴즈", icon: <IconQuiz size={24} /> },
-  { key: "ranking", label: "랭킹", icon: <IconTrophy size={24} /> },
-  { key: "welfare", label: "혜택", icon: <IconGift size={23} /> },
-  { key: "more", label: "더보기", icon: <IconMore size={24} /> },
+  { key: "home", label: "홈", icon: <IconHomeFill size={25} /> },
+  { key: "group", label: "모임", icon: <IconUsersFill size={25} /> },
+  { key: "quiz", label: "퀴즈", icon: <IconQuizFill size={25} /> },
+  { key: "ranking", label: "랭킹", icon: <IconTrophyFill size={25} /> },
+  { key: "welfare", label: "혜택", icon: <IconGiftFill size={24} /> },
+  { key: "more", label: "더보기", icon: <IconMoreFill size={24} /> },
 ];
 
 const FONT_LABEL: Record<number, string> = { 18: "보통", 21: "크게", 24: "아주 크게" };
@@ -247,15 +254,18 @@ function Shell() {
                 key={t.key}
                 onClick={() => navigate(t.key)}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex min-h-[72px] flex-col items-center justify-center gap-0.5 transition ${
-                  active ? "text-brand-dark" : "text-ink/50"
-                }`}
+                className="flex min-h-[72px] flex-col items-center justify-center px-1 py-1.5"
               >
-                <span className={`transition ${active ? "-translate-y-0.5 scale-105" : ""}`}>{t.icon}</span>
-                <span className={`text-[0.72rem] leading-none tracking-tight ${active ? "font-black" : "font-bold"}`}>
-                  {t.label}
+                <span
+                  className={`flex w-full max-w-[4.2rem] flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 transition ${
+                    active ? "bg-sky text-brand-deep shadow-[inset_0_0_0_1px_rgba(24,147,155,0.18)]" : "text-ink/45"
+                  }`}
+                >
+                  <span className={`transition ${active ? "-translate-y-0.5 scale-105" : ""}`}>{t.icon}</span>
+                  <span className={`text-[0.68rem] leading-none tracking-tight ${active ? "font-black" : "font-bold"}`}>
+                    {t.label}
+                  </span>
                 </span>
-                {active ? <span className="absolute bottom-1.5 h-1 w-1.5 rounded-full bg-brand" /> : null}
               </button>
             );
           })}

@@ -172,7 +172,8 @@ def main():
         check("카카오톡으로 우리 모임 초대하기" in body, "기존 카톡 초대 버튼 유지")
         check("아직 나 혼자 있어요" not in body, "여러 명 모임에서는 1인 안내 숨김")
         check(page.locator("[data-group-invite-top]").first.is_visible(), "상단 헤더 💌 초대 버튼")
-        check(page.locator("[data-group-row-invite]").first.is_visible(), "내 모임 ‘보는 중’ 줄 초대 버튼")
+        # 2026-11-18: 목록 줄의 초대 버튼은 중복이라 삭제(상단 💌 초대 하나로 일원화)
+        check(page.locator("[data-group-row-invite]").count() == 0, "목록 줄 초대 버튼 중복 없음")
 
         page.locator("[data-group-invite-top]").first.click()
         check(wait_sheet(page), "상단 초대 버튼으로 초대 시트 열림")
@@ -180,11 +181,6 @@ def main():
         check("FAM101" in sheet and "초대장 보내기" in sheet, "초대 시트 내용(번호·카톡)", sheet.replace("\n", " ")[:80])
         page.screenshot(path=f"{SHOT}/_group_invite_multi.png")
         shots.append(f"{SHOT}/_group_invite_multi.png")
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(800)
-
-        page.locator("[data-group-row-invite]").first.click()
-        check(wait_sheet(page), "목록 초대 버튼으로 초대 시트 열림")
         page.keyboard.press("Escape")
         page.wait_for_timeout(800)
 

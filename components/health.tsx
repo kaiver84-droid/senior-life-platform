@@ -26,7 +26,7 @@ const HEALTH_ICON: Record<string, Icon3DName> = {
  * 오늘의 건강생활 챌린지 — 원터치 완료 도장.
  * 홈과 우리 모임 탭에서 같은 카드를 쓴다(체크인은 한 곳에서 바뀌면 양쪽에 바로 반영).
  */
-export function HealthChallengeCard({ where = "home" }: { where?: "home" | "group" }) {
+export function HealthChallengeCard() {
   const { profile, today, state, healthToday, toggleHealth } = useApp();
   const { detail, active } = useGroup();
   const { show } = useToast();
@@ -149,11 +149,6 @@ export function HealthChallengeCard({ where = "home" }: { where?: "home" | "grou
           </div>
         ) : null}
 
-        {where === "home" ? (
-          <p className="mt-3 text-center text-[0.76rem] font-medium text-ink/40">
-            체크한 도장은 이 기기와 늘봄에 함께 저장돼요
-          </p>
-        ) : null}
       </section>
     </>
   );

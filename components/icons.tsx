@@ -274,6 +274,80 @@ export const IconMore = ({ className, size }: P) => (
   </svg>
 );
 
+/* ---------------------------------------------------------------- */
+/* 하단 메뉴 — 채움형(duotone) 아이콘                                  */
+/* ---------------------------------------------------------------- */
+
+const solid = (size = 26) => ({
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "currentColor",
+  "aria-hidden": true as const,
+});
+
+/** 홈(채움) — 지붕·몸통에 문을 비워 낸 집 */
+export const IconHomeFill = ({ className, size }: P) => (
+  <svg {...solid(size)} className={className}>
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M11.2 2.9a1.3 1.3 0 0 1 1.6 0l8.6 6.9a1.3 1.3 0 0 1-.8 2.3H19.5V20a1.3 1.3 0 0 1-1.3 1.3h-3.5v-5.4a1 1 0 0 0-1-1h-3.4a1 1 0 0 0-1 1v5.4H5.8A1.3 1.3 0 0 1 4.5 20v-7.9H3.4a1.3 1.3 0 0 1-.8-2.3z"
+    />
+  </svg>
+);
+
+/** 모임(채움) — 앞사람·뒷사람 */
+export const IconUsersFill = ({ className, size }: P) => (
+  <svg {...solid(size)} className={className}>
+    <circle cx="9.2" cy="8" r="3.5" />
+    <path d="M2.6 19.6c0-3.7 2.9-6.2 6.6-6.2s6.6 2.5 6.6 6.2c0 .6-.5 1-1 1H3.6c-.6 0-1-.4-1-1z" />
+    <circle cx="17.1" cy="9.3" r="2.7" opacity="0.65" />
+    <path d="M15.6 13.6c3 .2 5.4 2.4 5.4 5.5 0 .5-.4.9-.9.9h-3.1c.2-.4.3-.9.3-1.4 0-1.9-.6-3.5-1.7-4.6z" opacity="0.65" />
+  </svg>
+);
+
+/** 퀴즈(채움) — 동그란 배지 안의 물음표 */
+export const IconQuizFill = ({ className, size }: P) => (
+  <svg {...solid(size)} className={className}>
+    <circle cx="12" cy="12" r="9.2" />
+    <path
+      d="M12 6.4c-1.9 0-3.3 1.2-3.4 3h2.2c.1-.8.6-1.3 1.2-1.3s1.2.5 1.2 1.1c0 .5-.3.9-1 1.4-1 .7-1.6 1.4-1.6 2.6v.4h2.2v-.2c0-.6.3-1 1-1.4 1.1-.7 1.7-1.4 1.7-2.6 0-1.7-1.4-3-3.5-3z"
+      fill="#fff"
+    />
+    <circle cx="12" cy="16.9" r="1.2" fill="#fff" />
+  </svg>
+);
+
+/** 랭킹(채움) — 트로피 */
+export const IconTrophyFill = ({ className, size }: P) => (
+  <svg {...solid(size)} className={className}>
+    <path d="M7.2 2.6h9.6v5.1a4.8 4.8 0 0 1-9.6 0z" />
+    <path d="M6 4.2H3.3a1 1 0 0 0-1 1v.9a3.9 3.9 0 0 0 3.9 3.9zM18 4.2h2.7a1 1 0 0 1 1 1v.9a3.9 3.9 0 0 1-3.9 3.9z" opacity="0.6" />
+    <rect x="10.7" y="12.4" width="2.6" height="4.4" rx="0.8" />
+    <rect x="7.2" y="16.4" width="9.6" height="2.5" rx="1.1" />
+    <rect x="5.9" y="18.6" width="12.2" height="2.4" rx="1.1" />
+  </svg>
+);
+
+/** 혜택(채움) — 선물 상자 */
+export const IconGiftFill = ({ className, size }: P) => (
+  <svg {...solid(size)} className={className}>
+    <rect x="3" y="9.4" width="18" height="3.2" rx="1" />
+    <path d="M4.4 13.8h15.2v5.6a1.2 1.2 0 0 1-1.2 1.2H5.6a1.2 1.2 0 0 1-1.2-1.2z" />
+    <path d="M8.7 2.8c1.5 0 2.7 1 3.3 2.3.6-1.3 1.8-2.3 3.3-2.3 1.5 0 2.6 1 2.6 2.3 0 1.4-1.3 2.3-3 2.3h-1.1v1.3h-1.8V7.4H9.1c-1.7 0-3-.9-3-2.3 0-1.3 1.1-2.3 2.6-2.3z" />
+  </svg>
+);
+
+/** 더보기(채움) — 점 세 개 */
+export const IconMoreFill = ({ className, size }: P) => (
+  <svg {...solid(size)} className={className}>
+    <circle cx="5.2" cy="12" r="1.9" />
+    <circle cx="12" cy="12" r="1.9" />
+    <circle cx="18.8" cy="12" r="1.9" />
+  </svg>
+);
+
 /** 출석 도장 */
 export const IconStamp = ({ className, size }: P) => (
   <svg {...base(size)} className={className} aria-hidden>
