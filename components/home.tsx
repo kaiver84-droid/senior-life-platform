@@ -10,31 +10,20 @@ import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { lunarShortOf } from "@/lib/lunar";
 import { shortSido } from "@/lib/regions";
-import { BigButton, SectionTitle, Stars, Sheet, useToast } from "./ui";
-import { HomeCalendarBanner, TodayAlarmCard } from "./calendar";
-import { GroupMissionBanner, GroupSelectorBanner, TodayGroupCard } from "./groups";
+import { ddayLabel, upcomingEvents } from "@/lib/calendar";
+import { useGroup } from "@/lib/group-store";
+import { matchPrograms } from "@/lib/welfare";
+import { buildGroupRanking } from "@/lib/rankings";
+import { weekIdOf } from "@/lib/week";
+import { BigButton, Stars, Sheet, useToast } from "./ui";
+import { TodayAlarmCard } from "./calendar";
 import { HealthChallengeCard } from "./health";
 import { SharePreviewSheet } from "./share-sheet";
 import { SpeakButton } from "./speak";
-import { AssetImage, Icon3D, NeulbomMark, RaisedTile, WeatherArt, type Icon3DName } from "./art";
-import {
-  IconBank,
-  IconBook,
-  IconCalendar,
-  IconChevron,
-  IconDownload,
-  IconMail,
-  IconPill,
-  IconSend,
-  IconShare,
-  IconSparkle,
-  IconTools,
-  IconTrophy,
-} from "./icons";
+import { AssetImage, Icon3D, NeulbomMark, RaisedTile, WeatherArt } from "./art";
+import { IconChevron, IconDownload, IconShare, IconSparkle } from "./icons";
 
 const PRESETS = ["오늘도 건강하세요", "행복한 하루 보내세요", "손주가 보고 싶은 날", "우리 함께 힘내요"];
-
-const WEEKDAY = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
 
 /** 오늘의 운세를 소리로 읽어 줄 글 */
 function fortuneSpeech(fortune: Fortune): string {
@@ -53,14 +42,6 @@ function fortuneSpeech(fortune: Fortune): string {
   return parts.filter(Boolean).join(" ");
 }
 
-function longKoreanDate(dateStr: string): { date: string; day: string } {
-  const d = new Date(dateStr + "T00:00:00Z");
-  return {
-    date: `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`,
-    day: WEEKDAY[d.getUTCDay()],
-  };
-}
-
 export function HomeTab({
   onNavigate,
   onOpenCalendar,
@@ -68,7 +49,7 @@ export function HomeTab({
   onNavigate: (tab: string) => void;
   onOpenCalendar?: () => void;
 }) {
-  const { profile, streak, today, todayDaily, weekPoints } = useApp();
+  const { profile, today, todayDaily, state, code, weekId, recordMission } = useApp();
   const { show } = useToast();
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [weatherBusy, setWeatherBusy] = useState(false);
@@ -80,7 +61,6 @@ export function HomeTab({
     () => getFortune(profile?.nickname || "이용자", profile?.birthYear || 1955, today, profile?.birthTime),
     [profile?.nickname, profile?.birthYear, profile?.birthTime, today]
   );
-  const dateLabel = longKoreanDate(today);
   /** 맑음·구름은 3D 날씨 아이콘, 비·눈·안개는 상태를 살린 그림을 그대로 쓴다 */
   const weather3D = !/비|눈|소나기|천둥|이슬비|안개/.test(weather?.label || "맑음");
 
@@ -108,262 +88,319 @@ export function HomeTab({
     setWeatherBusy(false);
   }, [profile, weatherBusy]);
 
-  const tiles: { key: string; label: string; sub: string; icon: Icon3DName; go: () => void }[] = [
-    {
-      key: "quiz",
-      label: "오늘의 퀴즈",
-      sub: todayDaily?.done ? "완료했어요" : "3문제 · 1분",
-      icon: "icon-3d-quiz-trophy",
-      go: () => onNavigate("quiz"),
-    },
-    {
-      key: "welfare",
-      label: "정부 지원금",
-      sub: "내게 맞는 혜택",
-      icon: "icon-3d-welfare-gift",
-      go: () => onNavigate("welfare"),
-    },
-    {
-      key: "tools",
-      label: "돋보기",
-      sub: "크게 보기",
-      icon: "icon-3d-magnifier",
-      go: () => onNavigate("tools"),
-    },
-    {
-      key: "med",
-      label: "복약 체크",
-      sub: "아침 · 저녁 약",
-      icon: "icon-3d-pill",
-      go: () => onNavigate("family"),
-    },
-    {
-      key: "anbu",
-      label: "안부 전송",
-      sub: "카톡으로 인사",
-      icon: "icon-3d-mail",
-      go: () => onNavigate("family"),
-    },
-    {
-      key: "guide",
-      label: "생활 가이드",
-      sub: "1분 카드뉴스",
-      icon: "icon-3d-book",
-      go: () => onNavigate("tools"),
-    },
-  ];
+  /* 지금 보고 있는 모임 — 모임 요약 카드에 쓴다 */
+  const { active, detail } = useGroup();
+
+  /**
+   * 우리 모임이 이번 주 몇 위인지.
+   * 랭킹 탭과 같은 기준을 쓰도록 같은 API(scope=groups)를 부르고,
+   * 서버가 대답하지 못하면 랭킹 탭과 똑같은 계산(buildGroupRanking)으로 채운다.
+   */
+  const localRank = useMemo(() => {
+    if (!active || !detail) return null;
+    const view = buildGroupRanking({
+      weekId: weekId || weekIdOf(),
+      myGroups: [
+        {
+          id: active.id,
+          name: active.name,
+          memberCount: detail.memberCount,
+          points: detail.members.reduce((sum, m) => sum + (m.points || 0), 0),
+          attendedToday: detail.todayAttended,
+        },
+      ],
+    });
+    return view.myRank ?? null;
+  }, [active, detail, weekId]);
+
+  const [groupRank, setGroupRank] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active || !detail) {
+      setGroupRank(null);
+      return;
+    }
+    let alive = true;
+    const params = new URLSearchParams({
+      scope: "groups",
+      weekId: weekId || weekIdOf(),
+      code: code || "",
+    });
+    fetch(`/api/rankings?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad"))))
+      .then((j) => {
+        if (alive) setGroupRank(typeof j?.myRank === "number" ? j.myRank : localRank);
+      })
+      .catch(() => {
+        if (alive) setGroupRank(localRank);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [active, detail, code, weekId, localRank]);
+
+  /* 우리 동네에서 지금 받을 수 있는 복지 혜택 수 — 혜택 탭과 같은 기준 */
+  const benefitCount = useMemo(
+    () => matchPrograms(profile?.birthYear || 1955, profile?.sido || "", profile?.sigungu || "").length,
+    [profile?.birthYear, profile?.sido, profile?.sigungu]
+  );
+
+  /* 가족안부달력 — 가장 가까이 다가온 일정 하나 */
+  const nextEvent = useMemo(() => upcomingEvents(state.familyEvents, today, 120, 1)[0], [state.familyEvents, today]);
 
   return (
-    <div className="space-y-4 pb-2">
+    <div className="space-y-2 pb-2">
       {/* 🔔 오늘 일정 알람 — 알람 시간이 되면 홈 맨 위에 먼저 보인다 */}
       <TodayAlarmCard where="home" />
 
-      {/* 인사 히어로 — 아침 햇살 가득한 봄 마을, 손 흔드는 어르신 */}
-      <section data-home-hero className="fade-up overflow-hidden rounded-[1.9rem] bg-[#CFE7F7] shadow-card">
-        <div className="relative h-[224px] overflow-hidden">
-          <AssetImage
-            name="home-hero"
-            alt="아침 햇살이 비치는 봄 마을 정원에서 환하게 손을 흔드는 어르신"
-            priority
-            className="absolute inset-0 h-full w-full object-cover object-[54%_36%]"
-          />
-          {/* 아래쪽 글자 자리에만 깔리는 딥네이비 그라디언트 — 그림 위쪽은 가리지 않는다 */}
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-[74%]"
-            style={{
-              background:
-                "linear-gradient(to top, rgba(11,34,51,0.95) 0%, rgba(11,34,51,0.74) 24%, rgba(11,34,51,0.36) 52%, rgba(11,34,51,0))",
-            }}
-          />
-          <div className="absolute left-3.5 top-3.5 flex items-center gap-1.5 rounded-2xl bg-white/95 px-2.5 py-1.5 shadow-soft backdrop-blur">
-            <IconCalendar size={19} className="text-brand" />
-            <div className="leading-tight">
-              <p className="tabular text-[0.82rem] font-black text-ink">{dateLabel.date}</p>
-              <p className="text-[0.68rem] font-bold text-ink/50">{dateLabel.day}</p>
-              {lunarShortOf(today) ? (
-                <p className="text-[0.68rem] font-extrabold text-plum-dark">🌙 {lunarShortOf(today)}</p>
-              ) : null}
-            </div>
-          </div>
-          <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
-            <p className="t-sub font-extrabold tracking-tight text-white/90">안녕하세요,</p>
-            <h1 className="t-title mt-0.5 flex items-center gap-1.5 text-white drop-shadow-[0_2px_6px_rgba(8,24,38,0.45)]">
-              <span className="truncate">{profile?.nickname}</span>
-              <span className="text-[1.42rem]">😊</span>
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {streak > 0 ? (
-                <span className="rounded-full bg-white/95 px-2.5 py-1 text-[0.74rem] font-extrabold text-[#C0453A] shadow-soft">
-                  🔥 {streak}일 연속
-                </span>
-              ) : null}
-              <span className="text-[0.8rem] font-bold text-white/85">
-                {shortSido(profile?.sido || "")} {profile?.sigungu}
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 우리 모임 — 지금 보고 있는 모임과 오늘의 현황 */}
-      <GroupSelectorBanner />
-      <TodayGroupCard />
-
-      {/* 감성 인사카드 히어로 — 고화질 국화 사진 */}
-      <section className="fade-up overflow-hidden rounded-[1.75rem] bg-white shadow-card">
-        <div className="relative h-[228px] overflow-hidden bg-[#CFE7F7]">
-          <AssetImage
-            name="greeting-chrysanthemum"
-            alt="파란 하늘 아래 활짝 핀 노란 국화꽃"
-            priority
-            className="absolute inset-0 h-full w-full object-cover object-[64%_center]"
-          />
-          {/* 왼쪽 손글씨 자리만 덮는 흰 그라디언트 — 국화 사진 오른쪽은 원본 그대로 선명하게 */}
-          <div
-            className="pointer-events-none absolute inset-y-0 left-0 w-[78%]"
-            style={{
-              background:
-                "linear-gradient(to right, #FFFFFF 0%, rgba(255,255,255,0.96) 32%, rgba(255,255,255,0.66) 58%, rgba(255,255,255,0))",
-            }}
-          />
-          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/45 via-white/10 to-transparent" />
-          <div className="relative flex h-full flex-col justify-center gap-1 px-4">
-            <button
-              type="button"
-              onClick={() => setStudio({ open: true, autoShare: false })}
-              className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-ink/85 px-3 py-1.5 text-[0.76rem] font-extrabold text-white shadow-soft backdrop-blur"
-            >
-              오늘의 안부 인사 <IconChevron size={13} />
-            </button>
-            <p className="hand text-[2rem] leading-[1.2] text-[#122A44]">
-              {fortune.score >= 85 ? "오늘도 건강하고" : "천천히, 편안하게"}
-              <br />
-              행복하세요! <span className="text-coral">♡</span>
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-2 px-4 py-3">
-          <p className="flex items-center justify-center gap-1.5 pb-0.5 text-[0.8rem] font-bold text-ink/55">
-            <IconSparkle size={14} className="text-sun-dark" /> {shortFortuneLine(fortune)}
+      {/* 인사 배너 — 인물 사진은 오른쪽에만 작게, 왼쪽은 인사와 날씨 */}
+      <section
+        data-home-hero
+        className="fade-up relative overflow-hidden rounded-[1.55rem] bg-[#E8F5FC] shadow-card"
+      >
+        <AssetImage
+          name="home-hero"
+          alt="봄 마을 정원에서 환하게 손을 흔드는 어르신"
+          priority
+          className="absolute inset-y-0 right-0 h-full w-[56%] object-cover object-[74%_14%]"
+        />
+        {/* 사진이 왼쪽 글자 자리로 번지지 않게 하는 부드러운 경계 */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to right, #E8F5FC 0%, #E8F5FC 40%, rgba(232,245,252,0.94) 52%, rgba(232,245,252,0.55) 64%, rgba(232,245,252,0) 80%)",
+          }}
+        />
+        <div className="relative px-4 py-2.5">
+          <p className="truncate text-[1.1rem] font-black leading-tight tracking-tight text-ink">
+            {profile?.nickname}님,
+          </p>
+          <p className="mt-0.5 flex items-center gap-1 text-[1.1rem] font-black leading-tight tracking-tight text-ink">
+            <span className="truncate">오늘도 행복하세요!</span>
+            <span aria-hidden className="shrink-0">
+              😊
+            </span>
           </p>
           <button
             type="button"
-            onClick={() => setStudio({ open: true, autoShare: false })}
-            className="touch-btn min-h-[54px] w-full bg-gold text-ink shadow-sun active:bg-gold-dark"
+            onClick={() => setWeatherOpen(true)}
+            aria-label="오늘의 날씨와 생활팁 보기"
+            className="mt-1.5 inline-flex max-w-full flex-wrap items-center gap-x-1 gap-y-0 rounded-full bg-white/95 px-2.5 py-0.5 shadow-soft active:scale-[0.99]"
           >
-            <IconSend size={21} /> 인사카드 만들기
-          </button>
-          <button
-            type="button"
-            onClick={() => setStudio({ open: true, autoShare: true })}
-            className="touch-btn min-h-[52px] w-full bg-white text-ink shadow-soft"
-          >
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.6rem] font-black text-[#3C1E1E]">
-              TALK
+            {weather3D ? (
+              <Icon3D name="icon-3d-weather" size={20} />
+            ) : (
+              <span aria-hidden className="shrink-0 text-[0.95rem] leading-none">
+                🌤️
+              </span>
+            )}
+            <span className="tabular whitespace-nowrap text-[0.82rem] font-extrabold text-ink">
+              {weather ? `${weather.temp}°C` : "날씨 확인 중"}
             </span>
-            카카오톡으로 보내기
+            <span aria-hidden className="text-[0.8rem] font-bold text-ink/25">
+              |
+            </span>
+            <span className="whitespace-nowrap text-[0.82rem] font-extrabold text-ink">{koreanDate(today)}</span>
+            {lunarShortOf(today) ? (
+              <span className="whitespace-nowrap text-[0.78rem] font-bold text-plum-dark">({lunarShortOf(today)})</span>
+            ) : null}
           </button>
         </div>
       </section>
 
-      {/* 오늘의 모임 미션 */}
-      <GroupMissionBanner onJoin={() => onNavigate("quiz")} />
+      {/* 우리 모임 · 모임 랭킹 — 한 줄 두 칸 */}
+      <div className="fade-up grid grid-cols-[1.62fr_1fr] gap-2">
+        <button
+          type="button"
+          onClick={() => onNavigate("group")}
+          aria-label="우리 모임 열기"
+          className="flex min-w-0 flex-col justify-center rounded-[1.25rem] border border-brand/15 bg-white px-2.5 py-2 text-left shadow-soft active:scale-[0.995]"
+        >
+          <span className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-light text-[0.95rem]"
+            >
+              👥
+            </span>
+            <span className="line-clamp-2 min-w-0 flex-1 text-[0.94rem] font-black leading-tight text-ink">
+              {active ? active.name : "모임 고르기"}
+            </span>
+            <IconChevron size={15} className="shrink-0 text-ink/30" />
+          </span>
+          <span className="mt-1 block text-[0.76rem] font-bold leading-snug text-ink/55">
+            {detail ? (
+              <>
+                <span className="block">오늘 출석 {detail.todayAttended}/{detail.memberCount}명</span>
+                <span className="block">이번 주 참여율 {detail.weeklyRate}%</span>
+              </>
+            ) : (
+              "모임을 만들어요"
+            )}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate("ranking")}
+          aria-label="모임 랭킹 보기"
+          className="flex min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[1.25rem] bg-gradient-to-br from-gold-light via-[#FFF3CE] to-[#FFE7A6] px-2 py-2 text-left shadow-soft active:scale-[0.995]"
+        >
+          <span aria-hidden className="shrink-0 text-[1.4rem] leading-none drop-shadow">
+            🏆
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[0.76rem] font-black leading-tight text-[#8A6100]">모임 랭킹</span>
+            <span className="tabular block text-[1.05rem] font-black leading-tight text-[#C0453A]">
+              {groupRank ? `${groupRank}위` : "—"}
+            </span>
+          </span>
+        </button>
+      </div>
+
+      {/* 오늘의 공동 미션 — 치매예방 퀴즈 */}
+      <button
+        type="button"
+        data-group-mission={todayDaily?.done ? "done" : "open"}
+        onClick={() => {
+          recordMission("group");
+          onNavigate("quiz");
+        }}
+        className="fade-up relative block w-full overflow-hidden rounded-[1.4rem] p-3 text-left shadow-soft active:scale-[0.995]"
+        style={{ background: "linear-gradient(135deg, #FFE9CB 0%, #FFD6A6 55%, #FFC98C 100%)" }}
+      >
+        <span className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#EE7413] px-2.5 py-1 text-[0.78rem] font-black leading-none text-white shadow-soft">
+            🎯 오늘의 공동 미션
+          </span>
+          <span className="shrink-0 rounded-full bg-white/90 px-2 py-0.5 text-[0.72rem] font-black leading-tight text-[#B4530A]">
+            함께해요!
+          </span>
+        </span>
+        <span className="mt-1.5 flex items-start gap-1">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[1.08rem] font-black leading-snug tracking-tight text-[#5A2A00]">
+              {todayDaily?.done ? "오늘 퀴즈를 마쳤어요!" : "치매예방 퀴즈에 도전하세요!"}
+            </span>
+            <span className="mt-1 block text-[0.84rem] font-bold leading-snug text-[#8A4A0C]">
+              퀴즈를 풀고, 포인트도 받아요!
+            </span>
+          </span>
+          <Icon3D
+            name="icon-3d-brain"
+            size={54}
+            className="shrink-0 drop-shadow-[0_8px_14px_rgba(180,83,10,0.3)]"
+          />
+        </span>
+        <span className="mt-1.5 flex min-h-[42px] items-center justify-center gap-1 rounded-full bg-[#EE7413] text-[0.94rem] font-black text-white shadow-cta">
+          ▶ {todayDaily?.done ? "오늘 결과 보기" : "지금 바로 참여하기"} <IconChevron size={16} />
+        </span>
+      </button>
+
+      {/* 가족안부달력 · 오늘의 운세 — 나란히 두 칸 */}
+      <div className="fade-up grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onOpenCalendar?.()}
+          className="flex min-w-0 flex-col rounded-[1.25rem] bg-[#F3EEFF] px-2.5 py-1.5 text-left shadow-soft active:scale-[0.995]"
+        >
+          <span className="flex items-center gap-1">
+            <span aria-hidden className="shrink-0 text-[1rem] leading-none">
+              📅
+            </span>
+            <span className="min-w-0 flex-1 text-[0.9rem] font-black leading-tight text-ink">
+              가족안부달력
+            </span>
+            <IconChevron size={15} className="shrink-0 text-plum-dark/40" />
+          </span>
+          <span className="mt-1 block min-h-[2.4rem] text-[0.78rem] font-bold leading-snug text-ink/60">
+            {nextEvent
+              ? `${nextEvent.event.title} ${ddayLabel(nextEvent.days)}`
+              : "생일·기념일을 챙겨 보세요"}
+          </span>
+          <span className="mt-auto flex min-h-[36px] items-center justify-center rounded-full bg-plum text-[0.82rem] font-black text-white">
+            달력 보기
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFortuneOpen(true)}
+          className="flex min-w-0 flex-col rounded-[1.25rem] bg-[#E9F7EE] px-2.5 py-1.5 text-left shadow-soft active:scale-[0.995]"
+        >
+          <span className="flex items-center gap-1">
+            <span aria-hidden className="shrink-0 text-[1rem] leading-none">
+              🌙
+            </span>
+            <span className="min-w-0 flex-1 text-[0.9rem] font-black leading-tight text-ink">
+              오늘의 운세
+            </span>
+            <IconChevron size={15} className="shrink-0 text-leaf-dark/40" />
+          </span>
+          <span className="mt-1 block min-h-[2.4rem] text-[0.78rem] font-bold leading-snug text-ink/60">
+            {fortune.headline}
+          </span>
+          <span className="mt-auto flex min-h-[36px] items-center justify-center rounded-full bg-leaf text-[0.82rem] font-black text-white">
+            운세 보기
+          </span>
+        </button>
+      </div>
+
+      {/* 안부 인사 보내기 — 한 줄 */}
+      <button
+        type="button"
+        onClick={() => setStudio({ open: true, autoShare: false })}
+        className="fade-up flex w-full items-center gap-2.5 rounded-[1.25rem] bg-white px-3 py-2 text-left shadow-soft active:scale-[0.995]"
+      >
+        <span
+          aria-hidden
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-leaf-light text-[1.1rem]"
+        >
+          💬
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="min-w-0 text-[0.94rem] font-black leading-tight text-ink">안부 인사 보내기</span>
+            <span className="flex min-h-[32px] shrink-0 items-center gap-0.5 rounded-full bg-leaf px-2.5 text-[0.8rem] font-black text-white">
+              보내기 <IconChevron size={13} />
+            </span>
+          </span>
+          <span className="mt-0.5 block text-[0.78rem] font-bold leading-snug text-ink/55">
+            “오늘도 건강하세요! 😊” 마음을 전해요
+          </span>
+        </span>
+      </button>
+
+      {/* 오늘의 혜택 — 한 줄 */}
+      <button
+        type="button"
+        data-home-end
+        onClick={() => onNavigate("welfare")}
+        className="fade-up flex w-full items-center gap-2.5 rounded-[1.25rem] bg-white px-3 py-2 text-left shadow-soft active:scale-[0.995]"
+      >
+        <span
+          aria-hidden
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-light text-[1.1rem]"
+        >
+          🎁
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="min-w-0 text-[0.94rem] font-black leading-tight text-ink">오늘의 혜택</span>
+            <span className="flex min-h-[32px] shrink-0 items-center gap-0.5 rounded-full bg-[#EE7413] px-2.5 text-[0.8rem] font-black text-white">
+              확인하기 <IconChevron size={13} />
+            </span>
+          </span>
+          <span className="mt-0.5 block text-[0.78rem] font-bold leading-snug text-ink/55">
+            우리 동네 복지 혜택 {benefitCount}건이 있어요!
+          </span>
+        </span>
+      </button>
 
       {/* 오늘의 건강생활 챌린지 — 원터치 완료 도장 */}
       <HealthChallengeCard where="home" />
 
-      {/* 가족 안부 달력 — 생일·기념일과 동네 소식을 오늘의 운세보다 위에 둔다 */}
-      <HomeCalendarBanner onOpen={() => onOpenCalendar?.()} />
-
-      {/* 오늘의 운세 */}
-      <button
-        type="button"
-        onClick={() => setFortuneOpen(true)}
-        className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
-      >
-        <Icon3D
-          name="icon-3d-sun-fortune"
-          size={56}
-          className="drop-shadow-[0_10px_16px_rgba(196,138,40,0.32)]"
-        />
-        <span className="min-w-0 flex-1">
-          <span className="t-menu block leading-snug">오늘의 운세</span>
-          <span className="t-body mt-0.5 block truncate font-semibold text-ink/60">
-            {fortune.headline} · {fortune.zodiac}띠
-          </span>
-        </span>
-        <IconChevron size={22} className="shrink-0 text-ink/30" />
-      </button>
-
-      {/* 오늘의 날씨와 생활팁 */}
-      <button
-        type="button"
-        onClick={() => setWeatherOpen(true)}
-        className="card fade-up flex w-full items-center gap-3 p-3.5 text-left"
-      >
-        {weather3D ? (
-          <Icon3D name="icon-3d-weather" size={56} className="drop-shadow-[0_10px_16px_rgba(60,120,180,0.32)]" />
-        ) : (
-          <RaisedTile tone="sky" size={56}>
-            <WeatherArt label={weather?.label || "맑음"} size={36} />
-          </RaisedTile>
-        )}
-        <span className="min-w-0 flex-1">
-          <span className="block text-[1.04rem] font-black leading-snug text-ink">오늘의 날씨와 생활팁</span>
-          <span className="mt-0.5 block truncate text-[0.9rem] font-semibold text-ink/60">
-            {!weather
-              ? "날씨를 확인하고 있어요…"
-              : weather.source === "live"
-                ? `${weather.temp}° ${weather.label} · ${weather.tips[0]}`
-                : "눌러서 오늘 날씨를 다시 확인해요"}
-          </span>
-        </span>
-        <IconChevron size={22} className="shrink-0 text-ink/30" />
-      </button>
-
-      {/* 2×3 바로가기 */}
-      <section className="fade-up">
-        <SectionTitle right={<span className="text-[0.78rem] font-bold text-ink/40">자주 찾는 메뉴</span>}>
-          바로가기
-        </SectionTitle>
-        <div className="grid grid-cols-3 gap-2.5">
-          {tiles.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={t.go}
-              className="card flex flex-col items-start gap-1.5 p-3 text-left active:scale-[0.98]"
-            >
-              <Icon3D name={t.icon} size={44} className="drop-shadow-[0_6px_10px_rgba(60,80,70,0.16)]" />
-              <span className="block text-[0.9rem] font-black leading-tight text-ink">{t.label}</span>
-              <span className="block text-[0.7rem] font-bold leading-tight text-ink/45">{t.sub}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* 명예의 전당 배너 */}
-      <button
-        type="button"
-        onClick={() => onNavigate("ranking")}
-        className="fade-up flex w-full items-center gap-3 rounded-[1.5rem] bg-gradient-to-r from-gold-light via-[#FFF1C4] to-[#FFE7A6] px-4 py-3.5 text-left shadow-soft"
-      >
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/80 text-gold-dark">
-          <IconTrophy size={24} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[1rem] font-black leading-tight text-[#7A5600]">
-            이번 주 {weekPoints}점 · 명예의 전당
-          </span>
-          <span className="block text-[0.82rem] font-bold text-[#8A6A16]/80">
-            우리 동네 순위 보기
-          </span>
-        </span>
-        <IconChevron size={22} className="shrink-0 text-[#8A6A16]" />
-      </button>
-
-      <p className="flex items-center justify-center gap-1.5 pb-1 text-[0.76rem] font-semibold text-ink/35">
+      <p className="flex items-center justify-center gap-1.5 pb-1 pt-1 text-[0.76rem] font-semibold text-ink/35">
         <span className="t-notice flex items-center gap-1.5">
           <NeulbomMark size={16} /> 늘봄과 함께, 더 편안한 하루
         </span>
