@@ -3,10 +3,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useGroup } from "@/lib/group-store";
 import { GROUP_MAX_MEMBERS, timeAgo } from "@/lib/groups";
-import { kstDate, koreanDate } from "@/lib/week";
+import { copyText, kakaoSendNow, loadKakaoSdk, shareOutcomeMessage } from "@/lib/share";
+import { kstDate } from "@/lib/week";
 import { useApp } from "@/lib/storage";
 import { HealthChallengeCard } from "./health";
-import { SharePreviewSheet } from "./share-sheet";
 import { Avatar, Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import {
   IconChevron,
@@ -19,7 +19,74 @@ import {
   IconTrophy,
   IconUsers,
 } from "./icons";
-import type { GroupMemberInfo } from "@/lib/types";
+import type { GroupDetail, GroupMemberInfo } from "@/lib/types";
+
+/* ------------------------------------------------------------------ */
+/* 모임 초대 — 중간 안내 없이 바로 카카오톡                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 초대장에는 이 네 가지만 담는다(모임명은 제목에, 초대 번호는 설명에).
+ * 안내 문구·미리보기 창을 거치지 않고 곧바로 카카오톡 ‘보낼 사람 고르기’로 간다.
+ */
+function inviteFeed(detail: GroupDetail, link: string) {
+  return {
+    title: `[늘봄] ${detail.name}에 초대합니다`,
+    description: `초대 번호 ${detail.id} · 함께 치매예방 퀴즈 풀고 순위를 겨뤄요!`,
+    link,
+    buttonTitle: "모임 들어가기",
+  };
+}
+
+const INVITE_SENT_MESSAGE = "카카오톡이 열렸어요. 보낼 사람(단톡방)을 골라 주세요.";
+
+/**
+ * 모임 초대 버튼의 공통 동작 — **클릭과 같은 콜스택에서** 카카오톡 공유창을 연다.
+ *
+ * iOS Safari·카톡 인앱브라우저는 클릭 직후 동기 호출이 아니면 kakaolink:// 앱 전환을 막는다.
+ * 그래서 여기서는 await 를 하나도 두지 않고 kakaoSendNow 를 바로 부른다. (SDK 는 모임 탭이
+ * 열릴 때 미리 불러 두어 첫 클릭부터 준비돼 있다.)
+ * SDK 가 없거나 카카오가 거부했을 때만(폴백) 초대 링크를 복사하고 한 줄로 알린다.
+ */
+function sendInviteNow(opts: {
+  detail: GroupDetail;
+  link: string;
+  nickname?: string;
+  show: (message: string) => void;
+}) {
+  const { detail, link, nickname, show } = opts;
+  const feed = inviteFeed(detail, link);
+
+  const copyFallback = async () => {
+    const copied = await copyText(`${nickname || "가족"} 님이 ${detail.name}에 초대했어요! ${link}`);
+    show(
+      copied
+        ? "카카오톡을 열지 못해 초대 링크를 복사했어요. 카카오톡 대화창에 붙여넣어 보내세요."
+        : "카카오톡을 열지 못했어요. 잠시 뒤 다시 눌러 주세요."
+    );
+  };
+
+  const immediate = kakaoSendNow(feed, (failed) => {
+    show(shareOutcomeMessage(failed));
+    void copyFallback();
+  });
+  if (immediate?.kind === "kakao") {
+    show(INVITE_SENT_MESSAGE);
+    return true;
+  }
+
+  // 여기부터는 폴백 — SDK 를 한 번 불러 보고 다시 시도한 뒤, 그래도 안 되면 링크 복사
+  void (async () => {
+    const loaded = await loadKakaoSdk();
+    const again = loaded ? kakaoSendNow(feed) : null;
+    if (again?.kind === "kakao") {
+      show(INVITE_SENT_MESSAGE);
+      return;
+    }
+    await copyFallback();
+  })();
+  return false;
+}
 
 /* ------------------------------------------------------------------ */
 /* 작은 조각들                                                        */
@@ -264,11 +331,29 @@ export function GroupMissionBanner({ onJoin }: { onJoin: () => void }) {
 /* ------------------------------------------------------------------ */
 
 export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { active, activeId, detail, groups, addPost, cheer, join, select, todayDone, online } = useGroup();
+  const { active, activeId, detail, groups, addPost, cheer, join, select, todayDone, online, inviteLink } = useGroup();
+  const { profile } = useApp();
   const { show } = useToast();
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // 초대 버튼을 누르는 순간 카카오 SDK 가 준비돼 있어야 클릭과 같은 콜스택에서 보낼 수 있다.
+  useEffect(() => {
+    void loadKakaoSdk();
+  }, []);
+
+  /**
+   * 모든 ‘초대’ 버튼의 공통 동작 — 안내 시트를 열지 않고 바로 카카오톡으로 간다.
+   * (모임 정보를 아직 못 받았을 때만 시트를 열어 번호·링크를 보여 준다.)
+   */
+  const inviteNow = () => {
+    if (!detail) {
+      show("모임 정보를 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요.");
+      return;
+    }
+    sendInviteNow({ detail, link: inviteLink(detail.id), nickname: profile?.nickname, show });
+  };
 
   // 랭킹 ‘나눔왕 → 친구 초대하기’에서 넘어오면 초대 시트를 바로 연다.
   // 아직 모임이 없으면 초대할 대상이 없으니 모임 만들기 시트를 열고 안내한다.
@@ -348,11 +433,11 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
           </div>
           {active ? (
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              {/* 평소에도 한눈에 보이는 초대 버튼 — 누르면 바로 초대 시트가 열린다 */}
+              {/* 평소에도 한눈에 보이는 초대 버튼 — 누르면 바로 카카오톡으로 초대장을 보낸다 */}
               <button
                 type="button"
                 data-group-invite-top
-                onClick={() => setSheet("invite")}
+                onClick={inviteNow}
                 aria-label="우리 모임에 초대하기"
                 className="flex min-h-[50px] items-center gap-1.5 rounded-full bg-sun px-4 text-[0.96rem] font-black text-ink shadow-sun active:bg-sun-dark"
               >
@@ -420,7 +505,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                     <button
                       type="button"
                       data-group-row-invite={g.id}
-                      onClick={() => setSheet("invite")}
+                      onClick={inviteNow}
                       aria-label={`${g.name}에 초대하기`}
                       className="absolute right-2 top-1/2 flex min-h-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-sun px-3 text-[0.84rem] font-black text-ink shadow-sun active:bg-sun-dark"
                     >
@@ -495,7 +580,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
               <p className="mt-1 text-[0.9rem] font-semibold leading-relaxed text-ink/60">
                 초대 링크를 보내면 가족·친구가 바로 들어와 함께 퀴즈 순위를 겨룰 수 있어요.
               </p>
-              <BigButton variant="sun" size="lg" full className="mt-3" onClick={() => setSheet("invite")}>
+              <BigButton variant="sun" size="lg" full className="mt-3" onClick={inviteNow}>
                 <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
                   TALK
                 </span>
@@ -505,7 +590,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
           ) : null}
 
           {/* 모임 동작 — 새 모임 추가는 위 ‘내 모임’ 카드에 있고, 여기서는 카톡 초대 */}
-          <BigButton variant="sun" full onClick={() => setSheet("invite")}>
+          <BigButton variant="sun" full onClick={inviteNow}>
             <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
               TALK
             </span>
@@ -788,13 +873,12 @@ function GroupSheet({
   onChange: (m: SheetKind) => void;
 }) {
   const { groups, activeId, detail, select, create, join, inviteLink, updateGroup, leave } = useGroup();
-  const { profile, today } = useApp();
+  const { profile } = useApp();
   const { show } = useToast();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editRegion, setEditRegion] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -806,6 +890,12 @@ function GroupSheet({
     setEditRegion(detail.region || "");
     setEditDesc(detail.description || "");
   }, [mode, detail]);
+
+  // 초대 시트를 거칠 때(모임을 막 만든 뒤)도 버튼 한 번에 바로 카톡으로 갈 수 있게 미리 불러 둔다.
+  useEffect(() => {
+    if (mode !== "invite") return;
+    void loadKakaoSdk();
+  }, [mode]);
 
   const open = mode !== null;
   const link = useMemo(() => (detail ? inviteLink(detail.id) : ""), [detail, inviteLink]);
@@ -878,7 +968,7 @@ function GroupSheet({
       onClose={onClose}
       title={
         mode === "invite"
-          ? "카카오톡으로 모임 초대"
+          ? "모임 초대"
           : mode === "create"
             ? "새 모임 만들기"
             : mode === "join"
@@ -891,7 +981,7 @@ function GroupSheet({
       }
       subtitle={
         mode === "invite"
-          ? "가족·친구에게 링크를 보내면 바로 들어올 수 있어요"
+          ? undefined
           : mode === "create"
             ? "가족방이든 친구 모임이든 1초면 만들어져요"
             : mode === "join"
@@ -990,9 +1080,9 @@ function GroupSheet({
             <IconPlus size={21} /> {busy ? "모임을 만드는 중이에요…" : "모임 만들기"}
           </BigButton>
           <p className="text-center text-[0.8rem] font-semibold leading-relaxed text-ink/45">
-            만들면 바로 ‘카카오톡으로 초대’ 화면이 열려요.
+            만들면 바로 초대 화면이 열려요.
             <br />
-            가족에게 링크를 한 번에 보낼 수 있어요.
+            카카오톡으로 가족에게 한 번에 보낼 수 있어요.
           </p>
         </div>
       ) : null}
@@ -1037,31 +1127,20 @@ function GroupSheet({
       {mode === "invite" && detail ? (
         <div className="space-y-3" data-group-invite-sheet={detail.id}>
           <div className="rounded-[1.4rem] bg-white p-4 text-center shadow-soft">
-            <p className="text-[0.86rem] font-bold text-ink/50">{detail.name}</p>
+            <p className="text-[0.9rem] font-bold text-ink/50">{detail.name}</p>
             <p className="tabular mt-1 text-[2rem] font-black tracking-[0.28em] text-brand-deep">{detail.id}</p>
             <p className="text-[0.82rem] font-semibold text-ink/45">초대 번호</p>
           </div>
 
-          <div className="rounded-2xl bg-paper px-3.5 py-3">
-            <p className="text-[0.78rem] font-bold text-ink/45">초대 링크</p>
-            <p className="mt-1 break-all text-[0.84rem] font-semibold text-ink/70">{link}</p>
-          </div>
-
-          {/* 정원 안내 — 한 모임은 100명까지 */}
-          <p
-            data-group-invite-capacity
-            className={`rounded-2xl px-3.5 py-2.5 text-[0.84rem] font-bold leading-snug ${
-              detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
-                ? "bg-coral-light text-coral-dark"
-                : "bg-brand-light/60 text-brand-dark"
-            }`}
+          <BigButton
+            variant="sun"
+            size="lg"
+            full
+            onClick={() => {
+              sendInviteNow({ detail, link, nickname: profile?.nickname, show });
+              onClose();
+            }}
           >
-            {detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS)
-              ? `정원이 다 찼어요 (${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명) — 새 모임을 만들어 초대해 주세요.`
-              : `한 모임은 ${detail.maxMembers ?? GROUP_MAX_MEMBERS}명까지 들어올 수 있어요. 지금 ${detail.memberCount}/${detail.maxMembers ?? GROUP_MAX_MEMBERS}명이에요.`}
-          </p>
-
-          <BigButton variant="sun" size="lg" full onClick={() => setShareOpen(true)}>
             <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
               TALK
             </span>
@@ -1070,11 +1149,6 @@ function GroupSheet({
           <BigButton variant="white" full onClick={() => void copy()}>
             <IconShare size={20} /> {copied ? "복사했어요!" : "초대 링크 복사"}
           </BigButton>
-          <p className="text-center text-[0.8rem] font-semibold leading-relaxed text-ink/45">
-            링크로 들어온 가족은 로그인·초기 설정을 마치면
-            <br />
-            자동으로 이 모임에 들어옵니다.
-          </p>
         </div>
       ) : null}
 
@@ -1146,34 +1220,6 @@ function GroupSheet({
         </div>
       ) : null}
 
-      {detail ? (
-        <SharePreviewSheet
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-          data={{
-            kind: "invite",
-            badge: "우리 모임 초대",
-            emoji: "👥",
-            headline: `${detail.name}에 함께해요`,
-            sub: `초대 번호 ${detail.id} · 치매예방 퀴즈로 순위를 겨뤄요`,
-            message: "누르면 바로 모임에 들어와요.",
-            stats: [
-              { value: `${detail.memberCount}명`, label: "모임원" },
-              { value: `${detail.weeklyRate}%`, label: "이번 주 달성률" },
-            ],
-            name: profile?.nickname,
-            dateLabel: koreanDate(today),
-            title: `[늘봄] ${detail.name}에 초대합니다`,
-            description: `초대 번호 ${detail.id} · 함께 치매예방 퀴즈 풀고 순위를 겨뤄요!`,
-            buttonTitle: "모임 들어가기",
-            text: `${profile?.nickname || "가족"} 님이 ${detail.name}에 초대했어요! 초대 번호 ${detail.id}`,
-            link,
-            filename: `모임초대_${detail.id}.png`,
-            sheetTitle: "카카오톡으로 모임 초대",
-            sheetSubtitle: "가족 단톡방에 이렇게 보여요",
-          }}
-        />
-      ) : null}
     </Sheet>
   );
 }
