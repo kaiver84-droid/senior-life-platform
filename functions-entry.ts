@@ -4,6 +4,7 @@
  * wrangler 없이 REST API 로 배포할 때 이 파일을 번들해 out/_worker.js 로 올립니다.
  */
 import { onRequestGet as healthGet } from "./functions/api/health";
+import { onRequestGet as statsGet } from "./functions/api/stats";
 import { onRequestGet as rankingsGet } from "./functions/api/rankings";
 import { onRequestGet as groupsGet, onRequestPost as groupsPost } from "./functions/api/groups";
 import { onRequestGet as stateGet, onRequestPost as statePost } from "./functions/api/state";
@@ -23,6 +24,7 @@ export default {
 
     try {
       if (path === "/api/health") return await healthGet(ctx);
+      if (path === "/api/stats") return await statsGet(ctx);
       if (path === "/api/local-news") return await localNewsGet(ctx);
       if (path === "/api/weather") return await weatherGet(ctx);
       if (path === "/api/rankings") return await rankingsGet(ctx);

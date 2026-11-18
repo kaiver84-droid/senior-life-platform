@@ -19,6 +19,7 @@ import { FamilyTab } from "@/components/family";
 import { GradeSummaryRow, RankingTab } from "@/components/ranking";
 import { AlarmWatcher, CalendarScreen } from "@/components/calendar";
 import { InstallBanner, InstallGuide, InstallGuideRow } from "@/components/install-guide";
+import { CommunityStatsCard } from "@/components/stats";
 import { NeulbomMark } from "@/components/art";
 import { GroupProvider, useGroup } from "@/lib/group-store";
 import { captureInviteFromUrl } from "@/lib/groups";
@@ -471,6 +472,8 @@ function MoreTab({
         <h1 className="mt-1.5 text-[1.5rem] font-black leading-snug text-ink">도구 · 가족 · 설정</h1>
         <p className="mt-1 text-[0.9rem] font-semibold text-ink/55">필요한 기능을 한 번에 열 수 있어요.</p>
       </section>
+
+      <CommunityStatsCard />
 
       <div className="fade-up grid grid-cols-1 gap-2">
         <MoreRow
