@@ -69,13 +69,10 @@ with sync_playwright() as p:
         problems.append("안내 문구가 아직 남아 있음")
     if "초성 · 옛날 노래 · 틀린 그림 · OX · 넌센스" in body:
         problems.append("파란 박스 장르 나열이 아직 남아 있음")
-    if body.count("지금 318문제가") or re.search(r"지금 \d+문제가 준비돼 있어요", body):
-        # 위쪽 헤더의 배지는 남기고, 주제 영역 배지만 지웠는지 확인
-        header_bank = page.evaluate(
-            "() => Array.from(document.querySelectorAll('[data-quiz-bank]')).length"
-        )
-        if header_bank != 1:
-            problems.append(f"문제 수 배지 개수가 1개가 아님: {header_bank}")
+    if re.search(r"지금 \d+문제가 준비돼 있어요", body):
+        problems.append("위쪽 헤더의 문제 수 배지가 아직 남아 있음")
+    if page.evaluate("() => Array.from(document.querySelectorAll('[data-quiz-bank]')).length") != 1:
+        problems.append("문제 수 표식(data-quiz-bank)이 한 곳이 아님")
     if "점수와 상관없이 좋아하는 주제로 3문제를 풀어" in body:
         problems.append("주제 안내 문구가 3문제 그대로임")
     if "계속 풀어 볼 수 있어요" not in body:

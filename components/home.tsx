@@ -316,10 +316,10 @@ export function HomeTab({
               가족안부{"\u200B"}달력
             </span>
           </span>
-          <span className="mt-1.5 block min-h-[2.2rem] flex-1 break-words text-[0.78rem] font-bold leading-snug text-ink/60">
+          <span className="mt-1.5 block min-h-[1.3rem] flex-1 break-words text-[0.78rem] font-bold leading-snug text-ink/60">
             {nextEvent
               ? `${nextEvent.event.title} ${ddayLabel(nextEvent.days)}`
-              : "생일·기념일을 챙겨 보세요"}
+              : "생일·기념일 추가"}
           </span>
           <span className="mt-3 flex min-h-[40px] w-full items-center justify-center rounded-full bg-plum px-3 text-[clamp(15px,0.9rem,20px)] font-black leading-tight text-white">
             달력 보기
@@ -339,7 +339,7 @@ export function HomeTab({
               오늘의 운세
             </span>
           </span>
-          <span className="mt-1.5 block min-h-[2.2rem] flex-1 break-words text-[0.78rem] font-bold leading-snug text-ink/60">
+          <span className="mt-1.5 block min-h-[1.3rem] flex-1 break-words text-[0.78rem] font-bold leading-snug text-ink/60">
             {fortune.headline}
           </span>
           <span className="mt-3 flex min-h-[40px] w-full items-center justify-center rounded-full bg-leaf px-3 text-[clamp(15px,0.9rem,20px)] font-black leading-tight text-white">

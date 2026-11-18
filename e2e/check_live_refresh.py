@@ -170,6 +170,7 @@ with sync_playwright() as p:
     check("초성 · 옛날 노래 · 틀린 그림 · OX · 넌센스" not in body, "파란 박스 장르 나열 삭제")
     check("계속 풀어 볼 수 있어요" in body, "주제 안내 문구 변경")
     check("섞어서 3문제" not in body and "섞어서 풀기" in body, "‘섞어서 풀기’ 라벨")
+    check(not re.search(r"지금 \d+문제가 준비돼 있어요", body), "문제 수 배지 문구 삭제")
     grid = page.evaluate(
         """() => {
           const els = Array.from(document.querySelectorAll("[data-quiz-topic]"));
@@ -183,7 +184,7 @@ with sync_playwright() as p:
     )
     print("주제 그리드:", grid)
     check(grid["n"] == 6 and grid["cols"] == 2 and grid["rows"] == 3, "주제 버튼 2열 3행", str(grid))
-    check(grid["bank"] == 1, "‘318문제’ 배지는 위쪽 한 곳만", str(grid["bank"]))
+    check(grid["bank"] == 1, "문제 수 표식(data-quiz-bank) 한 곳", str(grid["bank"]))
     check(not grid["overflow"], "주제 버튼 글자 잘림 없음", str(grid["overflow"]))
     info = overflow()
     check(info["scrollW"] <= info["clientW"] + 1 and not info["over"], "퀴즈 화면 가로 넘침 없음", str(info["over"]))

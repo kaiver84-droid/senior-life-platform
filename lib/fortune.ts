@@ -141,7 +141,7 @@ export function getFortune(
     stars,
     headline:
       score >= 90
-        ? "오늘은 기운이 가득한 날!"
+        ? "기운이 가득한 날!"
         : score >= 80
           ? "좋은 일이 생기는 날"
           : score >= 70

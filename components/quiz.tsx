@@ -189,18 +189,14 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
 
   return (
     <div className="space-y-4">
-      <section className="fade-up flex items-start justify-between gap-2 pt-1">
+      {/* data-quiz-bank — 문제 수는 화면에 배지로 띄우지 않고,
+          점검 스크립트(e2e)가 읽을 수 있도록 섹션에만 붙여 둔다. */}
+      <section data-quiz-bank={QUIZ_TOTAL_COUNT} className="fade-up flex items-start justify-between gap-2 pt-1">
         <div>
           <p className="text-[0.86rem] font-extrabold tracking-tight text-brand-dark/80">오늘의 기억 건강</p>
           <h1 className="mt-0.5 text-[1.5rem] font-black leading-tight text-ink">1분 치매예방 퀴즈</h1>
           <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
             하루 3문제 · 이번 주 {weekPoints}점 {streak > 0 ? `· 🔥 ${streak}일 연속` : ""}
-          </p>
-          <p
-            data-quiz-bank={QUIZ_TOTAL_COUNT}
-            className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[0.76rem] font-extrabold text-brand-dark shadow-soft"
-          >
-            📚 지금 {QUIZ_TOTAL_COUNT}문제가 준비돼 있어요
           </p>
         </div>
         <span className="grid h-11 w-11 place-items-center rounded-full bg-gold-light text-gold-dark">
