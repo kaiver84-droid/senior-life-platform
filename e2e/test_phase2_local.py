@@ -119,7 +119,7 @@ def main():
 
         # ---------- 퀴즈: OX·넌센스 ----------
         page.get_by_role("navigation").get_by_role("button", name="퀴즈").click()
-        page.wait_for_selector("text=1분 두뇌 퀴즈", timeout=20000)
+        page.wait_for_selector("text=1분 치매예방 퀴즈", timeout=20000)
         page.wait_for_timeout(900)
         topics = page.locator("[data-quiz-topic]")
         check(topics.count() == 5, "주제 고르기 5가지", str(topics.count()))

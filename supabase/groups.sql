@@ -75,7 +75,7 @@ alter table public.group_cheers  enable row level security;
 /* 7. 체험 모임 '우리 가족 사랑방' (FAM101) — 비어 있지 않은 첫 화면     */
 /* ------------------------------------------------------------------ */
 insert into public.groups (id, name, description, goal_score, weekly_goal, creator_code, is_demo)
-values ('FAM101', '우리 가족 사랑방', '온 가족이 함께 두뇌 퀴즈로 건강을 챙기는 체험 모임이에요', 500, 5, 'FAM1A1', true)
+values ('FAM101', '우리 가족 사랑방', '온 가족이 함께 치매예방 퀴즈로 건강을 챙기는 체험 모임이에요', 500, 5, 'FAM1A1', true)
 on conflict (id) do update
   set name = excluded.name, description = excluded.description, is_demo = true;
 

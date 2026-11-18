@@ -5,7 +5,7 @@
 라이브: BASE=https://senior-life-platform.pages.dev python3 e2e/check_ranking_phase1.py
 
 확인하는 것
-1) 7개 영역 탭(늘봄왕·두뇌왕·건강왕·출석왕·모임왕·나눔왕·알뜰왕)이 모두 열리고 390px에서 넘치지 않는다
+1) 7개 영역 탭(늘봄왕·기억왕·건강왕·출석왕·모임왕·나눔왕·알뜰왕)이 모두 열리고 390px에서 넘치지 않는다
 2) 늘봄왕 점수가 쌓인다 — 출석(+10) → 건강(+20) → 복지 확인(+10) → 퀴즈(+30)
 3) 하루 최대 140점 상한이 서버에서도 적용된다(큰 값을 보내도 140점/일을 넘지 않는다)
 4) 순위 행마다 변동 배지(▲/▼/신규/－)가 있고, 내 요약 카드에 순위·격차 문구가 나온다
@@ -238,9 +238,9 @@ def main():
             "els => els.map(e => [e.getAttribute('data-area-tab'), e.innerText.replace(/\\n/g,' ').trim()])",
         )
         keys = [t[0] for t in tabs]
-        check(keys == AREA_KEYS, "7개 영역 탭(늘봄왕·두뇌왕·건강왕·출석왕·모임왕·나눔왕·알뜰왕)", str(keys))
+        check(keys == AREA_KEYS, "7개 영역 탭(늘봄왕·기억왕·건강왕·출석왕·모임왕·나눔왕·알뜰왕)", str(keys))
         labels = " ".join(t[1] for t in tabs)
-        check(all(k in labels for k in ["늘봄왕", "두뇌왕", "건강왕", "출석왕", "모임왕", "나눔왕", "알뜰왕"]),
+        check(all(k in labels for k in ["늘봄왕", "기억왕", "건강왕", "출석왕", "모임왕", "나눔왕", "알뜰왕"]),
               "영역 이름이 잘리지 않고 보임", labels)
         check(no_overflow(page) <= 0, "랭킹 탭 가로 넘침 없음", str(no_overflow(page)))
         check(not overflowing(page), "화면 밖으로 삐져나온 요소 없음", str(overflowing(page)[:2]))
@@ -384,12 +384,12 @@ def main():
                 page.screenshot(path=f"{SHOT}/_rank_p1_{key}.png")
                 shots.append(f"{SHOT}/_rank_p1_{key}.png")
 
-        # 두뇌왕 → 퀴즈
+        # 기억왕 → 퀴즈
         page.locator("[data-area-tab='brain']").first.click()
         page.wait_for_timeout(900)
         page.locator("[data-area-mission='brain'] button").first.click()
         page.wait_for_timeout(1500)
-        check("퀴즈" in active_tab(page), "두뇌왕 → 퀴즈 화면", active_tab(page))
+        check("퀴즈" in active_tab(page), "기억왕 → 퀴즈 화면", active_tab(page))
         nav(page, "랭킹")
 
         # 건강왕 → 건강 미션

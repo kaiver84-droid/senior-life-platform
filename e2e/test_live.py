@@ -141,7 +141,7 @@ def main():
 
         # ---------- 퀴즈 ----------
         nav.nth(2).click()
-        page.wait_for_selector("text=1분 두뇌 퀴즈", timeout=20000)
+        page.wait_for_selector("text=1분 치매예방 퀴즈", timeout=20000)
         res["quiz_intro"] = page.get_by_role("button", name="퀴즈 시작하기").is_visible()
         page.get_by_role("button", name="퀴즈 시작하기").click()
         page.wait_for_timeout(700)

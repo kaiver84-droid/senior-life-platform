@@ -205,7 +205,7 @@ def main():
     compose(
         [f"{TMP}/c_quiz.png", f"{TMP}/d_quiz_checked.png", f"{TMP}/f_cert.png"],
         f"{SHOT}/neulbom_quiz.png",
-        ["1분 두뇌 퀴즈 · 1/3 진행 바", "정답 확인 · 해설", "금빛 상장"],
+        ["1분 치매예방 퀴즈 · 1/3 진행 바", "정답 확인 · 해설", "금빛 상장"],
     )
     compose(
         [

@@ -287,7 +287,7 @@ def main():
                 page.wait_for_timeout(1000)
                 body = page.locator("main").inner_text()
                 ok = {
-                    "quiz": "1분 두뇌 퀴즈" in body,
+                    "quiz": "1분 치매예방 퀴즈" in body,
                     "welfare": "복지" in body,
                     "tools": "돋보기" in body,
                     "family": ("복약" in body or "가족" in body),

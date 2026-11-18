@@ -710,7 +710,7 @@ export async function renderCertificate(
   ctx.textAlign = "center";
   ctx.fillStyle = "#B07A16";
   ctx.font = `700 30px ${FONT}`;
-  ctx.fillText("제 1 회 · 1분 두뇌 퀴즈", W / 2, 130);
+  ctx.fillText("제 1 회 · 1분 치매예방 퀴즈", W / 2, 130);
 
   ctx.fillStyle = "#8A5A0B";
   ctx.font = `900 108px ${FONT}`;
@@ -722,7 +722,7 @@ export async function renderCertificate(
 
   ctx.fillStyle = "#3C4A63";
   ctx.font = `500 36px ${FONT}`;
-  ctx.fillText("위 분은 오늘의 두뇌 퀴즈를 훌륭히 마치셨으므로", W / 2, 444);
+  ctx.fillText("위 분은 오늘의 치매예방 퀴즈를 훌륭히 마치셨으므로", W / 2, 444);
   ctx.fillText("이 상장을 드립니다.", W / 2, 496);
 
   ctx.fillStyle = "#14213A";
@@ -837,7 +837,7 @@ export type ShareCardKind = "quiz" | "health" | "greeting" | "invite";
 
 export type ShareCardInput = {
   kind: ShareCardKind;
-  /** 위쪽 작은 배지 (예: 오늘의 두뇌 퀴즈) */
+  /** 위쪽 작은 배지 (예: 오늘의 치매예방 퀴즈) */
   badge: string;
   /** 오른쪽에 크게 놓는 이모지 */
   emoji: string;

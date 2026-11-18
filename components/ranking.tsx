@@ -1241,7 +1241,7 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
         <div className="min-w-0 flex-1">
           <p className="text-[0.98rem] font-black leading-snug text-ink">우리 모임과 이웃 순위가 궁금하세요?</p>
           <p className="mt-0.5 text-[0.85rem] font-semibold text-ink/55">
-            늘봄왕 · 두뇌왕 · 건강왕 · 출석왕 · 모임왕 · 나눔왕 · 알뜰왕
+            늘봄왕 · 기억왕 · 건강왕 · 출석왕 · 모임왕 · 나눔왕 · 알뜰왕
           </p>
         </div>
         <button

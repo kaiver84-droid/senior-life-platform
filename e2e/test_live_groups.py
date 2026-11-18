@@ -231,7 +231,7 @@ def main():
 
         # ---------- 퀴즈 ----------
         nav_button(page, "퀴즈").click()
-        page.wait_for_selector("text=1분 두뇌 퀴즈", timeout=20000)
+        page.wait_for_selector("text=1분 치매예방 퀴즈", timeout=20000)
         page.wait_for_timeout(1200)
         quiz = page.inner_text("main")
         check("우리 모임 공동 퀴즈" in quiz, "퀴즈 상단 ‘우리 모임 공동 퀴즈’ 배지")

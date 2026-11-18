@@ -25,7 +25,7 @@ export const IconHome = ({ className, size }: P) => (
   </svg>
 );
 
-/** 두뇌(퀴즈) */
+/** 기억(치매예방 퀴즈) */
 export const IconQuiz = ({ className, size }: P) => (
   <svg {...base(size)} className={className} aria-hidden>
     <path d="M12 4.4a2.9 2.9 0 0 0-2.9 2.7A2.7 2.7 0 0 0 7.3 12a2.9 2.9 0 0 0 1.4 4.9A2.8 2.8 0 0 0 12 19.6Z" />

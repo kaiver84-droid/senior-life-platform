@@ -160,7 +160,7 @@ export const BADGES: BadgeDef[] = [
   },
   {
     id: "brain",
-    label: "두뇌 박사",
+    label: "기억 박사",
     emoji: "🧠",
     how: "퀴즈 정답 50문제를 모으면 받아요",
     goal: 50,

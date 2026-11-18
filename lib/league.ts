@@ -106,7 +106,7 @@ export const LEAGUE_AREAS: LeagueAreaInfo[] = [
     desc: "출석·퀴즈·건강·모임·나눔·절약을 모두 합친 주간 종합 리그",
     action: "오늘의 종합 미션 보기",
   },
-  { key: "brain", label: "두뇌왕", emoji: "🧠", desc: "이번 주 퀴즈 점수와 정답률로 겨루는 순위", action: "오늘의 추가 퀴즈 풀기" },
+  { key: "brain", label: "기억왕", emoji: "🧠", desc: "이번 주 퀴즈 점수와 정답률로 겨루는 순위", action: "오늘의 추가 퀴즈 풀기" },
   { key: "health", label: "건강왕", emoji: "🏃", desc: "건강 미션을 많이 실천한 사람 순위", action: "건강 미션 하러 가기" },
   { key: "attend", label: "출석왕", emoji: "🔥", desc: "이번 주에 출석한 날이 많은 사람 순위", action: "출석 체크하기" },
   { key: "group", label: "모임왕", emoji: "👥", desc: "우리 모임과 단체별 참여 순위", action: "우리 모임 미션 보기" },

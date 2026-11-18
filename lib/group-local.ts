@@ -52,7 +52,7 @@ function seed(): LocalDb {
   const demo: LocalGroup = {
     id: DEMO_GROUP_ID,
     name: "우리 가족 사랑방",
-    description: "온 가족이 함께 두뇌 퀴즈로 건강을 챙기는 체험 모임이에요",
+    description: "온 가족이 함께 치매예방 퀴즈로 건강을 챙기는 체험 모임이에요",
     goalScore: 500,
     weeklyGoal: 5,
     creatorCode: DEMO_MEMBERS[0].code,

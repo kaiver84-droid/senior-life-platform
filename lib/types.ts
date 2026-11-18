@@ -107,7 +107,7 @@ export type RankingResult = {
   sample: boolean;
   /** 초대왕 순위에서 내가 초대한 사람 수 */
   myInvites?: number;
-  /** 이 순위표가 보여 주는 영역(늘봄왕·두뇌왕 …) */
+  /** 이 순위표가 보여 주는 영역(늘봄왕·기억왕 …) */
   area?: string;
   /** 내 순위 격차 안내에 쓰는 값 */
   myGap?: {

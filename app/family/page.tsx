@@ -329,7 +329,7 @@ function Dashboard() {
 
       <Card className="mb-3 p-4">
         <SectionTitle emoji="🧠" right={<Badge tone="leaf">🔥 {parentStreak}일 연속</Badge>}>
-          오늘의 두뇌 활동
+          오늘의 기억 활동
         </SectionTitle>
         <p className="text-[1rem] font-black">
           {todayLogs.length > 0 ? `퀴즈 ${todayLogs[0].correct}/${todayLogs[0].total} 정답` : "아직 퀴즈를 하지 않았어요"}

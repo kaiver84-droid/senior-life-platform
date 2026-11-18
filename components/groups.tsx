@@ -243,7 +243,7 @@ export function GroupMissionBanner({ onJoin }: { onJoin: () => void }) {
         </span>
       </div>
       <p className="mt-1.5 text-[0.98rem] font-black leading-snug text-ink">
-        🎁 오늘의 두뇌 퀴즈 맞히고,
+        🎁 오늘의 치매예방 퀴즈 맞히고,
         <br />
         모임 랭킹에 도전하세요!
       </p>
@@ -1114,7 +1114,7 @@ function GroupSheet({
             <textarea
               id="group-edit-desc"
               className="field min-h-[88px] resize-none"
-              placeholder="예) 매일 아침 함께 두뇌 퀴즈를 풀어요"
+              placeholder="예) 매일 아침 함께 치매예방 퀴즈를 풀어요"
               value={editDesc}
               maxLength={80}
               onChange={(e) => setEditDesc(e.target.value)}
@@ -1155,7 +1155,7 @@ function GroupSheet({
             badge: "우리 모임 초대",
             emoji: "👥",
             headline: `${detail.name}에 함께해요`,
-            sub: `초대 번호 ${detail.id} · 두뇌 퀴즈로 순위를 겨뤄요`,
+            sub: `초대 번호 ${detail.id} · 치매예방 퀴즈로 순위를 겨뤄요`,
             message: "누르면 바로 모임에 들어와요.",
             stats: [
               { value: `${detail.memberCount}명`, label: "모임원" },
@@ -1164,7 +1164,7 @@ function GroupSheet({
             name: profile?.nickname,
             dateLabel: koreanDate(today),
             title: `[늘봄] ${detail.name}에 초대합니다`,
-            description: `초대 번호 ${detail.id} · 함께 두뇌 퀴즈 풀고 순위를 겨뤄요!`,
+            description: `초대 번호 ${detail.id} · 함께 치매예방 퀴즈 풀고 순위를 겨뤄요!`,
             buttonTitle: "모임 들어가기",
             text: `${profile?.nickname || "가족"} 님이 ${detail.name}에 초대했어요! 초대 번호 ${detail.id}`,
             link,

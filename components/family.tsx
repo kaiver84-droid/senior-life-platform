@@ -122,7 +122,7 @@ export function FamilyTab({
         <div className="mt-1 space-y-1.5">
           <ActivityRow
             icon={<IconQuiz size={20} />}
-            title="두뇌 퀴즈"
+            title="치매예방 퀴즈"
             sub={todayDaily?.done ? `${todayDaily.correct}문제 정답` : "아직 안 했어요"}
             done={Boolean(todayDaily?.done)}
             action={

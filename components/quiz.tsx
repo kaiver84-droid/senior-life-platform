@@ -94,7 +94,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   const start = () => startSet(dailyQs, false);
 
   /**
-   * 연습 모드: 점수·연속 출석·순위와 무관한 두뇌 훈련용 3문제.
+   * 연습 모드: 점수·연속 출석·순위와 무관한 기억 훈련용 3문제.
    * `only` 를 주면 그 주제(초성·노래·그림·OX·넌센스)에서만 3문제를 낸다.
    */
   const startPractice = (excludeFrom?: Question[], only?: QuizType) => {
@@ -145,8 +145,8 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
     <div className="space-y-4">
       <section className="fade-up flex items-start justify-between gap-2 pt-1">
         <div>
-          <p className="text-[0.86rem] font-extrabold tracking-tight text-brand-dark/80">오늘의 두뇌 건강</p>
-          <h1 className="mt-0.5 text-[1.5rem] font-black leading-tight text-ink">1분 두뇌 퀴즈</h1>
+          <p className="text-[0.86rem] font-extrabold tracking-tight text-brand-dark/80">오늘의 기억 건강</p>
+          <h1 className="mt-0.5 text-[1.5rem] font-black leading-tight text-ink">1분 치매예방 퀴즈</h1>
           <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
             하루 3문제 · 이번 주 {weekPoints}점 {streak > 0 ? `· 🔥 ${streak}일 연속` : ""}
           </p>
@@ -178,7 +178,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
         <Card className="fade-up overflow-hidden p-5">
           <div className="rounded-[1.4rem] bg-gradient-to-br from-sky to-[#F4F9FD] p-5 text-center">
             <div className="mx-auto w-fit drop-shadow-[0_10px_18px_rgba(120,60,80,0.18)]">
-              <Icon3D name="icon-3d-brain" size={78} alt="두뇌" />
+              <Icon3D name="icon-3d-brain" size={78} alt="치매예방 퀴즈" />
             </div>
             <p className="mt-2 text-[1.15rem] font-black leading-snug text-ink">
               오늘의 3문제가
@@ -528,7 +528,7 @@ function PracticeResult({
       <p className="mt-2 text-[0.85rem] font-semibold leading-relaxed text-ink/55">
         연습 모드는 점수와 순위에 들어가지 않아요.
         <br />
-        마음 편히 두뇌 훈련으로 즐겨 주세요.
+        마음 편히 기억 훈련으로 즐겨 주세요.
       </p>
       <div className="mt-4 space-y-2">
         <BigButton variant="ink" size="lg" full onClick={onAgain}>
@@ -572,7 +572,7 @@ function ResultAndCertificate({
   }, [profile, today, show]);
 
   const praise =
-    correct === total ? "완벽해요! 오늘 두뇌가 아주 맑아요" : correct > 0 ? "잘하셨어요! 내일도 함께해요" : "괜찮아요. 내일 다시 도전해요";
+    correct === total ? "완벽해요! 오늘 기억력이 아주 좋아요" : correct > 0 ? "잘하셨어요! 내일도 함께해요" : "괜찮아요. 내일 다시 도전해요";
 
   return (
     <>
@@ -661,7 +661,7 @@ function ResultAndCertificate({
         sourceCanvas={canvasRef}
         data={{
           kind: "quiz",
-          badge: "오늘의 두뇌 퀴즈",
+          badge: "오늘의 치매예방 퀴즈",
           emoji: correct === total ? "🏆" : "🧠",
           headline: `${profile?.nickname || "가족"} 님, ${total}문제 중 ${correct}문제 정답!`,
           sub: `오늘 ${points}점을 모았어요.`,
@@ -674,14 +674,14 @@ function ResultAndCertificate({
           dateLabel: koreanDate(today),
           title:
             share === "group"
-              ? `${profile?.nickname || "가족"} 님의 오늘 두뇌 퀴즈 결과`
-              : `${profile?.nickname || "가족"} 님의 두뇌 퀴즈 상장`,
+              ? `${profile?.nickname || "가족"} 님의 오늘 치매예방 퀴즈 결과`
+              : `${profile?.nickname || "가족"} 님의 치매예방 퀴즈 상장`,
           description:
             share === "group" && groupDetail
               ? `${total}문제 중 ${correct}문제 정답! ${groupDetail.name}에서 함께 겨뤄요.`
               : `정답 ${correct}문제 · ${points}점`,
           buttonTitle: share === "group" ? "모임에서 함께하기" : "나도 해보기",
-          text: `오늘의 두뇌 퀴즈 ${correct}/${total}문제 정답! ${points}점 (늘봄)`,
+          text: `오늘의 치매예방 퀴즈 ${correct}/${total}문제 정답! ${points}점 (늘봄)`,
           link:
             share === "group" && groupDetail
               ? inviteLink(groupDetail.id) || siteOrigin()
