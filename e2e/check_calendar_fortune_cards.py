@@ -166,13 +166,19 @@ with sync_playwright() as p:
     page = ctx.new_page()
     console_errors, page_errors, http_errors = [], [], []
 
+    # 이 점검은 카카오 로그인 왕복을 가짜로 처리하며 카카오 SDK CDN(t1.kakaocdn.net)을 일부러 막는다.
+    # 그 차단으로 생기는 ERR_FAILED 는 사이트 오류가 아니므로 세지 않는다(그 외는 모두 센다).
     def keep(text, url=""):
+        if "kakaocdn.net" in url:
+            return False
         # 로컬 정적 서버(out/)는 /api/* 를 서빙하지 않으므로 로컬 실행에서는 빼고 센다
         return LIVE or "/api/" not in url
 
     page.on(
         "console",
-        lambda m: console_errors.append(m.text)
+        lambda m: console_errors.append(
+            f"{m.text} @ {(m.location or {}).get('url', '')}"
+        )
         if m.type == "error" and keep(m.text, (m.location or {}).get("url", ""))
         else None,
     )
@@ -240,6 +246,19 @@ with sync_playwright() as p:
         )
         page.wait_for_timeout(500)
         page.screenshot(path=f"{OUT}/_cards_{label.replace(' ', '_')}.png")
+        if label == "보통":
+            # 보고용 — 달력·운세 카드 두 개가 한눈에 들어오는 영역만 담는다
+            clip = page.evaluate(
+                """() => {
+                  const b = Array.from(document.querySelectorAll('main button'))
+                    .find(x => /달력 보기/.test(x.textContent || ''));
+                  const grid = b.parentElement.getBoundingClientRect();
+                  const top = Math.max(0, grid.top - 2);
+                  return { x: 0, y: top, width: document.documentElement.clientWidth,
+                           height: Math.min(window.innerHeight - top - 8, grid.height + 4) };
+                }"""
+            )
+            page.screenshot(path=f"{OUT}/neulbom_calendar_fortune_fix.png", clip=clip)
 
         sim = page.evaluate(SAFARI_SIM)
         print("    사파리 흉내:", json.dumps(sim, ensure_ascii=False))
