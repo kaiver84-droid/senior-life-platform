@@ -3,7 +3,7 @@
 검증 범위
 1) 홈: 오늘의 건강 챌린지 카드 → 원터치 도장 2개 → 새로고침 뒤에도 유지
 2) 다른 기기(새 브라우저)로 같은 카카오 계정 로그인 → Supabase 에 저장된 도장 복원
-3) 퀴즈: 주제 골라 풀기(OX 2지선다 · 넌센스 4지선다) + 기존 하루 3문제 흐름
+3) 퀴즈: 주제 골라 풀기(OX 2지선다 · 넌센스 4지선다) + 기존 하루 5문제 흐름
 4) 카카오톡 공유 미리보기 시트(건강 기록 · 퀴즈 상장) + 복사 폴백
 5) 모임 탭: 체험 모임(FAM101) 가입 → 모임 건강 챌린지 함께 달성률
 6) 기존 기능 회귀: 하단 탭 6개 · 홈 인사카드/운세/날씨/달력 · 더보기 도구/가족 · 랭킹 4탭
@@ -267,14 +267,14 @@ def main():
         check(page.locator("[data-quiz-option]").count() == 4, "넌센스 4지선다")
         check(page.get_by_text("힌트:").first.is_visible(), "넌센스 힌트 표시")
 
-        # 기존 하루 3문제 흐름 (점수 반영) — 새로고침으로 퀴즈 첫 화면으로 돌아간다
+        # 기존 하루 5문제 흐름 (점수 반영) — 새로고침으로 퀴즈 첫 화면으로 돌아간다
         page.reload(wait_until="domcontentloaded")
         page.wait_for_selector("text=퀴즈 시작하기", timeout=30000)
         page.wait_for_timeout(900)
         page.get_by_role("button", name="퀴즈 시작하기").click()
         page.wait_for_timeout(800)
         daily_types = []
-        for i in range(3):
+        for i in range(5):
             badge = page.locator("main").inner_text()
             for label in ["초성 퀴즈", "옛날 노래 가사", "틀린 그림 찾기", "OX 건강 상식", "넌센스·아재개그"]:
                 if label in badge:
@@ -287,7 +287,7 @@ def main():
             page.get_by_role("button", name=re.compile("^(다음 문제|결과 보기)$")).click()
             page.wait_for_timeout(500)
         page.wait_for_selector("text=오늘의 퀴즈 결과", timeout=20000)
-        check(len(daily_types) == 3, "하루 3문제 정상 진행", " / ".join(daily_types))
+        check(len(daily_types) == 5, "하루 5문제 정상 진행", " / ".join(daily_types))
         check(page.get_by_role("button", name=re.compile("금빛 상장 만들기")).is_visible(), "금빛 상장 버튼 유지")
 
         # 상장 공유 미리보기

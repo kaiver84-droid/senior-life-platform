@@ -55,7 +55,7 @@ export const LEAGUE_MISSIONS: LeagueMission[] = [
     label: "오늘의 퀴즈 완료",
     emoji: "🧠",
     points: LEAGUE_POINTS.quiz,
-    note: "하루 1번 · 3문제",
+    note: "하루 1번 · 5문제",
     area: "brain",
     action: "오늘의 추가 퀴즈 풀기",
   },
@@ -73,16 +73,16 @@ export const LEAGUE_MISSIONS: LeagueMission[] = [
     label: "복지·생활정보 확인",
     emoji: "💰",
     points: LEAGUE_POINTS.welfare,
-    note: "하루 1번 · 혜택 자세히 보기",
+    note: "하루 1번 · 혜택 보기",
     area: "save",
     action: "복지·혜택 보러 가기",
   },
   {
     id: "group",
-    label: "모임 공동 미션 참여",
+    label: "모임 미션 참여",
     emoji: "👥",
     points: LEAGUE_POINTS.group,
-    note: "하루 1번 · 우리 모임 미션",
+    note: "하루 1번 · 모임 미션",
     area: "group",
     action: "우리 모임 미션 보기",
   },
@@ -167,7 +167,7 @@ export type DayActivity = {
   date: string;
   /** 앱을 열어 출석 도장을 찍었는지 */
   attend: boolean;
-  /** 그날 퀴즈를 풀었는지(3문제 이상 또는 참여) */
+  /** 그날 퀴즈를 풀었는지(5문제 또는 참여) */
   quiz: boolean;
   /** 건강 미션을 1개 이상 했는지 */
   health: boolean;

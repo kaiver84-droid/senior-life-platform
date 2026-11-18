@@ -57,7 +57,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   const { show } = useToast();
   const dailyQs = useMemo(() => dailyQuestions(today), [today]);
   const [mode, setMode] = useState<"intro" | "play" | "done" | "practiceDone">(todayDaily?.done ? "done" : "intro");
-  /** 지금 풀고 있는 문제 세트 (오늘의 3문제 또는 연습 3문제) */
+  /** 지금 풀고 있는 문제 세트 (오늘의 5문제 또는 연습 3문제) */
   const [qs, setQs] = useState<Question[]>(dailyQs);
   const [isPractice, setIsPractice] = useState(false);
   const [index, setIndex] = useState(0);
@@ -196,7 +196,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           <p className="text-[0.86rem] font-extrabold tracking-tight text-brand-dark/80">오늘의 기억 건강</p>
           <h1 className="mt-0.5 text-[1.5rem] font-black leading-tight text-ink">1분 치매예방 퀴즈</h1>
           <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
-            하루 3문제 · 이번 주 {weekPoints}점 {streak > 0 ? `· 🔥 ${streak}일 연속` : ""}
+            하루 5문제 · 이번 주 {weekPoints}점 {streak > 0 ? `· 🔥 ${streak}일 연속` : ""}
           </p>
         </div>
         <span className="grid h-11 w-11 place-items-center rounded-full bg-gold-light text-gold-dark">
@@ -220,7 +220,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
               <Icon3D name="icon-3d-brain" size={78} alt="치매예방 퀴즈" />
             </div>
             <p className="mt-2 text-[1.15rem] font-black leading-snug text-ink">
-              오늘의 3문제가
+              오늘의 5문제가
               <br />
               준비됐어요
             </p>
@@ -542,7 +542,7 @@ function QuizCheerBanner() {
   return (
     <div className="relative flex items-end justify-between gap-1 overflow-hidden rounded-[1.6rem] bg-gradient-to-r from-[#FFF6E2] via-[#FFFCF2] to-[#F8F4E6] pl-4 pr-0.5 shadow-soft">
       <div className="pb-4 pt-4">
-        <p className="hand text-[1.42rem] leading-[1.18] text-ink">하루 3문제로</p>
+        <p className="hand text-[1.42rem] leading-[1.18] text-ink">하루 5문제로</p>
         <p className="hand text-[1.42rem] leading-[1.18] text-ink">
           가볍게! <span className="text-coral">♡</span>
         </p>
@@ -687,7 +687,7 @@ function ResultAndCertificate({
           </div>
         ) : null}
         <p className="mt-2 text-[0.82rem] font-semibold leading-relaxed text-ink/50">
-          내일 0시에 새로운 3문제가 열려요.
+          내일 0시에 새로운 5문제가 열려요.
           <br />
           매주 월요일 0시에 순위가 새로 시작됩니다.
         </p>
@@ -699,7 +699,7 @@ function ResultAndCertificate({
           <div className="flex-1">
             <p className="text-[1.02rem] font-black leading-snug text-ink">다른 문제 더 풀어보기</p>
             <p className="mt-1 text-[0.85rem] font-semibold leading-relaxed text-ink/55">
-              연습 모드로 새 3문제를 계속 풀 수 있어요. 점수·순위에는 들어가지 않아요.
+              연습 모드로 계속 풀 수 있어요. 점수·순위에는 들어가지 않아요.
             </p>
           </div>
         </div>

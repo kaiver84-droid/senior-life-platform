@@ -68,7 +68,7 @@ for (let i = 0; i < 120; i++) {
   const qs = dailyQuestions(d);
   qs.forEach((q) => dailySeen.add(q.id));
   if (i === 0) {
-    check(qs.length === 3 && new Set(qs.map((q) => q.id)).size === 3, "일일 퀴즈는 3문제(서로 다른 문제)", qs.map((q) => q.id).join(", "));
+    check(qs.length === 5 && new Set(qs.map((q) => q.id)).size === 5, "일일 퀴즈는 5문제(서로 다른 문제)", qs.map((q) => q.id).join(", "));
   }
 }
 const dailyNew = [...dailySeen].filter((id) => newSet.has(id));

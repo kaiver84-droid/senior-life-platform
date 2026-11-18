@@ -4541,19 +4541,25 @@ function hashStr(s: string): number {
   return h >>> 0;
 }
 
+/** 오늘의 공식 퀴즈 문제 수 — 2026-11-19 사용자 요청으로 3 → 5문제 */
+export const DAILY_QUIZ_COUNT = 5;
+
 /**
- * 그날의 3문제 — 날짜가 같으면 항상 같다.
- * 1번은 초성, 2번은 옛날 노래로 고정하고, 3번은 틀린 그림·OX·넌센스를 날짜에 따라 돌아가며 낸다.
- * 그래서 며칠만 풀어도 OX·넌센스 문제를 자연스럽게 만나게 된다.
+ * 그날의 5문제 — 날짜가 같으면 항상 같다.
+ * 1번은 초성, 2번은 옛날 노래로 고정하고, 3~5번은 틀린 그림·OX·넌센스를 날짜에 따라
+ * 순서만 바꿔 하나씩 낸다. 그래서 하루만 풀어도 서로 다른 유형 5가지를 모두 만나게 된다.
  */
 export function dailyQuestions(date: string): Question[] {
   const c = CHOSEONG[hashStr(date + "|ch") % CHOSEONG.length];
   const l = LYRICS[hashStr(date + "|ly") % LYRICS.length];
   const rotating: Question[][] = [SPOT, OX, NONSENSE];
-  const slot = hashStr(date + "|third") % rotating.length;
-  const pool = rotating[slot];
-  const third = pool[hashStr(date + "|t" + slot) % pool.length];
-  return [c, l, third];
+  const start = hashStr(date + "|third") % rotating.length;
+  const picked: Question[] = [];
+  for (let i = 0; i < DAILY_QUIZ_COUNT - 2; i++) {
+    const pool = rotating[(start + i) % rotating.length];
+    picked.push(pool[hashStr(date + "|r" + i) % pool.length]);
+  }
+  return [c, l, ...picked];
 }
 
 function pickRandom(pool: Question[], avoid: Set<string>): Question {
