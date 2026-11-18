@@ -297,28 +297,31 @@ export function HomeTab({
         </span>
       </button>
 
-      {/* 가족안부달력 · 오늘의 운세 — 나란히 두 칸 */}
+      {/* 가족안부달력 · 오늘의 운세 — 나란히 두 칸
+          아이폰 사파리는 <button> 안의 flex 자식을 기본값으로 늘리지 않아
+          알약 버튼이 글자 폭만큼만 작아지고 왼쪽에 붙는다 → w-full 을 직접 준다. */}
       <div className="fade-up grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={() => onOpenCalendar?.()}
-          className="flex min-w-0 flex-col rounded-[1.25rem] bg-[#F3EEFF] px-2.5 py-1.5 text-left shadow-soft active:scale-[0.995]"
+          className="flex w-full min-w-0 flex-col rounded-[1.25rem] bg-[#F3EEFF] p-3 text-left shadow-soft active:scale-[0.995]"
         >
-          <span className="flex items-center gap-1">
+          <span className="flex w-full items-center gap-1">
             <span aria-hidden className="shrink-0 text-[1rem] leading-none">
               📅
             </span>
-            <span className="min-w-0 flex-1 text-[0.9rem] font-black leading-tight text-ink">
-              가족안부달력
+            {/* 좁은 2열 카드라 ‘가족안부달력’은 단어 중간에서 끊기지 않도록
+                제로폭 띄어쓰기로 ‘가족안부 / 달력’ 자리만 끊을 수 있게 둔다 */}
+            <span className="min-w-0 flex-1 break-words text-[1rem] font-black leading-tight text-ink">
+              가족안부{"\u200B"}달력
             </span>
-            <IconChevron size={15} className="shrink-0 text-plum-dark/40" />
           </span>
-          <span className="mt-1 block min-h-[2.2rem] text-[0.78rem] font-bold leading-snug text-ink/60">
+          <span className="mt-1.5 block min-h-[2.2rem] flex-1 break-words text-[0.78rem] font-bold leading-snug text-ink/60">
             {nextEvent
               ? `${nextEvent.event.title} ${ddayLabel(nextEvent.days)}`
               : "생일·기념일을 챙겨 보세요"}
           </span>
-          <span className="mt-auto flex min-h-[36px] items-center justify-center rounded-full bg-plum text-[0.82rem] font-black text-white">
+          <span className="mt-3 flex min-h-[40px] w-full items-center justify-center rounded-full bg-plum px-3 text-[clamp(15px,0.9rem,20px)] font-black leading-tight text-white">
             달력 보기
           </span>
         </button>
@@ -326,21 +329,20 @@ export function HomeTab({
         <button
           type="button"
           onClick={() => setFortuneOpen(true)}
-          className="flex min-w-0 flex-col rounded-[1.25rem] bg-[#E9F7EE] px-2.5 py-1.5 text-left shadow-soft active:scale-[0.995]"
+          className="flex w-full min-w-0 flex-col rounded-[1.25rem] bg-[#E9F7EE] p-3 text-left shadow-soft active:scale-[0.995]"
         >
-          <span className="flex items-center gap-1">
+          <span className="flex w-full items-center gap-1">
             <span aria-hidden className="shrink-0 text-[1rem] leading-none">
               🌙
             </span>
-            <span className="min-w-0 flex-1 text-[0.9rem] font-black leading-tight text-ink">
+            <span className="min-w-0 flex-1 break-words text-[1rem] font-black leading-tight text-ink">
               오늘의 운세
             </span>
-            <IconChevron size={15} className="shrink-0 text-leaf-dark/40" />
           </span>
-          <span className="mt-1 block min-h-[2.2rem] text-[0.78rem] font-bold leading-snug text-ink/60">
+          <span className="mt-1.5 block min-h-[2.2rem] flex-1 break-words text-[0.78rem] font-bold leading-snug text-ink/60">
             {fortune.headline}
           </span>
-          <span className="mt-auto flex min-h-[36px] items-center justify-center rounded-full bg-leaf text-[0.82rem] font-black text-white">
+          <span className="mt-3 flex min-h-[40px] w-full items-center justify-center rounded-full bg-leaf px-3 text-[clamp(15px,0.9rem,20px)] font-black leading-tight text-white">
             운세 보기
           </span>
         </button>
