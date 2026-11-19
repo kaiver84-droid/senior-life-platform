@@ -282,10 +282,14 @@ with sync_playwright() as p:
         page.evaluate("() => window.scrollTo(0, 0)")
         page.wait_for_timeout(300)
         page.screenshot(path=f"{SHOT}/_rate_group_top_{tag_of.get(label, str(root))}.png")
+        if label == "아주 크게":
+            page.screenshot(path=f"{SHOT}/neulbom_group_rate_1line.png")
         if g:
             page.locator("[data-weekly-gauge]").scroll_into_view_if_needed()
             page.wait_for_timeout(300)
             page.locator("[data-weekly-gauge]").locator("xpath=..").screenshot(path=f"{SHOT}/_rate_gauge_{tag_of.get(label, str(root))}.png")
+            if label == "아주 크게":
+                page.locator("[data-weekly-gauge]").locator("xpath=..").screenshot(path=f"{SHOT}/neulbom_group_rate_gauge_1line.png")
             page.evaluate("() => window.scrollTo(0, 0)")
             page.wait_for_timeout(300)
 
@@ -302,6 +306,8 @@ with sync_playwright() as p:
         page.locator("[data-weekly-rate='home']").scroll_into_view_if_needed()
         page.wait_for_timeout(300)
         page.screenshot(path=f"{SHOT}/_rate_home_{tag_of.get(label, str(root))}.png")
+        if label == "아주 크게":
+            page.locator("[data-weekly-rate='home']").locator("xpath=ancestor::button[1]").screenshot(path=f"{SHOT}/neulbom_group_rate_home_1line.png")
 
         kept[label] = {
             "root": info["root"],
@@ -316,7 +322,9 @@ with sync_playwright() as p:
             page.get_by_role("navigation").get_by_role("button", name="모임").click()
             page.wait_for_timeout(1200)
 
-    # 보고용 대표 캡처 — 아주 크게 모임 화면 상단
+    # 보고용 대표 캡처 — 아주 크게 모임 화면 상단(부제의 ‘이번 주 달성률 N%’가 한 줄)
+    page.get_by_role("navigation").get_by_role("button", name="모임").click()
+    page.wait_for_timeout(1200)
     page.evaluate("() => window.scrollTo(0, 0)")
     page.wait_for_timeout(400)
     page.screenshot(path=f"{SHOT}/neulbom_group_rate_1line.png")
