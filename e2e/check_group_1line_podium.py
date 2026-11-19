@@ -321,10 +321,16 @@ def set_state(page, font_size: int):
 def open_group(page):
     page.get_by_role("navigation").get_by_role("button", name="모임").click()
     page.wait_for_timeout(1600)
-    demo = page.get_by_role("button", name=re.compile("체험 모임 들어가기"))
-    if demo.count():
-        demo.first.click()
-        page.wait_for_timeout(2500)
+    # 체험 모임에 들어간 화면(부제 달성률 표시)이 뜰 때까지 다시 시도한다
+    for _ in range(3):
+        if page.locator('[data-weekly-rate="sub"]').count():
+            return
+        demo = page.get_by_role("button", name=re.compile("체험 모임 들어가기"))
+        if demo.count():
+            demo.first.click()
+            page.wait_for_timeout(2500)
+        else:
+            page.wait_for_timeout(1200)
 
 
 def open_ranking(page):
