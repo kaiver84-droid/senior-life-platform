@@ -26,9 +26,7 @@ import {
   ageBandOf,
   areaInfo,
   formatAreaValue,
-  gapMessage,
   leagueWeek,
-  myAreaValue,
   weekDatesOf,
   type LeagueArea,
 } from "@/lib/league";
@@ -416,21 +414,15 @@ function RestList({ rows, area }: { rows: RankingResult["rows"]; area: LeagueAre
 function MyRankCard({
   view,
   area,
-  localValue,
   localNote,
-  notice,
   onOpenBadges,
 }: {
   view: RankingResult;
   area: LeagueArea;
-  localValue: number;
   localNote?: string;
-  /** 내 순위가 없는 이유를 알려 줄 한 줄 */
-  notice?: string;
   onOpenBadges: () => void;
 }) {
   const { rankingVisible, setRankingVisible, profile, streak, weekPoints } = useApp();
-  const info = areaInfo(area);
   // 훅은 조건 없이 늘 같은 순서로 불러야 한다(참여 OFF 여도 계산만 해 둔다).
   const gradeProfile = useGradeProfile();
   const g = gradeProfile.grade;
@@ -470,27 +462,8 @@ function MyRankCard({
     );
   }
 
-  const gap = view.myGap;
   const rank = view.myRank;
-  const display = view.myDisplay ?? formatAreaValue(area, localValue);
   const note = view.myNote ?? localNote;
-  const change = view.myChange;
-  const changeHead = typeof change === "number" ? "지난주보다" : "이번 주";
-  const changeMain =
-    typeof change === "number"
-      ? change > 0
-        ? `${change}계단 상승했어요!`
-        : change < 0
-          ? `${Math.abs(change)}계단 내려갔어요`
-          : "지난주와 같은 자리예요"
-      : rank
-        ? "순위에 올랐어요!"
-        : "이번 주 순위를 준비 중이에요";
-  const goalLine = rank
-    ? rank === 1
-      ? "이 자리를 지켜 봐요 👑"
-      : `다음 목표는 ${rank - 1}위예요!`
-    : "오늘 미션 하나면 순위가 생겨요";
 
   return (
     <Card
@@ -501,44 +474,37 @@ function MyRankCard({
       data-grade-points={gradeProfile.totalPoints}
       data-grade-next={gradeProfile.next ? gradeProfile.next.label : "none"}
     >
-      {/* 히어로 — 사진(월계관·왕관) + 순위 변화 · 다음 목표 */}
-      <div className="relative flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
+      {/* 히어로 — 사진(월계관·왕관) + 이름 + 내 순위 */}
+      <div className="relative flex items-center gap-3 px-3.5 pb-2.5 pt-3">
         <IconTrophy
           size={26}
           className="pointer-events-none absolute right-2.5 top-2.5 text-gold-dark/70"
         />
-        <div className="flex w-[4.6rem] shrink-0 flex-col items-center">
-          <div className="relative">
-            <span aria-hidden className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-gold via-sun-light to-gold-dark opacity-90" />
-            <span aria-hidden className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2 text-[0.95rem] leading-none">
-              👑
-            </span>
-            <span className="relative block rounded-full border-2 border-white bg-white p-0.5 shadow-soft">
-              <Avatar
-                name={profile?.nickname || "나"}
-                src={profile?.avatarUrl || profile?.avatar}
-                size={44}
-                ring="ring-2 ring-white"
-              />
-            </span>
-          </div>
-          <span
-            data-my-rank-ribbon
-            className="relative z-10 -mt-1.5 max-w-full truncate rounded-full bg-gradient-to-r from-gold to-sun px-1.5 py-0.5 text-center text-[0.62rem] font-black leading-tight text-[#6B4B00] shadow-soft"
-          >
-            {rank ? `내 순위 ${rank}위` : "순위 준비 중"}
+        <div className="relative shrink-0">
+          <span aria-hidden className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-gold via-sun-light to-gold-dark opacity-90" />
+          <span aria-hidden className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2 text-[0.95rem] leading-none">
+            👑
+          </span>
+          <span className="relative block rounded-full border-2 border-white bg-white p-0.5 shadow-soft">
+            <Avatar
+              name={profile?.nickname || "나"}
+              src={profile?.avatarUrl || profile?.avatar}
+              size={48}
+              ring="ring-2 ring-white"
+            />
           </span>
         </div>
 
-        <div className="min-w-0 flex-1 pr-6">
-          <p className="text-[0.68rem] font-bold leading-tight text-ink/50">{changeHead}</p>
-          <p className="mt-0.5 text-[0.96rem] font-black leading-tight text-ink">{changeMain}</p>
-          <p className="mt-0.5 text-[0.74rem] font-bold leading-tight text-brand-deep">{goalLine}</p>
-          <p data-rank-gap className="mt-0.5 text-[0.68rem] font-semibold leading-tight text-ink/50">
-            {!rank && notice
-              ? notice
-              : gapMessage({ rank, aheadDiff: gap?.aheadDiff, top10Diff: gap?.top10Diff, total: view.total })}
+        <div className="min-w-0 flex-1 pr-7">
+          <p className="truncate text-[1.08rem] font-black leading-tight text-ink">
+            {profile?.nickname || "나"} 님
           </p>
+          <span
+            data-my-rank-ribbon
+            className="mt-1 inline-block max-w-full truncate rounded-full bg-gradient-to-r from-gold to-sun px-2 py-0.5 text-[0.8rem] font-black leading-tight text-[#6B4B00] shadow-soft"
+          >
+            {rank ? `내 순위 ${rank}위` : "순위 준비 중"}
+          </span>
         </div>
       </div>
 
@@ -1409,11 +1375,6 @@ export function RankingBoard({
   // 내 순위 카드를 맨 위에 두려고 조회를 이 자리로 올렸다(순위표는 view 를 그대로 받아 그린다).
   const { view, loading } = useAreaRanking(area, range, band);
   const summaries = useAreaSummaries(range, band, area);
-  const invites = view.invitesByDay ?? invitesByDay;
-  const localValue =
-    area === "all"
-      ? leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay: invites }).total
-      : myAreaValue(area, { ...state, missions: state.missions ?? {} }, { today, invites: view.myInvites });
 
   const myTotal = leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay }).total;
   /** 모임 랭킹 화면은 모임 안 순위 카드를 따로 쓰므로 통합 카드를 숨긴다 */
@@ -1464,7 +1425,6 @@ export function RankingBoard({
         <MyRankCard
           view={view}
           area={area}
-          localValue={localValue}
           onOpenBadges={onOpenBadges ?? (() => {})}
         />
       ) : null}
