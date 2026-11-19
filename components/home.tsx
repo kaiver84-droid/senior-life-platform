@@ -351,6 +351,7 @@ export function HomeTab({
       {/* 안부 인사 보내기 — 한 줄 */}
       <button
         type="button"
+        data-home-greeting
         onClick={() => setStudio({ open: true, autoShare: false })}
         className="fade-up flex w-full items-center gap-2.5 rounded-[1.25rem] bg-white px-3 py-1.5 text-left shadow-soft active:scale-[0.995]"
       >

@@ -2046,7 +2046,10 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
       emoji: "💌",
       done: false,
       shortcut: true,
-      onClick: () => onNavigate("home"),
+      onClick: () => {
+        onNavigate("home");
+        revealLater("[data-home-greeting]");
+      },
     },
     {
       id: "health",
