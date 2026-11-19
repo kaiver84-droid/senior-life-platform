@@ -409,41 +409,6 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             <h1 className="mt-1.5 truncate text-[1.5rem] font-black leading-tight text-ink">
               {active ? active.name : "모임을 시작해 보세요"}
             </h1>
-            <p className="mt-1 text-[min(0.88rem,20px)] font-semibold leading-snug text-ink/55">
-              {active ? (
-                <>
-                  <span className="whitespace-nowrap">
-                    멤버 {active.memberCount} / {active.maxMembers ?? GROUP_MAX_MEMBERS}명
-                  </span>
-                  {" · "}
-                  <span data-weekly-rate="sub" className="whitespace-nowrap">
-                    이번 주 달성률 {detail?.weeklyRate ?? 0}%
-                  </span>
-                  {detail?.region ? (
-                    <>
-                      {" · "}
-                      <span className="whitespace-nowrap">{detail.region}</span>
-                    </>
-                  ) : null}
-                </>
-              ) : (
-                "가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요"
-              )}
-            </p>
-            {active ? (
-              <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-leaf-light px-2.5 py-1 text-[0.8rem] font-black text-leaf-dark">
-                <span className="h-2 w-2 rounded-full bg-leaf" />
-                지금 {active.onlineCount ?? detail?.onlineCount ?? 1}명 접속 중
-              </span>
-            ) : null}
-            {detail && detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS) ? (
-              <p
-                data-group-capacity="full"
-                className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-coral-light px-2.5 py-1 text-[0.8rem] font-black text-coral-dark"
-              >
-                정원이 다 찼어요 ({detail.memberCount}/{detail.maxMembers ?? GROUP_MAX_MEMBERS}명)
-              </p>
-            ) : null}
           </div>
           {active ? (
             /* 초대는 상단 한 곳에만 — 모임 전환은 바로 아래 ‘내 모임’ 목록에서 한다 */
@@ -458,6 +423,46 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
                 💌 초대
               </button>
             </div>
+          ) : null}
+        </div>
+
+        {/* 멤버 수 · 이번 주 달성률 — 초대 버튼과 다른 줄에서 카드 전체 폭을 쓴다(한 줄 고정) */}
+        <p
+          data-group-subline
+          className="mt-1 flex w-full items-center gap-1 whitespace-nowrap text-[min(0.84rem,19px)] font-semibold leading-snug text-ink/55"
+        >
+          {active ? (
+            <>
+              <span>
+                멤버 {active.memberCount}/{active.maxMembers ?? GROUP_MAX_MEMBERS}명
+              </span>
+              <span aria-hidden className="text-ink/30">
+                ·
+              </span>
+              <span data-weekly-rate="sub">이번 주 달성률 {detail?.weeklyRate ?? 0}%</span>
+            </>
+          ) : (
+            <span className="truncate whitespace-normal">가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요</span>
+          )}
+        </p>
+
+        <div className="min-w-0">
+          {active ? (
+            <span className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-leaf-light px-2.5 py-1 text-[0.8rem] font-black text-leaf-dark">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-leaf" />
+              <span className="truncate">
+                지금 {active.onlineCount ?? detail?.onlineCount ?? 1}명 접속 중
+                {detail?.region ? ` · ${detail.region}` : ""}
+              </span>
+            </span>
+          ) : null}
+          {detail && detail.memberCount >= (detail.maxMembers ?? GROUP_MAX_MEMBERS) ? (
+            <p
+              data-group-capacity="full"
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-coral-light px-2.5 py-1 text-[0.8rem] font-black text-coral-dark"
+            >
+              정원이 다 찼어요 ({detail.memberCount}/{detail.maxMembers ?? GROUP_MAX_MEMBERS}명)
+            </p>
           ) : null}
         </div>
       </section>

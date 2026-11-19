@@ -1549,34 +1549,77 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
 
 type RankLine = { rank: number; name: string; points: number; isMe?: boolean; avatarUrl?: string | null };
 
-type HeroPerson = { name: string; points: number; isMe?: boolean };
+type HeroPerson = { name: string; points: number; isMe?: boolean; avatarUrl?: string | null };
 
 const CROWN_TONE = (place: number) =>
   place === 1 ? "text-[#DFA210]" : place === 2 ? "text-[#93A8BC]" : "text-[#B7793F]";
 
+/** 시상대 사진 테두리 — 1위 금, 2위 은, 3위 동 (사진이 없을 때의 바탕색도 같은 계열) */
+const PODIUM_TONE = (place: number) =>
+  place === 1
+    ? {
+        ring: "ring-4 ring-[#EFB82C]",
+        background: "bg-gradient-to-b from-[#FFF6D2] to-[#FFE07E]",
+        text: "text-[#8A6100]",
+      }
+    : place === 2
+      ? {
+          ring: "ring-[3px] ring-[#C7D4E0]",
+          background: "bg-gradient-to-b from-white to-[#EDF2F7]",
+          text: "text-[#5D7387]",
+        }
+      : {
+          ring: "ring-[3px] ring-[#E7C4A6]",
+          background: "bg-gradient-to-b from-white to-[#FBEEDF]",
+          text: "text-[#9A6435]",
+        };
+
+/** 사진 아래에 겹쳐 붙는 등수 알약 배지 — 금·은·동 */
+const PODIUM_BADGE = (place: number) =>
+  place === 1
+    ? "bg-gradient-to-b from-[#FFD764] to-[#E8A200] text-white"
+    : place === 2
+      ? "bg-gradient-to-b from-[#E6EDF3] to-[#AFBECC] text-[#3F5566]"
+      : "bg-gradient-to-b from-[#F3D9C0] to-[#CE9764] text-white";
+
 /** 이번 주 랭킹 시상대 — 가운데 1위(금), 왼쪽 2위(은), 오른쪽 3위(동) */
 function HeroPodium({ rows }: { rows: HeroPerson[] }) {
   const Column = ({ place, row }: { place: number; row?: HeroPerson }) => {
-    const size = place === 1 ? "h-[86px] w-[86px]" : place === 2 ? "h-[66px] w-[66px]" : "h-[62px] w-[62px]";
-    const tone =
-      place === 1
-        ? "bg-gradient-to-b from-[#FFF6D2] to-[#FFE07E] ring-4 ring-gold/70"
-        : place === 2
-          ? "bg-gradient-to-b from-white to-[#EDF2F7] ring-4 ring-[#D6E1EB]"
-          : "bg-gradient-to-b from-white to-[#FBEEDF] ring-4 ring-[#EFD7C0]";
+    const size = place === 1 ? 72 : place === 2 ? 58 : 56;
+    const tone = PODIUM_TONE(place);
     return (
-      <div className="flex min-w-0 flex-1 flex-col items-center">
-        <IconCrown size={place === 1 ? 28 : 21} className={CROWN_TONE(place)} />
-        <div className={`mt-1 grid shrink-0 place-items-center rounded-full shadow-soft ${size} ${tone}`}>
+      <div className="flex min-w-0 flex-1 flex-col items-center" data-podium-column={place}>
+        <IconCrown size={place === 1 ? 30 : 22} className={CROWN_TONE(place)} />
+        <div className="relative mt-0.5 flex flex-col items-center">
+          {row ? (
+            <Avatar
+              name={row.name}
+              src={row.avatarUrl}
+              size={size}
+              background={tone.background}
+              ring={tone.ring}
+              className={`font-black shadow-soft ${tone.text}`}
+              alt={`${row.name} 님 프로필 사진`}
+            />
+          ) : (
+            <span
+              aria-hidden
+              className={`block rounded-full bg-white/80 ${tone.ring}`}
+              style={{ width: size, height: size }}
+            />
+          )}
           <span
-            className={`tabular font-black leading-none ${
-              place === 1 ? "text-[1.7rem] text-[#8A6100]" : "text-[1.15rem] text-ink/55"
-            }`}
+            data-podium-badge={place}
+            className={`absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-[1px] text-[min(0.7rem,17px)] font-black leading-tight shadow-soft ring-2 ring-white ${PODIUM_BADGE(place)}`}
           >
-            {place}
+            {place}위
           </span>
         </div>
-        <p className="mt-1.5 w-full truncate text-center text-[min(0.94rem,21px)] font-black leading-tight text-ink">
+        <p
+          className={`mt-3.5 w-full truncate text-center font-black leading-tight text-ink ${
+            place === 1 ? "text-[min(1rem,22px)]" : "text-[min(0.9rem,20px)]"
+          }`}
+        >
           {row ? row.name : "-"}
         </p>
         <p
@@ -1591,7 +1634,7 @@ function HeroPodium({ rows }: { rows: HeroPerson[] }) {
   };
 
   return (
-    <div className="mt-2 flex items-end justify-center gap-1.5">
+    <div data-hero-podium className="mt-2 flex items-end justify-center gap-1.5">
       <Column place={2} row={rows[1]} />
       <Column place={1} row={rows[0]} />
       <Column place={3} row={rows[2]} />
