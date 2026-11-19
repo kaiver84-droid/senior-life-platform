@@ -231,8 +231,11 @@ export function HomeTab({
           <span className="mt-1 block text-[0.76rem] font-bold leading-snug text-ink/55">
             {detail ? (
               <>
-                <span className="block">오늘 출석 {detail.todayAttended}/{detail.memberCount}명</span>
-                <span className="block">이번 주 참여율 {detail.weeklyRate}%</span>
+                <span className="block whitespace-nowrap">오늘 출석 {detail.todayAttended}/{detail.memberCount}명</span>
+                {/* 좁은 2칸 카드 — ‘이번 주 참여율 73%’가 중간에서 끊기지 않게 한 줄로 두고 글씨 상한을 둔다 */}
+                <span data-weekly-rate="home" className="block whitespace-nowrap text-[min(0.9rem,17px)]">
+                  이번 주 참여율 {detail.weeklyRate}%
+                </span>
               </>
             ) : (
               "모임을 만들어요"

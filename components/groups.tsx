@@ -135,9 +135,14 @@ function Gauge({ percent, label }: { percent: number; label: string }) {
   const value = Math.max(0, Math.min(100, Math.round(percent)));
   return (
     <div>
-      <div className="mb-1 flex items-end justify-between">
-        <p className="text-[0.84rem] font-extrabold text-ink/60">{label}</p>
-        <p className="tabular text-[0.95rem] font-black text-brand-dark">{value}%</p>
+      {/* 라벨과 %는 항상 한 줄 — 좁은 칸·큰 글씨에서도 끊기지 않게 nowrap + 글씨 상한 */}
+      <div data-weekly-gauge className="mb-1 flex items-end justify-between gap-2 whitespace-nowrap">
+        <p data-rate-label className="text-[min(0.84rem,20px)] font-extrabold leading-tight text-ink/60">
+          {label}
+        </p>
+        <p data-rate-value className="tabular shrink-0 text-[min(0.95rem,21px)] font-black leading-tight text-brand-dark">
+          {value}%
+        </p>
       </div>
       <div className="h-3 w-full overflow-hidden rounded-full bg-ink/8">
         <div
@@ -266,9 +271,11 @@ export function TodayGroupCard() {
               {detail.top ? `${detail.top.points}점` : "점수를 모으는 중"}
             </p>
           </div>
-          <div className="flex items-center justify-between rounded-2xl bg-paper px-3 py-2">
-            <p className="text-[0.78rem] font-bold text-ink/55">이번 주 달성률</p>
-            <p className="tabular text-[0.92rem] font-black text-brand-dark">{detail.weeklyRate}%</p>
+          <div className="flex items-center justify-between gap-1.5 rounded-2xl bg-paper px-2.5 py-2 whitespace-nowrap">
+            <p className="text-[min(0.78rem,18px)] font-bold leading-tight text-ink/55">이번 주 달성률</p>
+            <p data-rate-value className="tabular shrink-0 text-[min(0.92rem,20px)] font-black leading-tight text-brand-dark">
+              {detail.weeklyRate}%
+            </p>
           </div>
         </div>
       </div>
@@ -402,12 +409,26 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
             <h1 className="mt-1.5 truncate text-[1.5rem] font-black leading-tight text-ink">
               {active ? active.name : "모임을 시작해 보세요"}
             </h1>
-            <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
-              {active
-                ? `멤버 ${active.memberCount} / ${active.maxMembers ?? GROUP_MAX_MEMBERS}명 · 이번 주 달성률 ${detail?.weeklyRate ?? 0}%${
-                    detail?.region ? ` · ${detail.region}` : ""
-                  }`
-                : "가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요"}
+            <p className="mt-1 text-[min(0.88rem,20px)] font-semibold leading-snug text-ink/55">
+              {active ? (
+                <>
+                  <span className="whitespace-nowrap">
+                    멤버 {active.memberCount} / {active.maxMembers ?? GROUP_MAX_MEMBERS}명
+                  </span>
+                  {" · "}
+                  <span data-weekly-rate="sub" className="whitespace-nowrap">
+                    이번 주 달성률 {detail?.weeklyRate ?? 0}%
+                  </span>
+                  {detail?.region ? (
+                    <>
+                      {" · "}
+                      <span className="whitespace-nowrap">{detail.region}</span>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                "가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요"
+              )}
             </p>
             {active ? (
               <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-leaf-light px-2.5 py-1 text-[0.8rem] font-black text-leaf-dark">
@@ -1211,7 +1232,7 @@ export function GroupRankingBanner({ onNavigate }: { onNavigate?: (tab: string) 
   if (!detail || !active) return null;
   return (
     <div className="rounded-[1.5rem] bg-gradient-to-r from-leaf-light via-[#EAF7EF] to-[#DDF1E6] px-4 py-3.5 text-center shadow-soft">
-      <p className="flex items-center justify-center gap-1.5 text-[0.95rem] font-black text-leaf-dark">
+      <p className="flex items-center justify-center gap-1.5 whitespace-nowrap text-[min(0.95rem,20px)] font-black text-leaf-dark">
         <IconTrophy size={18} /> 이번 주 우리 모임 달성률 {detail.weeklyRate}%
       </p>
       <p className="mt-1 text-[0.84rem] font-bold text-ink/55">
