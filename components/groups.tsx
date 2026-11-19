@@ -400,7 +400,7 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
       <section className="fade-up pt-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Badge tone="brand">
                 <IconUsers size={13} /> 우리 모임
               </Badge>
@@ -429,20 +429,15 @@ export function GroupTab({ onNavigate }: { onNavigate: (tab: string) => void }) 
         {/* 멤버 수 · 이번 주 달성률 — 초대 버튼과 다른 줄에서 카드 전체 폭을 쓴다(한 줄 고정) */}
         <p
           data-group-subline
-          className="mt-1 flex w-full items-center gap-1 whitespace-nowrap text-[min(0.84rem,19px)] font-semibold leading-snug text-ink/55"
+          className="mt-1 w-full whitespace-nowrap text-[min(0.84rem,19px)] font-semibold leading-snug text-ink/55"
         >
           {active ? (
             <>
-              <span>
-                멤버 {active.memberCount}/{active.maxMembers ?? GROUP_MAX_MEMBERS}명
-              </span>
-              <span aria-hidden className="text-ink/30">
-                ·
-              </span>
+              멤버 {active.memberCount}/{active.maxMembers ?? GROUP_MAX_MEMBERS}명{" · "}
               <span data-weekly-rate="sub">이번 주 달성률 {detail?.weeklyRate ?? 0}%</span>
             </>
           ) : (
-            <span className="truncate whitespace-normal">가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요</span>
+            <span className="whitespace-normal">가족·친구와 함께 퀴즈 순위를 겨루는 공간이에요</span>
           )}
         </p>
 
