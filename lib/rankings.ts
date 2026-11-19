@@ -11,6 +11,7 @@ import type {
 } from "./types";
 import type { LeagueArea } from "./league";
 import { LEAGUE_DAILY_CAP, LEAGUE_POINTS, formatAreaValue, weekDatesOf } from "./league";
+import { normalizeSido, sidoLabel } from "./regions";
 import { periodLabel, weekIdOf } from "./week";
 
 const SURNAMES = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "전", "홍"];
@@ -138,7 +139,8 @@ export function scopeLabel(scope: RankingScope, sido?: string, sigungu?: string)
   if (scope === "group") return "우리 모임";
   if (scope === "national") return "전국";
   if (scope === "invite") return "초대왕";
-  if (scope === "region") return `${sigungu || sido || "우리 동네"}`;
+  // ‘지역별’ 범위는 시·군·구가 아니라 광역 시·도(충청북도·대전광역시 등) 기준이다.
+  if (scope === "region") return sidoLabel(sido);
   if (scope === "zodiac") return "같은 띠·나이";
   return "개근상";
 }
@@ -396,6 +398,7 @@ export function buildAreaRanking(input: AreaRankingInput): RankingResult {
   const limit = Math.max(1, input.limit ?? 10);
   const dates = weekDatesOf(input.today);
   const todayIndex = Math.max(0, Math.min(dates.length - 1, dates.indexOf(input.today)));
+  const sido = normalizeSido(input.sido);
 
   const pool: RankParticipant[] = [];
   const seen = new Set<string>();
@@ -410,7 +413,7 @@ export function buildAreaRanking(input: AreaRankingInput): RankingResult {
     area: input.area,
     range: input.range,
     weekId: input.weekId,
-    sido: input.sido,
+    sido,
     sigungu: input.sigungu,
     band: input.band,
     todayIndex,
@@ -484,6 +487,7 @@ export function buildAreaRanking(input: AreaRankingInput): RankingResult {
     myPercentile: myRank ? Math.max(1, Math.round((myRank / pool.length) * 100)) : null,
     sample: rows.some((r) => (pool.find((p) => p.name === r.name)?.sample ?? false)),
     area: input.area,
+    regionLabel: input.range === "region" ? sidoLabel(sido) : undefined,
     myGap,
     myDisplay: mine ? formatAreaValue(input.area, myValue) : undefined,
     myInvites: input.area === "share" ? myValue : undefined,

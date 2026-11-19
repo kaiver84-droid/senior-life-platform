@@ -41,7 +41,9 @@ import {
   peekPendingDuel,
   postDuel,
 } from "@/lib/duels";
-import { IconChevron, IconQuiz, IconSparkle, IconTrophy, IconUsers } from "./icons";
+import { IconCheck, IconChevron, IconCrown, IconPin, IconQuiz, IconSparkle, IconTrophy, IconUsers } from "./icons";
+import { AssetImage } from "./art";
+import { sidoLabel } from "@/lib/regions";
 import { GroupRankingBanner } from "./groups";
 
 /* ------------------------------------------------------------------ */
@@ -1536,16 +1538,429 @@ export function RankingPanel({ onNavigate }: { onNavigate?: (tab: string) => voi
   );
 }
 
+/* ================================================================== */
+/* 랭킹 화면 — 2026-11-19 시안                                          */
+/* ------------------------------------------------------------------ */
+/* 한 장을 위에서 아래로 이어 보는 구성이다.                             */
+/*  위: 이번 주 랭킹(지역·모임) · 우리 모임 내 순위 · 함께해요 배너       */
+/*  가운데: 지역 랭킹 · 우리 모임 랭킹 · 오늘의 미션                     */
+/*  아래: 주간 명예의 전당 · 모임 참여 현황 · 응원 배너                  */
+/* ================================================================== */
+
+type RankLine = { rank: number; name: string; points: number; isMe?: boolean; avatarUrl?: string | null };
+
+type HeroPerson = { name: string; points: number; isMe?: boolean };
+
+const CROWN_TONE = (place: number) =>
+  place === 1 ? "text-[#DFA210]" : place === 2 ? "text-[#93A8BC]" : "text-[#B7793F]";
+
+/** 이번 주 랭킹 시상대 — 가운데 1위(금), 왼쪽 2위(은), 오른쪽 3위(동) */
+function HeroPodium({ rows }: { rows: HeroPerson[] }) {
+  const Column = ({ place, row }: { place: number; row?: HeroPerson }) => {
+    const size = place === 1 ? "h-[86px] w-[86px]" : place === 2 ? "h-[66px] w-[66px]" : "h-[62px] w-[62px]";
+    const tone =
+      place === 1
+        ? "bg-gradient-to-b from-[#FFF6D2] to-[#FFE07E] ring-4 ring-gold/70"
+        : place === 2
+          ? "bg-gradient-to-b from-white to-[#EDF2F7] ring-4 ring-[#D6E1EB]"
+          : "bg-gradient-to-b from-white to-[#FBEEDF] ring-4 ring-[#EFD7C0]";
+    return (
+      <div className="flex min-w-0 flex-1 flex-col items-center">
+        <IconCrown size={place === 1 ? 28 : 21} className={CROWN_TONE(place)} />
+        <div className={`mt-1 grid shrink-0 place-items-center rounded-full shadow-soft ${size} ${tone}`}>
+          <span
+            className={`tabular font-black leading-none ${
+              place === 1 ? "text-[1.7rem] text-[#8A6100]" : "text-[1.15rem] text-ink/55"
+            }`}
+          >
+            {place}
+          </span>
+        </div>
+        <p className="mt-1.5 w-full truncate text-center text-[min(0.94rem,21px)] font-black leading-tight text-ink">
+          {row ? row.name : "-"}
+        </p>
+        <p
+          className={`tabular mt-0.5 whitespace-nowrap text-center text-[min(0.84rem,20px)] font-extrabold leading-tight ${
+            place === 1 ? "text-[#A5760A]" : "text-ink/55"
+          }`}
+        >
+          {row ? `${Math.max(0, Math.round(row.points))}점` : " "}
+        </p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="mt-2 flex items-end justify-center gap-1.5">
+      <Column place={2} row={rows[1]} />
+      <Column place={1} row={rows[0]} />
+      <Column place={3} row={rows[2]} />
+    </div>
+  );
+}
+
+/** 이번 주 랭킹 히어로 카드 — 지역 랭킹 / 모임 랭킹 두 탭 */
+function RankingHero({
+  mode,
+  onMode,
+  regionLabel,
+  regionRows,
+  groupRows,
+  regionRank,
+  regionTotal,
+  groupRank,
+  groupMembers,
+  hasGroup,
+}: {
+  mode: "region" | "group";
+  onMode: (m: "region" | "group") => void;
+  regionLabel: string;
+  regionRows: HeroPerson[];
+  groupRows: HeroPerson[];
+  regionRank: number | null;
+  regionTotal: number;
+  groupRank: number | null;
+  groupMembers: number;
+  hasGroup: boolean;
+}) {
+  const rows = mode === "region" ? regionRows : groupRows;
+  const rank = mode === "region" ? regionRank : groupRank;
+  const total = mode === "region" ? regionTotal : groupMembers;
+
+  const pill = (on: boolean) =>
+    `flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.15rem] px-2 py-1.5 transition ${
+      on ? "bg-brand text-white shadow-soft" : "bg-white/90 text-ink/65 shadow-soft active:bg-white"
+    }`;
+
+  return (
+    <section
+      data-ranking-hero
+      className="fade-up relative overflow-hidden rounded-[1.8rem] shadow-card"
+    >
+      {/* 따뜻한 하늘 · 초원 */}
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-[#C8E6F7] via-[#E3F2FA] to-[#E4F2DA]" />
+      <div aria-hidden className="absolute -right-7 -top-9 h-28 w-28 rounded-full bg-[#FFEDB4]/80" />
+      <div aria-hidden className="absolute -left-12 bottom-0 h-20 w-52 rounded-[100%] bg-[#CDE7BB]" />
+      <div aria-hidden className="absolute -right-10 -bottom-2 h-16 w-48 rounded-[100%] bg-[#C3E0B0]" />
+
+      <div className="relative px-3.5 pb-3.5 pt-3">
+        <p className="flex items-center justify-center gap-1.5 text-[min(1.06rem,23px)] font-black leading-tight text-ink">
+          <span aria-hidden className="text-[1.2rem] leading-none">🏆</span> 이번 주 랭킹
+        </p>
+
+        <div className="mt-2 grid grid-cols-2 gap-2" role="tablist" aria-label="랭킹 종류">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "region"}
+            data-rank-mode="region"
+            onClick={() => onMode("region")}
+            className={pill(mode === "region")}
+          >
+            <span className="flex max-w-full items-center gap-1 text-[min(0.94rem,21px)] font-black leading-tight">
+              <span aria-hidden className="shrink-0">📍</span>
+              <span className="truncate">지역 랭킹</span>
+            </span>
+            <span className="block w-full truncate text-center text-[min(0.78rem,19px)] font-bold leading-tight opacity-85">
+              ({regionLabel})
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "group"}
+            data-rank-mode="group"
+            onClick={() => onMode("group")}
+            className={pill(mode === "group")}
+          >
+            <span className="flex max-w-full items-center gap-1 text-[min(0.94rem,21px)] font-black leading-tight">
+              <span aria-hidden className="shrink-0">👥</span>
+              <span className="truncate">모임 랭킹</span>
+            </span>
+            <span className="block w-full truncate text-center text-[min(0.78rem,19px)] font-bold leading-tight opacity-85">
+              (우리 모임)
+            </span>
+          </button>
+        </div>
+
+        <HeroPodium rows={rows} />
+
+        <div className="mt-3 rounded-[1.1rem] bg-white/90 px-3 py-2 text-center shadow-soft">
+          {mode === "region" ? (
+            <p className="text-[min(0.92rem,21px)] font-black leading-snug text-ink/80">
+              <span className="block">
+                <span aria-hidden>📍</span> {regionLabel}{" "}
+                {rank ? (
+                  <>
+                    전체 <span className="tabular text-brand-deep">{rank.toLocaleString("ko-KR")}위</span>
+                  </>
+                ) : (
+                  <span className="text-ink/55">순위를 준비하고 있어요</span>
+                )}
+              </span>
+              {rank ? (
+                <span className="mt-0.5 block text-[min(0.8rem,19px)] font-bold text-ink/50">
+                  (총 {total.toLocaleString("ko-KR")}명 중)
+                </span>
+              ) : null}
+            </p>
+          ) : !hasGroup ? (
+            <p className="text-[min(0.92rem,21px)] font-black leading-snug text-ink/80">
+              <span aria-hidden>👥</span> 모임에 들어가면 우리 모임 순위가 보여요
+            </p>
+          ) : (
+            <p className="text-[min(0.92rem,21px)] font-black leading-snug text-ink/80">
+              <span className="block">
+                <span aria-hidden>👥</span> 우리 모임 전체{" "}
+                {rank ? (
+                  <>
+                    <span className="tabular text-brand-deep">{rank.toLocaleString("ko-KR")}위</span>
+                  </>
+                ) : (
+                  <span className="text-ink/55">순위를 준비하고 있어요</span>
+                )}
+              </span>
+              {rank ? (
+                <span className="mt-0.5 block text-[min(0.8rem,19px)] font-bold text-ink/50">
+                  (총 {total.toLocaleString("ko-KR")}명 중)
+                </span>
+              ) : null}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** 순위 한 줄 — 1~3위는 왕관, 내 줄은 민트색으로 표시 */
+function RankRow({ line, area = "all" }: { line: RankLine; area?: LeagueArea }) {
+  return (
+    <div
+      data-rank-row={line.rank}
+      data-rank-me={line.isMe ? "1" : undefined}
+      className={`flex items-center gap-1.5 rounded-[0.9rem] px-2 py-1.5 ${
+        line.isMe ? "bg-brand-light" : ""
+      }`}
+    >
+      <span className="grid w-7 shrink-0 place-items-center">
+        {line.rank <= 3 ? (
+          <IconCrown size={22} className={CROWN_TONE(line.rank)} />
+        ) : (
+          <span className="tabular text-[min(0.95rem,20px)] font-black leading-none text-ink/40">{line.rank}</span>
+        )}
+      </span>
+      <span
+        className={`min-w-0 flex-1 truncate text-[min(0.98rem,21px)] leading-tight ${
+          line.isMe ? "font-black text-brand-deep" : "font-bold text-ink/85"
+        }`}
+      >
+        {line.name}
+        {line.isMe ? <span className="ml-1 text-[min(0.72rem,19px)] font-extrabold text-brand">(나)</span> : null}
+      </span>
+      <span className="tabular shrink-0 whitespace-nowrap text-[min(0.95rem,20px)] font-black leading-tight text-ink/70">
+        {formatAreaValue(area, line.points)}
+      </span>
+    </div>
+  );
+}
+
+/** 지역 · 모임 순위표 카드 — 5위까지 보이고 ‘더보기’로 10위까지 */
+function RankListCard({
+  title,
+  emoji,
+  subtitle,
+  lines,
+  area = "all",
+  expanded,
+  onToggle,
+  empty,
+  anchor,
+}: {
+  title: string;
+  emoji: string;
+  subtitle?: string;
+  lines: RankLine[];
+  area?: LeagueArea;
+  expanded: boolean;
+  onToggle: () => void;
+  empty?: React.ReactNode;
+  /** 지역/모임 순위표에 붙이는 화면 이동용 표식 */
+  anchor?: "region" | "group";
+}) {
+  const shown = lines.slice(0, expanded ? 10 : 5);
+  const canMore = lines.length > 5;
+  const hidden = lines.slice(shown.length).length;
+
+  return (
+    <Card
+      className="!p-3"
+      {...(anchor === "region" ? { "data-region-rank-section": "1" } : {})}
+      {...(anchor === "group" ? { "data-group-rank-section": "1" } : {})}
+    >
+      <div className="mb-1 flex items-center justify-between gap-2 px-1">
+        <p className="flex min-w-0 items-center gap-1 text-[min(1rem,22px)] font-black leading-tight text-ink">
+          <span aria-hidden className="shrink-0">{emoji}</span>
+          <span className="truncate">{title}</span>
+        </p>
+        {subtitle ? (
+          <span className="shrink-0 truncate text-[min(0.78rem,19px)] font-bold text-ink/45">{subtitle}</span>
+        ) : null}
+      </div>
+
+      {shown.length ? (
+        <div className="space-y-0.5">
+          {shown.map((line) => (
+            <RankRow key={`${line.rank}-${line.name}`} line={line} area={area} />
+          ))}
+        </div>
+      ) : (
+        <div className="px-1 py-3">{empty}</div>
+      )}
+
+      {canMore ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="mt-1.5 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-[0.9rem] bg-paper text-[min(0.88rem,20px)] font-extrabold text-ink/55 active:bg-ink/5"
+        >
+          {expanded ? "접기" : `더보기${hidden ? ` (${hidden}명 더)` : ""}`}
+          <IconChevron size={16} className={`transition ${expanded ? "-rotate-90" : "rotate-90"}`} />
+        </button>
+      ) : null}
+    </Card>
+  );
+}
+
+/** 오늘의 미션 한 줄 */
+type MissionLine = {
+  id: string;
+  label: string;
+  emoji: string;
+  points?: number;
+  done: boolean;
+  /** 점수 없이 다른 화면으로 이어 주는 줄(안부 인사 보내기) */
+  shortcut?: boolean;
+  onClick: () => void;
+};
+
+function TodayMissionCard({
+  rows,
+  allDone,
+  dayPoints,
+}: {
+  rows: MissionLine[];
+  allDone: boolean;
+  dayPoints: number;
+}) {
+  return (
+    <Card className="!p-3" data-league-missions data-league-today={dayPoints}>
+      <div className="flex items-center justify-between gap-2 px-1">
+        <p className="flex items-center gap-1 text-[min(1rem,22px)] font-black leading-tight text-ink">
+          <span aria-hidden>🎯</span> 오늘의 미션
+        </p>
+        {allDone ? (
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-leaf-light px-2.5 py-1 text-[min(0.78rem,19px)] font-black text-leaf-dark">
+            모두 완료! 🎉
+          </span>
+        ) : (
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-brand-light px-2.5 py-1 text-[min(0.78rem,19px)] font-black text-brand-deep">
+            오늘 {dayPoints}점
+          </span>
+        )}
+      </div>
+
+      <div className="mt-1.5 space-y-0.5">
+        {rows.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            data-league-mission={m.id}
+            data-league-done={m.done ? "1" : "0"}
+            aria-pressed={m.done}
+            onClick={m.onClick}
+            className="flex min-h-[44px] w-full items-center gap-2 rounded-[0.9rem] px-1.5 py-1 text-left active:bg-paper"
+          >
+            {m.done ? (
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-leaf text-white">
+                <IconCheck size={15} />
+              </span>
+            ) : m.shortcut ? (
+              <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center text-[1.05rem] leading-none">
+                💌
+              </span>
+            ) : (
+              <span aria-hidden className="h-6 w-6 shrink-0 rounded-full border-2 border-ink/15" />
+            )}
+            <span
+              className={`min-w-0 flex-1 truncate text-[min(0.94rem,21px)] font-black leading-tight ${
+                m.done ? "text-leaf-dark" : "text-ink"
+              }`}
+            >
+              {m.label}
+            </span>
+            {m.points ? (
+              <span className="tabular shrink-0 whitespace-nowrap text-[min(0.85rem,20px)] font-black text-brand-dark">
+                +{m.points}점
+              </span>
+            ) : (
+              <IconChevron size={17} className="shrink-0 text-ink/35" />
+            )}
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/** 모임 참여 현황 도넛 */
+function Donut({ percent, size = 76 }: { percent: number; size?: number }) {
+  const p = Math.max(0, Math.min(100, Math.round(percent)));
+  const stroke = 8;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }} data-donut={p}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E7EEF3" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="#18939B"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${(c * p) / 100} ${c}`}
+        />
+      </svg>
+      <span className="tabular absolute inset-0 grid place-items-center text-[min(1.02rem,22px)] font-black leading-none text-brand-deep">
+        {p}%
+      </span>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* 전용 랭킹 화면                                                     */
 /* ------------------------------------------------------------------ */
 
 export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { profile, streak, state, today, todayDaily, rankingVisible, code } = useApp();
+  const { profile, streak, state, today, todayDaily, rankingVisible, code, healthToday, missionsToday } = useApp();
+  const { detail: groupDetail, active: groupActive } = useGroup();
+
+  const [mode, setMode] = useState<"region" | "group">("region");
+  const [regionMore, setRegionMore] = useState(false);
+  const [groupMore, setGroupMore] = useState(false);
+  const [badgeOpen, setBadgeOpen] = useState(false);
+
+  const band = ageBandOf(profile?.birthYear);
+  const { view: regionView, loading } = useAreaRanking("all", "region", band);
+  const regionLabel = regionView.regionLabel || sidoLabel(profile?.sido);
 
   // 친구 초대 성공(+50점/명)은 서버만 안다 — 날짜별 초대 수를 한 번 받아 온다.
   const [invitesByDay, setInvitesByDay] = useState<Record<string, number> | undefined>(undefined);
-  const [badgeOpen, setBadgeOpen] = useState(false);
   useEffect(() => {
     if (!code) return;
     const params = new URLSearchParams({
@@ -1569,48 +1984,309 @@ export function RankingTab({ onNavigate }: { onNavigate: (tab: string) => void }
 
   const week = leagueWeek({ ...state, missions: state.missions ?? {} }, { today, invitesByDay });
 
+  /** 내 모임 순위표 — 모임원 순위(서버·모임 저장소)를 그대로 쓴다 */
+  const groupLines = useMemo<RankLine[]>(() => {
+    return (groupDetail?.members ?? [])
+      .slice()
+      .sort((a, b) => a.rank - b.rank || b.points - a.points)
+      .map((m) => ({ rank: m.rank, name: m.name, points: m.points, isMe: m.isMe, avatarUrl: m.avatarUrl }));
+  }, [groupDetail]);
+
+  const regionLines: RankLine[] = regionView.rows.map((r) => ({
+    rank: r.rank,
+    name: r.name,
+    points: r.points,
+    isMe: r.isMe,
+    avatarUrl: r.avatarUrl,
+  }));
+
+  const champion = regionView.rows[0] ?? null;
+  const hasGroup = Boolean(groupDetail && groupActive);
+  const groupRank = groupDetail?.myRank ?? null;
+  const groupMembers = groupDetail?.memberCount ?? 0;
+
+  const scrollToGroup = () => {
+    if (typeof document === "undefined") return;
+    document.querySelector("[data-group-rank-section]")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const goMission = (area: LeagueArea) => {
+    if (area === "brain") onNavigate("quiz");
+    else if (area === "save") onNavigate("welfare");
+    else if (area === "group") onNavigate("group");
+    else if (area === "health") {
+      onNavigate("home");
+      revealLater("[data-health-card]");
+    } else if (area === "attend") {
+      onNavigate("home");
+      revealLater("[data-home-hero]");
+    }
+  };
+
+  const missionRows: MissionLine[] = [
+    {
+      id: "attend",
+      label: "오늘 출석하기",
+      emoji: "📅",
+      points: LEAGUE_POINTS.attend,
+      done: state.visits.includes(today),
+      onClick: () => goMission("attend"),
+    },
+    {
+      id: "quiz",
+      label: "치매예방 퀴즈 풀기",
+      emoji: "🧠",
+      points: LEAGUE_POINTS.quiz,
+      done: Boolean(todayDaily?.done),
+      onClick: () => goMission("brain"),
+    },
+    {
+      id: "greeting",
+      label: "안부 인사 보내기",
+      emoji: "💌",
+      done: false,
+      shortcut: true,
+      onClick: () => onNavigate("home"),
+    },
+    {
+      id: "health",
+      label: "건강 미션 하기",
+      emoji: "🏃",
+      points: LEAGUE_POINTS.health,
+      done: healthToday.length > 0,
+      onClick: () => goMission("health"),
+    },
+    {
+      id: "welfare",
+      label: "복지 혜택 확인하기",
+      emoji: "💰",
+      points: LEAGUE_POINTS.welfare,
+      done: missionsToday.includes("welfare"),
+      onClick: () => goMission("save"),
+    },
+    {
+      id: "group",
+      label: "모임 미션 참여하기",
+      emoji: "👥",
+      points: LEAGUE_POINTS.group,
+      done: missionsToday.includes("group"),
+      onClick: () => goMission("group"),
+    },
+  ];
+  const pointMissions = missionRows.filter((m) => !m.shortcut);
+  const allDone = pointMissions.every((m) => m.done);
+
+  const joinRate = groupMembers > 0 ? Math.round(((groupDetail?.todayAttended ?? 0) / groupMembers) * 100) : 0;
+
   return (
-    <div className="space-y-4">
-      <section className="fade-up pt-1">
-        <div className="flex items-center gap-2">
-          <Badge tone="gold">🏆 명예의 전당</Badge>
-          <Badge tone="brand">{periodLabel()}</Badge>
+    <div className="space-y-3 pb-1">
+      <RankingHero
+        mode={mode}
+        onMode={setMode}
+        regionLabel={regionLabel}
+        regionRows={regionLines.slice(0, 3)}
+        groupRows={groupLines.slice(0, 3)}
+        regionRank={regionView.myRank}
+        regionTotal={regionView.total}
+        groupRank={groupRank}
+        groupMembers={groupMembers}
+        hasGroup={hasGroup}
+      />
+
+      {/* 우리 모임 내 순위 — 누르면 아래 ‘우리 모임 랭킹’으로 내려간다 */}
+      <Card className="flex items-center gap-2 !p-3.5" data-my-group-rank-card>
+        <div className="min-w-0 flex-1">
+          <p className="text-[min(1rem,22px)] font-black leading-tight text-ink">👥 우리 모임 내 순위</p>
+          {hasGroup ? (
+            <p className="mt-1 text-[min(1.5rem,30px)] font-black leading-none text-brand-deep">
+              {groupRank ? (
+                <>
+                  <span className="tabular">{groupRank}</span>위{" "}
+                  <span className="text-[min(0.88rem,20px)] font-extrabold text-ink/45">({groupMembers}명 중)</span>
+                </>
+              ) : (
+                <span className="text-[min(0.95rem,21px)] font-bold text-ink/45">아직 이번 주 기록이 없어요</span>
+              )}
+            </p>
+          ) : (
+            <p className="mt-1 text-[min(0.92rem,21px)] font-bold leading-snug text-ink/55">
+              모임에 들어가면 함께 순위를 겨뤄요
+            </p>
+          )}
         </div>
-        <h1 className="t-title mt-1.5 text-ink">{profile?.nickname} 님의 이번 주 순위</h1>
-        {/* 부제는 조각마다 통째로 줄바꿈되게 */}
-        <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="whitespace-nowrap rounded-full bg-white/80 px-2.5 py-0.5 text-[0.92rem] font-bold leading-tight text-ink/60">
-            🔥 {streak}일 연속 출석
-          </span>
-          <span className="whitespace-nowrap">
-            <span className="text-[0.92rem] font-bold text-ink/55">이번 주 늘봄왕 </span>
-            <span className="t-num text-brand-deep" data-league-total={week.total}>
-              {week.total}점
-            </span>
-          </span>
+        <button
+          type="button"
+          onClick={() => (hasGroup ? scrollToGroup() : onNavigate("group"))}
+          aria-label={hasGroup ? "우리 모임 랭킹으로 내려가기" : "모임 참여하기"}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-brand-light text-brand-deep shadow-soft active:scale-95"
+        >
+          <IconChevron size={24} />
+        </button>
+      </Card>
+
+      {/* 이번 주도 함께해요 */}
+      <Card className="flex items-stretch gap-0 overflow-hidden !p-0">
+        <div className="relative h-[104px] w-[36%] shrink-0 overflow-hidden">
+          <AssetImage
+            name="family-greeting-couple"
+            alt="함께 웃으며 인사하는 어르신 부부"
+            className="h-full w-full object-cover"
+          />
         </div>
-        {!rankingVisible ? (
-          <p className="mt-1.5 rounded-xl bg-white/80 px-3 py-2 text-[0.82rem] font-bold text-ink/55">
-            랭킹 참여를 꺼 두었어요 — 내 점수는 나만 볼 수 있어요.
+        <div className="flex min-w-0 flex-1 flex-col justify-center py-2.5 pl-3 pr-2.5">
+          <p className="text-[min(1.02rem,22px)] font-black leading-tight text-ink">이번 주도 함께해요!</p>
+          <p className="mt-1 text-[min(0.8rem,19px)] font-bold leading-snug text-ink/55">
+            이번 주 <span className="tabular text-brand-deep">{week.total}점</span> · 🔥 {streak}일 연속
+          </p>
+        </div>
+      </Card>
+
+      {/* 지역 랭킹 */}
+      <RankListCard
+        title="지역 랭킹"
+        emoji="📍"
+        subtitle={loading ? "불러오는 중…" : `(${regionLabel})`}
+        lines={regionLines}
+        anchor="region"
+        expanded={regionMore}
+        onToggle={() => setRegionMore((v) => !v)}
+        empty={
+          <p className="text-[min(0.9rem,21px)] font-bold leading-snug text-ink/50">
+            이번 주 {regionLabel} 순위가 아직 비어 있어요.
+            <br />
+            출석·퀴즈로 첫 이름을 올려 보세요.
+          </p>
+        }
+      />
+
+      {/* 우리 모임 랭킹 */}
+      <RankListCard
+        title="우리 모임 랭킹"
+        emoji="👥"
+        subtitle={hasGroup ? (groupActive?.name ?? "") : undefined}
+        lines={groupLines}
+        expanded={groupMore}
+        onToggle={() => setGroupMore((v) => !v)}
+        anchor="group"
+        empty={
+          <div className="text-center">
+            <p className="text-[min(0.9rem,21px)] font-bold leading-snug text-ink/55">
+              모임에 들어가면 우리 모임 순위가 여기에 보여요.
+            </p>
+            <div className="mt-2">
+              <BigButton variant="ink" full onClick={() => onNavigate("group")}>
+                <IconUsers size={20} /> 모임 참여하기
+              </BigButton>
+            </div>
+          </div>
+        }
+      />
+
+      <TodayMissionCard rows={missionRows} allDone={allDone} dayPoints={week.today.total} />
+
+      {/* 주간 명예의 전당 */}
+      <Card
+        data-week-champion
+        className="relative overflow-hidden bg-gradient-to-b from-gold-light via-[#FFFDF4] to-white !p-4 text-center"
+      >
+        <p className="flex items-center justify-center gap-1 text-[min(1rem,22px)] font-black leading-tight text-ink">
+          <span aria-hidden>👑</span> 주간 명예의 전당
+        </p>
+        <span className="mt-1.5 inline-flex items-center justify-center rounded-full bg-gold/25 px-3 py-1 text-[min(0.8rem,19px)] font-black text-[#8A6100]">
+          이번 주 1위
+        </span>
+
+        <div className="relative mx-auto mt-2 flex w-fit items-center gap-1">
+          <span aria-hidden className="text-[1.6rem] leading-none">🌿</span>
+          <Avatar
+            name={champion?.name}
+            src={champion?.avatarUrl}
+            size={84}
+            background="bg-brand-light"
+            ring="ring-4 ring-gold/60"
+            className="text-brand-dark"
+            alt={champion ? `${champion.name} 님 프로필 사진` : "명예의 전당"}
+          />
+          <span aria-hidden className="text-[1.6rem] leading-none">🌿</span>
+        </div>
+
+        <p className="mt-2 truncate text-[min(1.1rem,24px)] font-black leading-tight text-ink">
+          {champion ? `${champion.name}님` : "첫 1위를 기다리고 있어요"}
+        </p>
+        {champion ? (
+          <p className="tabular mt-0.5 text-[min(1.3rem,28px)] font-black leading-none text-gold-dark">
+            {Math.max(0, Math.round(champion.points))}점
           </p>
         ) : null}
-      </section>
+        <p className="mt-1 text-[min(0.92rem,21px)] font-extrabold leading-snug text-ink/55">
+          {champion ? "축하드립니다! 🎉" : "이번 주 주인공이 되어 보세요"}
+        </p>
+        <button
+          type="button"
+          onClick={() => setBadgeOpen(true)}
+          className="mt-2 min-h-[40px] rounded-full bg-white px-3 text-[min(0.82rem,20px)] font-extrabold text-ink/60 shadow-soft active:scale-[0.98]"
+        >
+          내 등급 · 배지 보기
+        </button>
+      </Card>
 
-      <RankingBoard onNavigate={onNavigate} invitesByDay={invitesByDay} onOpenBadges={() => setBadgeOpen(true)} />
+      {/* 모임 참여 현황 */}
+      <Card className="!p-4" data-group-join-status>
+        <p className="text-[min(1rem,22px)] font-black leading-tight text-ink">👥 모임 참여 현황</p>
+        {hasGroup ? (
+          <div className="mt-2 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[min(0.85rem,20px)] font-bold leading-snug text-ink/55">오늘 우리 모임 참여자</p>
+              <p className="mt-0.5 text-[min(1.35rem,28px)] font-black leading-none text-ink">
+                <span className="tabular">{groupDetail?.todayAttended ?? 0}명</span>{" "}
+                <span className="text-[min(0.9rem,21px)] font-extrabold text-ink/45">/ {groupMembers}명</span>
+              </p>
+            </div>
+            <Donut percent={joinRate} />
+          </div>
+        ) : (
+          <p className="mt-1.5 text-[min(0.9rem,21px)] font-bold leading-snug text-ink/55">
+            모임에 참여하면 오늘 함께한 사람과 순위를 볼 수 있어요.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => onNavigate("group")}
+          className="mt-2.5 flex min-h-[48px] w-full items-center justify-center gap-1 rounded-full bg-sky px-3 text-[min(0.92rem,21px)] font-black text-brand-deep shadow-soft active:scale-[0.99]"
+        >
+          {hasGroup ? "모임 참여하기" : "모임 시작하기"} <IconChevron size={18} />
+        </button>
+      </Card>
+
+      {/* 응원 배너 */}
+      <div className="relative overflow-hidden rounded-[1.6rem] shadow-card" data-rank-cheer>
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-[#DCEEF8] via-[#E7F3FB] to-[#E6F3DC]" />
+        <div aria-hidden className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#FFEDB4]/70" />
+        <div className="relative flex items-center gap-2 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[min(1.02rem,22px)] font-black leading-tight text-ink">
+              늘봄과 함께
+              <br />
+              더 즐거운 하루! <span aria-hidden>❤️</span>
+            </p>
+          </div>
+          <div className="relative h-[76px] w-[42%] shrink-0 overflow-hidden rounded-[1rem] shadow-soft">
+            <AssetImage
+              name="home-hero"
+              alt="웃으며 손 흔드는 어르신"
+              className="h-full w-full object-cover object-[70%_center]"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 랭킹 참여 켜기/끄기 — 내 이름을 다른 사람에게 보일지 정하는 자리 */}
+      <OptInCard />
 
       {/* 친구와 1:1 대결 — 지금은 숨김(ENABLE_DUELS). 코드는 lib/duels.ts 에 그대로 둔다. */}
       {ENABLE_DUELS ? <DuelSection onNavigate={onNavigate} /> : null}
 
       <BadgeCollectionSheet open={badgeOpen} onClose={() => setBadgeOpen(false)} />
-
-      <div className="grid grid-cols-1 gap-2">
-        <BigButton variant={todayDaily?.done ? "white" : "teal"} size="lg" full onClick={() => onNavigate("quiz")}>
-          <IconQuiz size={22} /> {todayDaily?.done ? "퀴즈 결과 · 상장 보기" : "오늘 퀴즈 풀러 가기"}
-        </BigButton>
-        <BigButton variant="white" full onClick={() => onNavigate("group")}>
-          <IconUsers size={20} /> 우리 모임 보기
-        </BigButton>
-      </div>
     </div>
   );
 }

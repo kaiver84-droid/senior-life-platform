@@ -109,6 +109,8 @@ export type RankingResult = {
   myInvites?: number;
   /** 이 순위표가 보여 주는 영역(늘봄왕·기억왕 …) */
   area?: string;
+  /** ‘지역별’ 순위표의 기준 이름 — 정식 시·도 명칭(충청북도·대전광역시 등) */
+  regionLabel?: string;
   /** 내 순위 격차 안내에 쓰는 값 */
   myGap?: {
     rank: number | null;

@@ -5,6 +5,7 @@ import { normalizeAvatarUrl } from "../../lib/avatar";
 import { sbRequest, supabaseConfig } from "../../lib/db";
 import type { DbEnv } from "../../lib/db";
 import { kstDate, weekIdOf } from "../../lib/week";
+import { normalizeSido, sidoLabel } from "../../lib/regions";
 import {
   LEAGUE_DAILY_CAP,
   LEAGUE_POINTS,
@@ -285,10 +286,12 @@ async function leagueAggregate(
   const persons: RankParticipant[] = [];
   let me: RankParticipant | null = null;
   const myFlags = flags.get(opts.code);
+  // ‘지역별’은 시·군·구가 아니라 광역 시·도 단위로 묶는다 — 약칭·정식 명칭이 섞여도 같은 도로 본다.
+  const mySido = normalizeSido(opts.sido);
 
   users.forEach((u) => {
     if (u.ranking_visible === false) return; // 랭킹 참여 OFF — 공개 순위표에서 빠진다
-    if (opts.range === "region" && (u.sido !== opts.sido || u.sigungu !== opts.sigungu)) return;
+    if (opts.range === "region" && normalizeSido(u.sido) !== mySido) return;
     if (opts.range === "age" && ageBandOf(u.birth_year) !== opts.band) return;
 
     let daily = dailyOf(flags.get(u.code), opts.area);
@@ -633,7 +636,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
   const range = parseRange(p.get("range") || p.get("scope"), scopeParam);
   const code = p.get("code") || "";
   const visible = p.get("visible") !== "0";
-  const sido = p.get("sido") || "";
+  const sido = normalizeSido(p.get("sido") || "");
   const sigungu = p.get("sigungu") || "";
   const band = Number(p.get("band") || 0) || ageBandOf(Number(p.get("birthYear") || 1955));
 
@@ -686,5 +689,11 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
     me: agg.me,
   });
 
-  return json({ ok: true, ...result, invitesByDay: agg.invitesByDay });
+  return json({
+    ok: true,
+    ...result,
+    // ‘지역별’ 기준 이름 — 시·군·구가 아니라 정식 시·도 명칭(충청북도 등)을 돌려준다.
+    regionLabel: range === "region" ? sidoLabel(sido) : undefined,
+    invitesByDay: agg.invitesByDay,
+  });
 };

@@ -114,6 +114,74 @@ export const REGIONS: SidoEntry[] = [
 
 export const SIDO_NAMES = REGIONS.map((r) => r.name);
 
+/**
+ * 시·도 이름 정규화 — DB·옛 기록에 약칭(충북·충남·대전)과 정식 명칭이 섞여 있어도
+ * 17개 광역 시·도의 **정식 명칭** 하나로 맞춘다(랭킹 ‘지역별’ 집계·표시가 이 값을 쓴다).
+ */
+const SIDO_ALIASES: Record<string, string> = {
+  서울: "서울특별시",
+  서울시: "서울특별시",
+  부산: "부산광역시",
+  부산시: "부산광역시",
+  대구: "대구광역시",
+  대구시: "대구광역시",
+  인천: "인천광역시",
+  인천시: "인천광역시",
+  광주: "광주광역시",
+  광주시: "광주광역시",
+  대전: "대전광역시",
+  대전시: "대전광역시",
+  울산: "울산광역시",
+  울산시: "울산광역시",
+  세종: "세종특별자치시",
+  세종시: "세종특별자치시",
+  경기: "경기도",
+  경기도: "경기도",
+  강원: "강원특별자치도",
+  강원도: "강원특별자치도",
+  충북: "충청북도",
+  충북도: "충청북도",
+  충청북: "충청북도",
+  충남: "충청남도",
+  충남도: "충청남도",
+  충청남: "충청남도",
+  전북: "전북특별자치도",
+  전북도: "전북특별자치도",
+  전라북도: "전북특별자치도",
+  전라북: "전북특별자치도",
+  전남: "전라남도",
+  전남도: "전라남도",
+  전라남: "전라남도",
+  경북: "경상북도",
+  경북도: "경상북도",
+  경상북: "경상북도",
+  경남: "경상남도",
+  경남도: "경상남도",
+  경상남: "경상남도",
+  제주: "제주특별자치도",
+  제주도: "제주특별자치도",
+  제주특별시: "제주특별자치도",
+};
+
+export function normalizeSido(raw?: string | null): string {
+  const v = (raw || "").trim();
+  if (!v) return "";
+  if (SIDO_NAMES.includes(v)) return v;
+  const compact = v.replace(/\s+/g, "");
+  if (SIDO_NAMES.includes(compact)) return compact;
+  const alias = SIDO_ALIASES[compact];
+  if (alias) return alias;
+  // ‘충청북도 옥천군’처럼 시·도와 시·군·구가 한 칸에 들어온 값도 앞부분으로 알아본다.
+  const full = SIDO_NAMES.find((name) => compact.startsWith(name));
+  if (full) return full;
+  return v;
+}
+
+/** 랭킹에 보여 줄 지역 이름 — 시·도를 모르면 ‘우리 지역’ */
+export function sidoLabel(raw?: string | null): string {
+  return normalizeSido(raw) || "우리 지역";
+}
+
 export function sigunguList(sido: string): string[] {
   return REGIONS.find((r) => r.name === sido)?.sigungu ?? [];
 }
