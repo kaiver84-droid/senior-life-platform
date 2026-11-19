@@ -1584,30 +1584,22 @@ const PODIUM_BADGE = (place: number) =>
 
 /** 이번 주 랭킹 시상대 — 가운데 1위(금), 왼쪽 2위(은), 오른쪽 3위(동) */
 function HeroPodium({ rows }: { rows: HeroPerson[] }) {
-  const Column = ({ place, row }: { place: number; row?: HeroPerson }) => {
+  const Column = ({ place, row }: { place: number; row: HeroPerson }) => {
     const size = place === 1 ? 72 : place === 2 ? 58 : 56;
     const tone = PODIUM_TONE(place);
     return (
       <div className="flex min-w-0 flex-1 flex-col items-center" data-podium-column={place}>
         <IconCrown size={place === 1 ? 30 : 22} className={CROWN_TONE(place)} />
         <div className="relative mt-0.5 flex flex-col items-center">
-          {row ? (
-            <Avatar
-              name={row.name}
-              src={row.avatarUrl}
-              size={size}
-              background={tone.background}
-              ring={tone.ring}
-              className={`font-black shadow-soft ${tone.text}`}
-              alt={`${row.name} 님 프로필 사진`}
-            />
-          ) : (
-            <span
-              aria-hidden
-              className={`block rounded-full bg-white/80 ${tone.ring}`}
-              style={{ width: size, height: size }}
-            />
-          )}
+          <Avatar
+            name={row.name}
+            src={row.avatarUrl}
+            size={size}
+            background={tone.background}
+            ring={tone.ring}
+            className={`font-black shadow-soft ${tone.text}`}
+            alt={`${row.name} 님 프로필 사진`}
+          />
           <span
             data-podium-badge={place}
             className={`absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-[1px] text-[min(0.7rem,17px)] font-black leading-tight shadow-soft ring-2 ring-white ${PODIUM_BADGE(place)}`}
@@ -1620,24 +1612,30 @@ function HeroPodium({ rows }: { rows: HeroPerson[] }) {
             place === 1 ? "text-[min(1rem,22px)]" : "text-[min(0.9rem,20px)]"
           }`}
         >
-          {row ? row.name : "-"}
+          {row.name}
         </p>
         <p
           className={`tabular mt-0.5 whitespace-nowrap text-center text-[min(0.84rem,20px)] font-extrabold leading-tight ${
             place === 1 ? "text-[#A5760A]" : "text-ink/55"
           }`}
         >
-          {row ? `${Math.max(0, Math.round(row.points))}점` : " "}
+          {`${Math.max(0, Math.round(row.points))}점`}
         </p>
       </div>
     );
   };
 
+  // 사람이 모자란 시상대는 빈 원을 세우지 않고 있는 만큼만 보여 준다(1명이면 1위만 가운데).
+  const slots = [2, 1, 3]
+    .map((place) => ({ place, row: rows[place - 1] }))
+    .filter((x): x is { place: number; row: HeroPerson } => Boolean(x.row));
+  if (!slots.length) return null;
+
   return (
     <div data-hero-podium className="mt-2 flex items-end justify-center gap-1.5">
-      <Column place={2} row={rows[1]} />
-      <Column place={1} row={rows[0]} />
-      <Column place={3} row={rows[2]} />
+      {slots.map(({ place, row }) => (
+        <Column key={place} place={place} row={row} />
+      ))}
     </div>
   );
 }
