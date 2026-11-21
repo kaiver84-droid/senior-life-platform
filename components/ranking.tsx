@@ -901,7 +901,6 @@ function GroupsBoard({ onNavigate, loading }: { onNavigate?: (tab: string) => vo
       <p className="rounded-2xl bg-white/70 px-4 py-3 text-center text-[0.8rem] font-semibold leading-relaxed text-ink/50">
         모임원 점수를 모두 더해 겨루고, 인원이 달라도 공평하게 보이도록 평균 점수도 함께 보여 드려요.
         {loading ? " 순위를 불러오는 중…" : ""}
-        {view.sample ? " 이름 뒤에 ‘예시’ 모임이 함께 있어요. 실제 모임이 늘면 그대로 채워집니다." : ""}
       </p>
     </div>
   );
@@ -1071,7 +1070,7 @@ function AreaBoard({
         공개 순위표에는 10위까지만 보여 드려요. 매주 월요일 0시에 새로 시작해요 (앞으로 {resetCountdown()}).
         <br />
         {rankingVisible
-          ? `이름은 뒤 글자를 가려서 보여 드려요.${view.sample ? " 지금은 예시 순위가 함께 있어요." : ""}`
+          ? "이름은 뒤 글자를 가려서 보여 드려요."
           : "랭킹 참여를 끄면 내 이름은 다른 사람에게 보이지 않아요."}
         {loading ? " 순위를 새로 불러오는 중…" : ""}
         {streak >= 3 ? ` 🔥 ${streak}일 연속 출석 중이에요.` : ""}

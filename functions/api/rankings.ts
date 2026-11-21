@@ -360,7 +360,10 @@ async function groupsFromDb(
   if (!supabaseConfig(env).configured) return null;
   const today = kstDate();
 
-  const groups = await sbGet<GroupRow>(env, `groups?select=id,name,is_demo&limit=200`);
+  // 체험 모임(is_demo)은 예시 회원으로 채워진 모임이라 단체 순위에서 뺀다.
+  const groups = (await sbGet<GroupRow>(env, `groups?select=id,name,is_demo&limit=200`)).filter(
+    (g) => !g.is_demo
+  );
   if (!groups.length) return null;
   const members = await sbGet<MemberRow>(
     env,
@@ -440,7 +443,13 @@ async function groupBattleScores(
   const dates = weekDatesOf(today);
   const start = dates[0];
   const end = dates[6];
-  const groups = await sbGet<{ id: string; name: string }>(env, `groups?select=id,name&limit=200`).catch(() => []);
+  // 체험 모임(is_demo)은 예시 회원으로 채워진 모임이라 랭킹 집계에서 뺀다.
+  const groups = await sbGet<{ id: string; name: string; is_demo?: boolean }>(
+    env,
+    `groups?select=id,name,is_demo&limit=200`
+  )
+    .then((rows) => rows.filter((g) => !g.is_demo))
+    .catch(() => [] as { id: string; name: string; is_demo?: boolean }[]);
   if (!groups.length) return null;
   const members = await sbGet<{ group_id: string; user_code: string; role: string }>(
     env,
@@ -628,7 +637,7 @@ export const onRequestGet = async ({ request, env }: Ctx) => {
     } catch {
       groups = [];
     }
-    const result: GroupBattleResult = buildGroupBattle({ weekId, groups, fill: true });
+    const result: GroupBattleResult = buildGroupBattle({ weekId, groups });
     return json({ ok: true, ...result, sample: sample || result.sample });
   }
 
