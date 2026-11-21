@@ -63,7 +63,7 @@ export function HealthChallengeCard() {
             </p>
           </div>
           <span
-            className={`grid h-12 w-12 shrink-0 place-items-center rounded-full text-[0.86rem] font-black ${
+            className={`grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full text-[min(0.86rem,20px)] font-black ${
               done === HEALTH_TOTAL ? "bg-leaf text-white" : "bg-leaf-light text-leaf-dark"
             }`}
             aria-label={`오늘 ${done}/${HEALTH_TOTAL} 완료`}
@@ -90,26 +90,29 @@ export function HealthChallengeCard() {
                 data-health-item={c.id}
                 aria-pressed={on}
                 onClick={() => toggle(c.id, c.title, c.done)}
-                className={`flex min-h-[58px] w-full items-center gap-3 rounded-2xl border-2 px-3 py-2 text-left transition active:scale-[0.995] ${
+                className={`flex min-h-[58px] w-full items-center gap-2 rounded-2xl border-2 px-2.5 py-2 text-left transition active:scale-[0.995] ${
                   on ? "border-leaf bg-leaf-light" : "border-ink/8 bg-paper"
                 }`}
               >
-                <span className="grid h-10 w-10 shrink-0 place-items-center">
+                {/* 아이콘·도장 칸은 px 고정 — 글씨를 키워도 이 칸이 같이 커져 제목 폭을 잡아먹지 않게 한다 */}
+                <span className="grid h-[44px] w-[44px] shrink-0 place-items-center">
                   {HEALTH_ICON[c.id] ? (
-                    <Icon3D name={HEALTH_ICON[c.id]} size={40} className="drop-shadow-[0_4px_8px_rgba(60,80,70,0.18)]" />
+                    <Icon3D name={HEALTH_ICON[c.id]} size={38} className="drop-shadow-[0_4px_8px_rgba(60,80,70,0.18)]" />
                   ) : (
                     <span className="text-[1.2rem]">{c.emoji}</span>
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={`block text-[1rem] font-black leading-tight ${on ? "text-leaf-dark" : "text-ink"}`}>
+                  <span className={`block break-keep text-[min(1rem,23px)] font-black leading-tight ${on ? "text-leaf-dark" : "text-ink"}`}>
                     {c.title}
                   </span>
-                  <span className="mt-0.5 block truncate text-[0.78rem] font-semibold text-ink/45">{c.desc}</span>
+                  <span className="mt-0.5 block text-[min(0.78rem,18px)] font-semibold leading-snug text-ink/45">
+                    {c.desc}
+                  </span>
                 </span>
                 <span
                   data-health-done={on ? "1" : "0"}
-                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[0.92rem] font-black ${
+                  className={`grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full text-[0.92rem] font-black ${
                     on ? "bg-leaf text-white" : "border-2 border-dashed border-ink/15 text-ink/25"
                   }`}
                 >

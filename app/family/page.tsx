@@ -105,7 +105,13 @@ function Dashboard() {
     return () => clearInterval(t);
   }, [activeCode]);
 
-  const useRemote = Boolean(remote) && !profile;
+  /**
+   * 주소에 ?code= 가 있거나 지난번에 연결한 부모님 번호가 있으면 **부모님 데이터를 보여 준다**.
+   * (예전에는 이 기기에 내 프로필이 있으면 부모님 데이터를 버리고 내 기록을 그려서,
+   *  자녀가 늘봄을 쓰는 기기에서는 부모님 안부가 자기 기록으로 보였다.)
+   * 내 데이터를 쓰는 경우는 부모님 번호가 전혀 없는 `/family/` 뿐이다.
+   */
+  const useRemote = Boolean(remote) && Boolean(activeCode);
   const data: {
     name: string;
     birthYear: number;

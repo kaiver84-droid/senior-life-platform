@@ -231,8 +231,8 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
                 {CATEGORY_EMOJI[p.category] || "🎁"}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[0.98rem] font-black leading-snug text-ink">{p.title}</span>
-                <span className="block truncate text-[0.84rem] font-extrabold text-coral-dark">{p.amount}</span>
+                <span className="block break-keep text-[min(0.98rem,22px)] font-black leading-snug text-ink">{p.title}</span>
+                <span className="mt-0.5 block break-keep text-[min(0.84rem,20px)] font-extrabold leading-snug text-coral-dark">{p.amount}</span>
               </span>
               <IconChevron size={20} className="shrink-0 text-ink/25" />
             </button>

@@ -293,6 +293,8 @@ create index if not exists health_date_idx on public.health_checks (check_date);
 create index if not exists health_user_idx on public.health_checks (user_code, check_date desc);
 
 alter table public.health_checks enable row level security;
+/* 정책을 만들지 않는다 = anon 키 전면 차단. 앱은 Functions 의 service_role 로만 읽고 쓴다.
+   2026-11-21 라이브에서 이 설정이 꺼져 있어 anon 전체 조회·삽입이 가능했으므로 다시 켰다. */
 
 /* ------------------------------------------------------------------ */
 /* 13. 랭킹 고도화 1차 — 7개 영역 · 주간 종합 리그(늘봄왕)               */

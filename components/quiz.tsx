@@ -328,11 +328,12 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           )}
 
           <Card className="p-4">
-            <div className="flex items-center justify-between">
+            {/* 글씨를 아주 크게 해도 배지·타이머가 카드 밖으로 넘치지 않게 줄바꿈을 허용한다 */}
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
               <Badge tone="brand">
                 {QUIZ_TYPE_EMOJI[q.type]} {QUIZ_TYPE_LABEL[q.type]}
               </Badge>
-              <span className="flex items-center gap-2">
+              <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
                 {isPractice ? <Badge tone="gold">연습 모드</Badge> : null}
                 {!checked ? (
                   <span className="flex items-center gap-1 text-[0.78rem] font-bold text-ink/40">

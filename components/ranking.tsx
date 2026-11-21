@@ -1736,14 +1736,18 @@ function RankingHero({
                     전체 <span className="tabular text-brand-deep">{rank.toLocaleString("ko-KR")}위</span>
                   </>
                 ) : (
-                  <span className="text-ink/55">순위를 준비하고 있어요</span>
+                  <span className="text-ink/55">아직 순위에 들지 않았어요</span>
                 )}
               </span>
               {rank ? (
                 <span className="mt-0.5 block text-[min(0.8rem,19px)] font-bold text-ink/50">
                   (총 {total.toLocaleString("ko-KR")}명 중)
                 </span>
-              ) : null}
+              ) : (
+                <span className="mt-0.5 block text-[min(0.8rem,19px)] font-bold text-ink/50">
+                  오늘 미션으로 참여하면 순위에 들어요
+                </span>
+              )}
             </p>
           ) : !hasGroup ? (
             <p className="text-[min(0.92rem,21px)] font-black leading-snug text-ink/80">
@@ -1758,14 +1762,18 @@ function RankingHero({
                     <span className="tabular text-brand-deep">{rank.toLocaleString("ko-KR")}위</span>
                   </>
                 ) : (
-                  <span className="text-ink/55">순위를 준비하고 있어요</span>
+                  <span className="text-ink/55">아직 순위에 들지 않았어요</span>
                 )}
               </span>
               {rank ? (
                 <span className="mt-0.5 block text-[min(0.8rem,19px)] font-bold text-ink/50">
                   (총 {total.toLocaleString("ko-KR")}명 중)
                 </span>
-              ) : null}
+              ) : (
+                <span className="mt-0.5 block text-[min(0.8rem,19px)] font-bold text-ink/50">
+                  오늘 미션으로 참여하면 순위에 들어요
+                </span>
+              )}
             </p>
           )}
         </div>

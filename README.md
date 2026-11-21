@@ -30,16 +30,19 @@ Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Page
 
 ## 화질(레티나 3배 · 2K) · 이미지 자산
 
-- `public/images/` 의 배너·사진은 **긴 변 2400px 초고화질**(무손실 PNG 원본에서 Lanczos 다단 업스케일 +
-  미세 샤픈, WebP q94 method6 / JPEG q93 4:4:4)입니다. 아이폰 14(390px·DPR 3 = 1170px)에서 2배 여유가 있어
-  확대해도 뭉개지지 않습니다. 예전에는 1000px·40KB대로 줄여 두어 흐릿했습니다.
-- `public/images/onboarding-hero.*` — 접속 첫 화면 상단 배너(맑은 봄 하늘·노란 국화·웃는 가족, 글자 없음) 2400×1317.
-- `public/images/home-hero.*` — 로그인 후 홈 첫 화면 인사 히어로(아침 햇살 봄 마을 정원에서 손 흔드는 어르신,
-  2400×1351, 글자 없음). 글자 자리에만 딥네이비 그라디언트를 얹어 그림 본체는 원본 그대로 보입니다.
+- `public/images/` 의 배너·사진은 **원본을 다시 그린 고해상도 아트(2026-11-21 전면 재생성)** 를 긴 변 **1600px**로
+  맞춰(원본보다 큰 해상도로 억지 업스케일하지 않음) 아주 약한 샤픈 후 **WebP q95 method6 / JPEG q93 4:4:4** 로 저장합니다.
+  아이폰 14(390px·DPR 3 = 1170px)에서 1.4~2배 여유가 있고, 같은 화면에서 예전보다 가볍습니다(전체 4.1MB → 2.7MB).
+- `public/images/onboarding-hero.*` — 접속 첫 화면 상단 배너(맑은 봄 하늘·노란 국화·웃는 가족, 글자 없음) 1600×879.
+- `public/images/home-hero.*` — 로그인 후 홈 첫 화면 인사 히어로(봄 마을 정원에서 손 흔드는 어르신,
+  1600×900, 글자 없음). 글자 자리에만 딥네이비 그라디언트를 얹어 그림 본체는 원본 그대로 보입니다.
+- `public/share-card.png` — 카카오톡 공유 썸네일 2400×1260(2배 렌더). `work/neulbom_assets/share-card.html`을
+  브라우저에서 1200×630·DPR2 로 찍어 만듭니다(글자가 벡터처럼 선명).
 - `public/images/icon-3d-*.png|webp` — 클레이·글래스 질감의 **3D 입체 아이콘 15종**(WebP 1024px · PNG 768px 폴백,
   모서리는 투명). 접속 첫 화면 3개 카드·홈 바로가기 6개 타일·오늘의 운세/날씨·건강 챌린지·퀴즈 첫 화면(치매예방)에 씁니다.
-- 재가공 스크립트: `work/neulbom_assets/process_uhd.py` (원본 → 2400px 배너 · 1024px 아이콘)
-- 검증: `python3 e2e/capture_4k_neulbom.py` (390×844 · DPR 3, 히어로 naturalWidth 2400px+ · 아이콘 768px+ ·
+- 재가공 스크립트: `work/neulbom_assets/process_uhd.py` (재생성 원본 → 1600px 배너 · 1024px 아이콘),
+  공유 카드: `work/neulbom_assets/share-card.html`
+- 검증: `python3 e2e/capture_4k_neulbom.py` (390×844 · DPR 3, 히어로 naturalWidth 1536~1600px · 아이콘 768px+ ·
   깨진 이미지·콘솔 오류 확인 + `downloads/neulbom_uhd_*.png` 스크린샷),
   `python3 e2e/preview_uhd.py` (로컬 화면 빠른 확인)
 

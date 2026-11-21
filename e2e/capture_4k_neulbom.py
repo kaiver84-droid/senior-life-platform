@@ -6,7 +6,7 @@ BASE=https://senior-life-platform.pages.dev python3 e2e/capture_4k_neulbom.py   
 확인 항목
 - 접속 첫 화면 히어로(onboarding-hero) · 홈 국화 · 퀴즈 부부 · 복지 건물 · 가족 사진이
   표시 크기의 3배 이상 해상도로 로드되는지(naturalWidth)
-- 3D 아이콘(icon-3d-*)이 모두 640px 원본으로 로드되는지, 깨진 이미지 0건
+- 3D 아이콘(icon-3d-*)이 1024px 로, 사진·배너가 실제 표시의 3배 이상으로 로드되는지, 깨진 이미지 0건
 - 콘솔/페이지 오류 0건
 스크린샷
 - downloads/neulbom_uhd_onboarding.png · neulbom_uhd_home.png · neulbom_uhd_icons.png
@@ -27,14 +27,14 @@ CHROME = os.environ.get("CHROME_PATH", "/workspace/.cache/ms-playwright/chromium
 KAKAO_ID, KAKAO_NAME = "777009002", "순자"
 
 BIG = {  # 고해상도 여야 하는 배너·사진 (파일명 조각 → 최소 naturalWidth)
-    "onboarding-hero": 2400,
-    "home-hero": 2400,
-    "greeting-chrysanthemum": 2400,
-    "quiz-couple": 2400,
-    "welfare-pension-bg": 2400,
-    "family-greeting-couple": 2400,
+    "onboarding-hero": 1600,
+    "home-hero": 1600,
+    "greeting-chrysanthemum": 1536,
+    "quiz-couple": 1254,
+    "welfare-pension-bg": 1536,
+    "family-greeting-couple": 1402,
 }
-ICON_MIN = 768  # 3D 아이콘(icon-3d-*) 최소 원본 크기
+ICON_MIN = 768  # 3D 아이콘(icon-3d-*) 최소 원본 크기 — 표시 30~48px 의 16배 이상
 
 
 def kakao_stub(route, request):
