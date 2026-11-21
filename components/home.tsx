@@ -128,7 +128,13 @@ export function HomeTab({
     fetch(`/api/rankings?${params.toString()}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad"))))
       .then((j) => {
-        if (alive) setGroupRank(typeof j?.myRank === "number" ? j.myRank : localRank);
+        if (!alive) return;
+        // 지금 보고 있는 모임의 순위를 보여 준다 — 예시 참여자가 빠져 순위표가 짧아졌으므로
+        // ‘내가 낀 모임 중 가장 높은 순위(myRank)'가 아니라 이 모임의 줄을 찾아 쓴다.
+        const rows: { id?: string; rank?: number }[] = Array.isArray(j?.rows) ? j.rows : [];
+        const row = rows.find((r) => r.id === active.id);
+        if (typeof row?.rank === "number") setGroupRank(row.rank);
+        else setGroupRank(typeof j?.myRank === "number" ? j.myRank : localRank);
       })
       .catch(() => {
         if (alive) setGroupRank(localRank);
