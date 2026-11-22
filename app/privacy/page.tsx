@@ -18,6 +18,13 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-[460px] bg-paper px-4 pb-safe pt-safe shadow-[0_0_70px_-24px_rgba(23,59,94,0.4)]">
+      {/* 앱에서 고른 글씨 크기(보통·크게·아주 크게)를 이 공개 페이지에서도 그대로 쓴다 */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html:
+            "try{var v=JSON.parse(localStorage.getItem('seniorLife.v1')||'{}');var s=v.fontSize;if(s===18||s===21||s===24){document.documentElement.style.setProperty('--app-font',(s+1)+'px');}}catch(e){}",
+        }}
+      />
       <header className="flex h-[62px] items-center justify-between">
         <Link href="/" className="flex items-center gap-2" aria-label="늘봄 홈으로">
           <NeulbomMark size={32} />
