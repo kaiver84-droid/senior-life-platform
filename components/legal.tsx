@@ -198,8 +198,8 @@ export function PrivacySheet({ open, onClose }: { open: boolean; onClose: () => 
     <Sheet
       open={open}
       onClose={onClose}
-      title="개인정보처리방침 · 이용안내"
-      subtitle="어떤 정보를 어떻게 쓰는지 알려 드려요"
+      title="개인정보 안내"
+      subtitle="처리방침 · 이용안내 · 광고 안내"
     >
       <PrivacyPolicyBody />
     </Sheet>
