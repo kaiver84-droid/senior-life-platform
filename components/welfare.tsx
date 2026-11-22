@@ -11,6 +11,7 @@ import { SpeakButton } from "./speak";
 import { IconBank, IconBell, IconChevron, IconPhone, IconPin, IconSend } from "./icons";
 import { AssetImage } from "./art";
 import { BIRTH_YEARS } from "./profile-fields";
+import { AdFitBanner } from "./adfit-banner";
 
 const CATEGORY_EMOJI: Record<string, string> = {
   전체: "🗂️",
@@ -276,6 +277,9 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
         <br />
         신청 전에 주민센터(129)로 한 번 더 확인하시면 확실해요.
       </p>
+
+      {/* 광고 — 혜택 목록 맨 아래, 버튼·카드와 떨어뜨린 자리. 광고 단위 ID 가 없으면 아무것도 안 그린다. */}
+      <AdFitBanner placement="welfare" />
 
       {/* 지원금 상세 */}
       <Sheet

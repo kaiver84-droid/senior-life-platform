@@ -19,6 +19,7 @@ import { FamilyTab } from "@/components/family";
 import { GradeSummaryRow, RankingTab } from "@/components/ranking";
 import { AlarmWatcher, CalendarScreen } from "@/components/calendar";
 import { InstallBanner, InstallGuide, InstallGuideRow } from "@/components/install-guide";
+import { PrivacySheet } from "@/components/legal";
 import { CommunityStatsCard } from "@/components/stats";
 import { NeulbomMark } from "@/components/art";
 import { GroupProvider, useGroup } from "@/lib/group-store";
@@ -446,6 +447,8 @@ function MoreTab({
 }) {
   const { active, detail } = useGroup();
   const { fontSize, setFontSize } = useApp();
+  /** 개인정보처리방침 · 이용안내 시트 */
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   if (view === "tools" || view === "family") {
     return (
@@ -510,6 +513,12 @@ function MoreTab({
           sub="이름 · 지역 · 글씨 크기 · 가족 연결 번호"
           onClick={onOpenSettings}
         />
+        <MoreRow
+          emoji="🔒"
+          title="개인정보처리방침"
+          sub="이용안내 · 광고 안내"
+          onClick={() => setPrivacyOpen(true)}
+        />
         <InstallGuideRow />
       </div>
 
@@ -535,6 +544,8 @@ function MoreTab({
       <p className="flex items-center justify-center gap-1.5 pb-1 text-[0.76rem] font-semibold text-ink/35">
         <NeulbomMark size={16} /> 늘봄과 함께, 더 편안한 하루
       </p>
+
+      <PrivacySheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
     </div>
   );
 }

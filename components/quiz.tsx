@@ -23,6 +23,7 @@ import { IconChevron, IconClock, IconDownload, IconShare, IconTrophy } from "./i
 import { AssetImage, Icon3D } from "./art";
 import { RankingPanel } from "./ranking";
 import { SharePreviewSheet, type ShareSheetData } from "./share-sheet";
+import { AdFitBanner } from "./adfit-banner";
 import type { QuizType } from "@/lib/types";
 
 /** 초성을 소리로 읽을 때 쓰는 이름 — “ㅅ ㄹ”을 “시옷, 리을”로 읽어 준다 */
@@ -514,13 +515,18 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       ) : null}
 
       {mode === "done" ? (
-        <ResultAndCertificate
-          correct={todayDaily?.correct ?? correctCount}
-          total={dailyQs.length}
-          points={todayDaily?.points ?? weekPoints}
-          show={show}
-          onPractice={() => startPractice()}
-        />
+        <>
+          <ResultAndCertificate
+            correct={todayDaily?.correct ?? correctCount}
+            total={dailyQs.length}
+            points={todayDaily?.points ?? weekPoints}
+            show={show}
+            onPractice={() => startPractice()}
+          />
+          {/* 광고 — 상장·공유·연습 버튼과 넉넉히 떨어뜨린 결과 화면 맨 아래.
+              광고 단위 ID 가 없으면 아무것도 그리지 않는다. */}
+          <AdFitBanner placement="quiz" />
+        </>
       ) : null}
 
       {mode === "practiceDone" ? (
