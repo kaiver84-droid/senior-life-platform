@@ -16,8 +16,9 @@ import { onRequestGet as localNewsGet } from "./functions/api/local-news";
 import { onRequestGet as weatherGet } from "./functions/api/weather";
 import { onRequestGet as kakaoGet, onRequestPost as kakaoPost } from "./functions/api/auth/kakao";
 import { onRequestGet as duelsGet, onRequestPost as duelsPost } from "./functions/api/duels";
+import { onRequestGet as shareImageGet, onRequestPost as shareImagePost } from "./functions/api/share-image";
 import { applyShareMeta, SITE_ORIGIN, type ShareMeta } from "./lib/og";
-import { shareMetaForRequest } from "./functions/og";
+import { cardImageUrlFromParams, shareMetaForRequest } from "./functions/og";
 
 type Env = Record<string, unknown> & { ASSETS?: { fetch: (r: Request) => Promise<Response> } };
 type Ctx = { request: Request; env: any };
@@ -53,6 +54,9 @@ export default {
       }
       if (path === "/api/duels") {
         return request.method === "POST" ? await duelsPost(ctx) : await duelsGet(ctx);
+      }
+      if (path === "/api/share-image") {
+        return request.method === "POST" ? await shareImagePost(ctx) : await shareImageGet(ctx);
       }
       if (path === "/api/auth/kakao") {
         return request.method === "POST" ? await kakaoPost(ctx) : await kakaoGet(ctx);
@@ -112,11 +116,12 @@ async function serveHtmlWithMeta(
   if (!assetRes.ok) return null;
 
   const html = await assetRes.text();
-  const meta =
-    page.route === "page" ? pageMetaFromHtml(html) : await shareMetaForRequest(env, url);
+  // 링크에 `?card=<종류>&h=<해시>` 가 붙어 있으면 그 ‘진짜 카드’를 미리보기 이미지로 쓴다.
+  const cardImage = cardImageUrlFromParams(url);
+  const meta = page.route === "page" ? pageMetaFromHtml(html) : await shareMetaForRequest(env, url);
   const body = applyShareMeta(html, meta, {
     url: url.toString(),
-    imageUrl: `${SITE_ORIGIN}${meta.image}`,
+    imageUrl: cardImage || `${SITE_ORIGIN}${meta.image}`,
   });
 
   return new Response(body, {

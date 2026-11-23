@@ -32,6 +32,60 @@ export type ShareMeta = {
 /** worker 에서도 안전하게 쓰는 기본 주소(브라우저에서는 window.location.origin 을 먼저 쓴다) */
 export const SITE_ORIGIN = "https://senior-life-platform.pages.dev";
 
+/**
+ * 상황별 카카오 피드 카드 이미지(1200×630).
+ * 예전에는 어떤 상황이든 같은 로고 배너(/share-card.png)가 떠서 “무슨 링크인지”가
+ * 카드에서 보이지 않았다. 이제는 상황마다 그 상황을 그림으로 보여 준다.
+ * (home·ranking·more 는 대표 배너를 그대로 쓴다)
+ */
+export const SHARE_IMAGE_BY_SITUATION: Record<ShareSituation, string> = {
+  home: "/share-card.png",
+  family: "/images/share-family.png",
+  invite: "/images/share-group.png",
+  groups: "/images/share-group.png",
+  quiz: "/images/share-quiz.png",
+  welfare: "/images/share-welfare.png",
+  ranking: "/share-card.png",
+  greeting: "/images/share-greeting.png",
+  fortune: "/images/share-fortune.png",
+  more: "/share-card.png",
+};
+
+/** 업로드한 ‘내가 만든 카드’를 가리킬 때 쓰는 종류 — 이 이름들이 저장 경로·주소에 들어간다 */
+export const CARD_IMAGE_KINDS = ["greeting", "quiz", "welfare", "group", "family", "fortune"] as const;
+export type CardImageKind = (typeof CARD_IMAGE_KINDS)[number];
+
+export function isCardImageKind(value: string): value is CardImageKind {
+  return (CARD_IMAGE_KINDS as readonly string[]).includes(value);
+}
+
+/** 상황 → 그 상황의 기본 카드 이미지 경로(사이트 기준) */
+export function shareImageFor(situation: ShareSituation): string {
+  return SHARE_IMAGE_BY_SITUATION[situation] || "/share-card.png";
+}
+
+/** 상황 → 절대 주소(카카오에 그대로 넘기는 값) */
+export function shareImageUrlFor(situation: ShareSituation, origin?: string): string {
+  const base = (origin || siteOrigin()).replace(/\/+$/, "");
+  return `${base}${shareImageFor(situation)}`;
+}
+
+/** 앱의 공유 카드 종류(lib/canvas) → OG 상황 */
+export function situationForCardKind(kind: string): ShareSituation {
+  switch (kind) {
+    case "greeting":
+      return "greeting";
+    case "quiz":
+      return "quiz";
+    case "health":
+      return "welfare";
+    case "invite":
+      return "invite";
+    default:
+      return "home";
+  }
+}
+
 const DEFAULT_META: ShareMeta = {
   title: "늘봄 | 언제나, 늘 곁에 있는 시니어 생활 플랫폼",
   description:
@@ -95,7 +149,7 @@ export function shareMetaFor(
             ? `초대 번호 ${code} · 매일 안부와 치매예방 퀴즈를 함께해요`
             : "매일 안부와 치매예방 퀴즈를 함께해요",
           buttonTitle: "모임 들어가기",
-          image: DEFAULT_META.image,
+          image: shareImageFor("invite"),
         };
       }
       return {
@@ -104,7 +158,7 @@ export function shareMetaFor(
           ? `초대 번호 ${code} · 매일 안부와 치매예방 퀴즈를 함께해요`
           : "매일 안부와 치매예방 퀴즈를 함께해요",
         buttonTitle: "모임 들어가기",
-        image: DEFAULT_META.image,
+        image: shareImageFor("invite"),
       };
 
     case "family":
@@ -112,7 +166,7 @@ export function shareMetaFor(
         title: "늘봄 가족 안부 확인",
         description: "가족의 오늘 안부·건강 챌린지·복약 기록을 확인해 보세요",
         buttonTitle: "가족 안부 보기",
-        image: DEFAULT_META.image,
+        image: shareImageFor("family"),
       };
 
     case "quiz":
@@ -120,7 +174,7 @@ export function shareMetaFor(
         title: "늘봄 1분 치매예방 퀴즈",
         description: "초성·옛날노래·OX 퀴즈로 두뇌 건강을 챙겨보세요",
         buttonTitle: "퀴즈 풀기",
-        image: DEFAULT_META.image,
+        image: shareImageFor("quiz"),
       };
 
     case "welfare":
@@ -128,7 +182,7 @@ export function shareMetaFor(
         title: "늘봄 오늘의 복지 혜택",
         description: "내 나이와 동네에 맞는 지원금과 신청 방법 3단계를 확인해 보세요",
         buttonTitle: "혜택 보기",
-        image: DEFAULT_META.image,
+        image: shareImageFor("welfare"),
       };
 
     case "ranking":
@@ -144,7 +198,7 @@ export function shareMetaFor(
         title: "늘봄 우리 모임",
         description: "가족·친구와 모임을 만들어 매일 안부를 나누세요",
         buttonTitle: "모임 보기",
-        image: DEFAULT_META.image,
+        image: shareImageFor("groups"),
       };
 
     case "greeting":
@@ -152,7 +206,7 @@ export function shareMetaFor(
         title: "오늘도 마음을 전해 보세요 | 늘봄",
         description: "가족·친구에게 안부 인사카드를 보내고 오늘의 운세도 함께 나눠요",
         buttonTitle: "안부 보내기",
-        image: DEFAULT_META.image,
+        image: shareImageFor("greeting"),
       };
 
     case "fortune":
@@ -160,7 +214,7 @@ export function shareMetaFor(
         title: "오늘의 운세, 함께 볼까요? | 늘봄",
         description: "생년월일로 보는 오늘의 운세와 행운의 색·숫자를 확인해 보세요",
         buttonTitle: "운세 보기",
-        image: DEFAULT_META.image,
+        image: shareImageFor("fortune"),
       };
 
     case "more":
@@ -176,25 +230,38 @@ export function shareMetaFor(
   }
 }
 
-/** 상황에 맞는 ‘그 링크’ — 이 주소로 보내야 카톡 미리보기도 그 상황으로 뜬다 */
+/**
+ * 상황에 맞는 ‘그 링크’ — 이 주소로 보내야 카톡 미리보기도 그 상황으로 뜬다.
+ * card 를 넘기면 그 카드(이미 올려 둔 내 카드 PNG)를 미리보기 이미지로 쓰도록
+ * `?card=<종류>&h=<해시>` 를 붙인다 — 링크를 그대로 붙여 넣어도 같은 카드가 뜨다.
+ */
 export function shareLinkFor(
   situation: ShareSituation,
-  opts: { origin?: string; groupCode?: string; ref?: string; familyCode?: string } = {}
+  opts: { origin?: string; groupCode?: string; ref?: string; familyCode?: string; card?: { kind: CardImageKind; hash: string } } = {}
 ): string {
   const origin = (opts.origin || siteOrigin()).replace(/\/+$/, "");
   const code = (opts.groupCode || "").trim().toUpperCase();
   const familyCode = (opts.familyCode || "").trim().toUpperCase();
   const withRef = (url: string) => {
-    if (!opts.ref) return url;
-    const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}ref=${encodeURIComponent(opts.ref)}`;
+    let out = url;
+    if (opts.card?.hash && isCardImageKind(opts.card.kind)) {
+      const sep = out.includes("?") ? "&" : "?";
+      out = `${out}${sep}card=${opts.card.kind}&h=${encodeURIComponent(opts.card.hash)}`;
+    }
+    if (!opts.ref) return out;
+    const sep = out.includes("?") ? "&" : "?";
+    return `${out}${sep}ref=${encodeURIComponent(opts.ref)}`;
   };
 
   switch (situation) {
     case "invite":
       return withRef(`${origin}/?group=${encodeURIComponent(code)}`);
-    case "family":
-      return `${origin}/family/${familyCode ? `?code=${encodeURIComponent(familyCode)}` : ""}`;
+    case "family": {
+      const base = `${origin}/family/${familyCode ? `?code=${encodeURIComponent(familyCode)}` : ""}`;
+      if (!opts.card?.hash || !isCardImageKind(opts.card.kind)) return base;
+      const sep = base.includes("?") ? "&" : "?";
+      return `${base}${sep}card=${opts.card.kind}&h=${encodeURIComponent(opts.card.hash)}`;
+    }
     case "quiz":
       return withRef(`${origin}/?tab=quiz`);
     case "welfare":
@@ -260,7 +327,8 @@ export type ApplyShareMetaOptions = {
 export function applyShareMeta(html: string, meta: ShareMeta, opts: ApplyShareMetaOptions = {}): string {
   const title = esc(meta.title);
   const description = esc(meta.description);
-  const imageUrl = opts.imageUrl || `${SITE_ORIGIN}${meta.image}`;
+  // meta.image 는 사이트 기준 경로(/images/share-*.png)이거나, 업로드한 카드의 절대 주소다.
+  const imageUrl = opts.imageUrl || (/^https?:\/\//i.test(meta.image) ? meta.image : `${SITE_ORIGIN}${meta.image}`);
 
   let out = html;
 

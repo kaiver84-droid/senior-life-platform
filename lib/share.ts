@@ -416,6 +416,8 @@ export async function shareCard(opts: {
   text: string;
   /** 공유할 링크 — 상황에 맞는 주소(예: /family/?code=…)를 넣으면 미리보기도 그 상황으로 뜼다 */
   link?: string;
+  /** 카카오 피드에 쓸 이미지 주소 — 비우면 기본 배너 */
+  imageUrl?: string;
 }): Promise<ShareResult> {
   const outcome = await smartShare(opts);
   return outcome.kind === "kakao" ? "kakao" : outcome.kind === "share" ? "share" : outcome.kind === "failed" ? "failed" : "downloaded";

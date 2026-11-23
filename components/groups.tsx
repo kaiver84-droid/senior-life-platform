@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useGroup } from "@/lib/group-store";
 import { GROUP_MAX_MEMBERS, timeAgo } from "@/lib/groups";
 import { copyText, kakaoSendNow, loadKakaoSdk, shareOutcomeMessage } from "@/lib/share";
+import { shareImageUrlFor } from "@/lib/og";
 import { kstDate } from "@/lib/week";
 import { useApp } from "@/lib/storage";
 import { Avatar, Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
@@ -34,6 +35,8 @@ function inviteFeed(detail: GroupDetail, link: string) {
     description: `초대 번호 ${detail.id} · 매일 안부와 치매예방 퀴즈를 함께해요`,
     link,
     buttonTitle: "모임 들어가기",
+    // 모임 초대 카드 — 예전처럼 늘봄 로고 배너가 아니라 ‘함께하는 사람들’ 그림이 뜨게 한다.
+    imageUrl: shareImageUrlFor("invite"),
   };
 }
 

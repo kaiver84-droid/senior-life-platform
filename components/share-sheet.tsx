@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ShareCardInput, ShareCardKind } from "@/lib/canvas";
-import { renderShareCard } from "@/lib/canvas";
+import { renderFramedShareCard, renderShareCard } from "@/lib/canvas";
+import { cardImageFor, preparedCardLink, scheduleCardUpload } from "@/lib/card-share";
+import { situationForCardKind, type CardImageKind } from "@/lib/og";
 import {
   isKakaoInAppBrowser,
   kakaoConfig,
@@ -36,6 +38,8 @@ export type ShareSheetData = {
   text: string;
   /** 공유할 링크 (모임 초대·퀴즈 결과). 비우면 현재 주소 */
   link?: string;
+  /** 이미지 종류 — 비우면 카드 종류(kind)로 정한다 */
+  cardKind?: CardImageKind;
   filename: string;
   sheetTitle?: string;
   sheetSubtitle?: string;
@@ -87,6 +91,10 @@ export function SharePreviewSheet({
   const sent = useRef(false);
   const inApp = typeof navigator !== "undefined" ? isKakaoInAppBrowser() : false;
 
+  /** 이 시트가 보내는 카드의 종류 — 올려 둔 ‘진짜 카드’와 상황별 기본 카드를 고르는 데 쓴다 */
+  const cardKind: CardImageKind = data.cardKind || (kindToCardKind(data.kind) as CardImageKind);
+  const situation = situationForCardKind(data.kind);
+
   const card = useMemo<ShareCardInput>(
     () => ({
       kind: data.kind,
@@ -105,9 +113,16 @@ export function SharePreviewSheet({
 
   const link = useCallback(() => {
     if (typeof window === "undefined") return "";
+    let base = data.link || window.location.origin;
+    // 올려 둔 내 카드가 있으면 주소에도 표시를 남긴다 — 링크를 그대로 붙여 넣어도 그 카드가 뜬다.
+    const card = preparedCardLink(cardKind);
+    if (card) {
+      const sep = base.includes("?") ? "&" : "?";
+      base = `${base}${sep}card=${card.kind}&h=${card.hash}`;
+    }
     // 공유 링크에도 `ref=<내 id>` 를 붙인다 — 이 링크로 가입한 사람이 ‘초대왕’ 순위에 잡힌다.
-    return withInviteRef(data.link || window.location.origin, viewerId);
-  }, [data.link, viewerId]);
+    return withInviteRef(base, viewerId);
+  }, [data.link, viewerId, cardKind]);
 
   /**
    * 보내기 — **클릭과 같은 콜스택에서** Kakao.Share.sendDefault 를 동기로 부른다.
@@ -122,6 +137,9 @@ export function SharePreviewSheet({
       description: data.description || data.sub || data.message || "",
       link: link(),
       buttonTitle: data.buttonTitle || "늘봄 열기",
+      // 클릭과 같은 순간에 **이미 올려 둔 카드 주소**를 넘긴다(없으면 그 상황의 기본 카드).
+      // 여기서 await 하지 않는다 — iOS 사파리는 클릭 직후 동기 호출만 카톡으로 넘겨 준다.
+      imageUrl: cardImageFor(cardKind, situation),
     };
 
     // 1) SDK 가 준비돼 있으면 즉시(동기) 전송 — 여기서 await 하지 않는 것이 핵심
@@ -215,7 +233,7 @@ export function SharePreviewSheet({
               </span>
               <div data-share-preview className="w-[78%] overflow-hidden rounded-2xl bg-white shadow-sm">
                 <div className="relative bg-[#F4F1EA]">
-                  <ShareCardPreview canvasRef={canvasRef} card={card} sourceCanvas={sourceCanvas} />
+                  <ShareCardPreview canvasRef={canvasRef} card={card} sourceCanvas={sourceCanvas} cardKind={cardKind} />
                   <span className="absolute right-1.5 top-1.5 rounded-full bg-black/45 px-2 py-0.5 text-[0.58rem] font-bold text-white">
                     늘봄
                   </span>
@@ -294,144 +312,43 @@ function ShareCardPreview({
   canvasRef,
   card,
   sourceCanvas,
+  cardKind,
 }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   card: ShareCardInput;
   sourceCanvas?: React.RefObject<HTMLCanvasElement | null>;
+  cardKind: CardImageKind;
 }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    let alive = true;
     const src = sourceCanvas?.current;
-    if (src && src.width > 0) {
-      void frameWithSource(canvas, card, src).catch(() => {});
-      return;
-    }
-    void renderShareCard(canvas, card).catch(() => {});
-  }, [canvasRef, card, sourceCanvas]);
+    const drawn =
+      src && src.width > 0
+        ? renderFramedShareCard(canvas, card, src).catch(() => {})
+        : renderShareCard(canvas, card).catch(() => {});
+    // 카드가 그려지면 조용히 올려 둔다 — [카톡으로 보내기] 때는 이미 주소가 준비돼 있다.
+    void drawn.then(() => {
+      if (alive) scheduleCardUpload(canvas, cardKind);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [canvasRef, card, sourceCanvas, cardKind]);
   return <canvas ref={canvasRef} className="block w-full" style={{ aspectRatio: "1200 / 630" }} />;
 }
 
-/** 1200×630 공유 카드 안에 이미 만든 카드(상장·인사카드)를 액자처럼 넣는다 */
-async function frameWithSource(canvas: HTMLCanvasElement, card: ShareCardInput, src: HTMLCanvasElement) {
-  const W = 1200;
-  const H = 630;
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  if (document.fonts?.ready) await document.fonts.ready;
-
-  const PAL: Record<string, { top: string; bottom: string; accent: string }> = {
-    quiz: { top: "#FFF8E3", bottom: "#FFE9AE", accent: "#8A5A0B" },
-    health: { top: "#EDF9F1", bottom: "#CDEBD9", accent: "#1B6B45" },
-    greeting: { top: "#FFF2F6", bottom: "#FFDCE8", accent: "#A84066" },
-    invite: { top: "#EAF7F8", bottom: "#CDEDEF", accent: "#0F6F76" },
-  };
-  const pal = PAL[card.kind] ?? PAL.quiz;
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, pal.top);
-  bg.addColorStop(1, pal.bottom);
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  ctx.shadowColor = "rgba(20,33,58,0.20)";
-  ctx.shadowBlur = 34;
-  ctx.shadowOffsetY = 12;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.beginPath();
-  ctx.roundRect(56, 56, W - 112, H - 112, 44);
-  ctx.fill();
-  ctx.restore();
-
-  // 오른쪽 액자
-  const boxW = 430;
-  const boxH = 470;
-  const boxX = W - 96 - boxW;
-  const boxY = (H - boxH) / 2;
-  const scale = Math.min(boxW / src.width, boxH / src.height);
-  const dw = src.width * scale;
-  const dh = src.height * scale;
-  const dx = boxX + (boxW - dw) / 2;
-  const dy = boxY + (boxH - dh) / 2;
-
-  ctx.save();
-  ctx.shadowColor = "rgba(20,33,58,0.22)";
-  ctx.shadowBlur = 26;
-  ctx.shadowOffsetY = 10;
-  ctx.fillStyle = "#FFFDF6";
-  ctx.beginPath();
-  ctx.roundRect(boxX - 10, boxY - 10, boxW + 20, boxH + 20, 26);
-  ctx.fill();
-  ctx.restore();
-  ctx.drawImage(src, dx, dy, dw, dh);
-
-  // 왼쪽 글
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  const badgeText = card.badge || "늘봄";
-  ctx.font = "800 26px " + FONT;
-  const bw = ctx.measureText(badgeText).width + 58;
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.beginPath();
-  ctx.roundRect(100, 104, bw, 54, 27);
-  ctx.fill();
-  ctx.fillStyle = pal.accent;
-  ctx.textBaseline = "middle";
-  ctx.fillText(badgeText, 129, 132);
-
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#14213A";
-  ctx.font = "900 56px " + FONT;
-  let y = 262;
-  wrapText(ctx, card.headline, 560).slice(0, 3).forEach((line) => {
-    ctx.fillText(line, 100, y);
-    y += 68;
-  });
-
-  if (card.sub) {
-    ctx.fillStyle = "#4A5670";
-    ctx.font = "600 30px " + FONT;
-    wrapText(ctx, card.sub, 560).slice(0, 2).forEach((line) => {
-      ctx.fillText(line, 100, y + 6);
-      y += 42;
-    });
+/** 앱의 카드 종류 → 올려 둘 카드 종류 */
+function kindToCardKind(kind: ShareCardKind) {
+  switch (kind) {
+    case "quiz":
+      return "quiz";
+    case "invite":
+      return "group";
+    case "health":
+      return "welfare";
+    default:
+      return "greeting";
   }
-  if (card.message) {
-    ctx.fillStyle = pal.accent;
-    ctx.font = "800 30px " + FONT;
-    wrapText(ctx, card.message, 560).slice(0, 2).forEach((line) => {
-      ctx.fillText(line, 100, y + 8);
-      y += 42;
-    });
-  }
-
-  ctx.fillStyle = "#8A93A6";
-  ctx.font = "600 26px " + FONT;
-  const meta = [card.name, card.dateLabel].filter(Boolean).join(" · ");
-  if (meta) ctx.fillText(meta, 100, 528);
-}
-
-const FONT = '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const lines: string[] = [];
-  let cur = "";
-  for (const ch of text) {
-    if (ch === "\n") {
-      lines.push(cur);
-      cur = "";
-      continue;
-    }
-    const test = cur + ch;
-    if (ctx.measureText(test).width > maxWidth && cur) {
-      lines.push(cur);
-      cur = ch;
-    } else {
-      cur = test;
-    }
-  }
-  if (cur) lines.push(cur);
-  return lines;
 }

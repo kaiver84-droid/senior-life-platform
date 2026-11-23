@@ -190,8 +190,9 @@ lib/
   calendar.ts       가족안부달력 일정 모델 · 매년 반복·D-Day·월간 달력 계산
   local-news.ts     우리동네 소식(지역 행사·축제·무료 강좌·복지) 데이터 · 지역별 생성
   canvas.ts         인사카드·상장·안부카드·공유 카드(1200×630) Canvas 렌더러
-  share.ts          카카오톡 공유(이미지 업로드·피드) → 공유창 → 저장/복사 폴백
-  og.ts             공유 상황별 제목·설명·링크(단일 출처) — worker 의 OG 주입과 앱 공유 버튼이 함께 쓴다
+  share.ts          카카오톡 공유(피드) → 공유창 → 저장/복사 폴백 — 클릭과 같은 콜스택에서 동기 호출
+  card-share.ts     내가 만든 카드(인사카드·상장)를 미리 /api/share-image 에 올려 두고, 클릭 때 그 주소를 넘긴다(디바운스 350ms)
+  og.ts             공유 상황별 제목·설명·링크·**카드 이미지**의 단일 출처 — worker 의 OG 주입과 앱 공유 버튼이 함께 쓴다
   storage.tsx       localStorage 상태 + 가족 코드 (+ 가족 일정 추가/수정/삭제)
   groups.ts         모임 API 호출 · 초대 링크(?group=) 기억 · 시간 표기
   group-store.tsx   모임 상태(목록·상세·오늘 출석·달성률)와 만들기/가입/글쓰기/응원
@@ -199,12 +200,24 @@ lib/
   group-local.ts    서버에 못 붙을 때의 localStorage 모임 폴백
   health.ts         건강생활 챌린지 5가지 정의 · 날짜별 체크 계산 · 모임 요약
   db.ts             Supabase(PostgREST) 연결 + 메모리 폴백
-functions/api/      Pages Functions (auth/kakao, state, rankings, groups, health)
+functions/api/      Pages Functions (auth/kakao, state, rankings, groups, health, share-image)
 functions/og.ts     요청 주소 → OG 정보(모임 초대는 Supabase 에서 모임 이름 조회)
 functions-entry.ts  _worker.js 진입점 — /api/* + 화면 HTML 의 제목·og:* 를 상황별로 바꿔 내려보냄
 supabase/schema.sql DB 스키마
 supabase/groups.sql 모임 테이블 + 체험 모임 시드
 ```
+
+## 카카오톡 공유 카드 이미지 (2026-11-23)
+
+- 카톡 맨 위 카드는 **상황마다 다른 그림**입니다 — `public/images/share-{greeting,quiz,welfare,group,family,fortune}.png`
+  (1200×630, `work/neulbom_assets/make_share_cards.py` 로 HTML+chromium 렌더. 홈·랭킹·더보기는 `public/share-card.png`).
+- 안부 인사카드·퀴즈 상장처럼 **내가 만든 카드**는 그 카드가 그대로 뜹니다:
+  카드가 그려지면(문구를 고치면 350ms 뒤) `lib/card-share.ts` 가 1200×630 피드 카드로 감싸 `POST /api/share-image` 로 올리고,
+  [카톡으로 보내기] 클릭 순간에는 **await 없이** 그 주소(`/api/share-image?k=…&h=…`)를 `sendDefault.content.imageUrl` 로 넘깁니다.
+  아직 올리는 중이거나 실패하면 그 상황의 기본 카드로 자동 폴백합니다(카톡이 안 열리는 일이 없게).
+- 저장: Supabase Storage 공개 버킷 `share-cards`(서비스 키로만 쓰기). 파일명이 내용 해시라 같은 카드는 덮어쓰기(중복 없음),
+  7일 지난 임시 카드는 올릴 때 가끔 정리합니다. 카카오는 `GET /api/share-image?k=…&h=…` 로 200 image/png 를 받습니다.
+- 링크에도 `?card=<종류>&h=<해시>` 가 붙어, 링크를 그대로 붙여 넣어도 같은 카드가 미리보기로 뜹니다(worker `functions/og.ts`).
 
 ## 검증
 
@@ -212,6 +225,8 @@ supabase/groups.sql 모임 테이블 + 체험 모임 시드
 - 공유 미리보기(OG) 검증: `node e2e/worker-meta-test.mjs` — out/_worker.js 를 그대로 불러
   `/?group=`·`/?join=`·`/family/`·`/?tab=quiz`·`/?share=greeting` 등 주소별 og:title·og:description 확인
   (모임 이름 조회는 `SUPABASE_SERVICE_ROLE_KEY` 가 있을 때 실제 Supabase 로 돈다)
+- 공유 카드 이미지 검증: `BASE=https://senior-life-platform.pages.dev python3 e2e/verify_share_cards.py`
+  (상황별 og:image 가 서로 다른 카드인지 + 그 주소 200 image/png + 카드 업로드/조회 + 카톡 payload 의 imageUrl 이 그 카드인지)
 - 문제 감사: `python3 scripts/audit_quiz.py` — 초성·노래·그림·**OX 2지선다·넌센스 4지선다** 검증(208문항, 0 errors)
 - 모임 API 검증(실제 Supabase): `node e2e/test_groups_api.mjs` — 만들기·가입·글쓰기·응원·선택·나가기·오류 처리 24항목
 - 건강 챌린지 저장·모임 반영 검증(실제 Supabase): `node e2e/test_health_api.mjs` — 저장·복원·줄이기·모임 health 요약 12항목

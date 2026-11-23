@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useApp, medToday } from "@/lib/storage";
-import { renderAnbuCard } from "@/lib/canvas";
+import { renderAnbuCard, type ShareCardInput } from "@/lib/canvas";
 import { shareCard, shareMessageText, shareText } from "@/lib/share";
 import { shareLinkFor } from "@/lib/og";
+import { cardImageFor, preparedCardLink, scheduleFramedCardUpload } from "@/lib/card-share";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, useToast } from "./ui";
 import { FamilyCalendarCard } from "./calendar";
@@ -34,9 +35,23 @@ export function FamilyTab({
   const timeLabel = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
   const doneCount = (todayDaily?.done ? 1 : 0) + (med.morning || med.evening ? 1 : 0) + (state.visits.includes(today) ? 1 : 0);
 
+  /** 안부카드가 그려질 때 함께 쓰는 문구 — 피드 카드(1200×630) 액자에도 같은 값이 들어간다 */
+  const anbuCard: ShareCardInput = useMemo(
+    () => ({
+      kind: "greeting",
+      badge: "오늘의 안부",
+      emoji: "💌",
+      headline: `${profile?.nickname || "가족"} 님의 오늘 안부`,
+      sub: "오늘도 잘 지내고 있어요",
+      name: profile?.nickname,
+      dateLabel: koreanDate(today),
+    }),
+    [profile?.nickname, today]
+  );
+
   useEffect(() => {
     if (!canvasRef.current || !profile) return;
-    void renderAnbuCard(canvasRef.current, {
+    const drawn = renderAnbuCard(canvasRef.current, {
       name: profile.nickname,
       morning: med.morning,
       evening: med.evening,
@@ -45,7 +60,13 @@ export function FamilyTab({
       timeLabel,
       dateLabel: koreanDate(today),
     });
-  }, [profile, med.morning, med.evening, streak, todayDaily?.done, timeLabel, today]);
+    // 카드가 그려지면 카카오 피드용 카드(1200×630)로 감싸 조용히 올려 둔다.
+    void drawn
+      .then(() => {
+        if (canvasRef.current) scheduleFramedCardUpload(canvasRef.current, anbuCard, "family");
+      })
+      .catch(() => {});
+  }, [profile, med.morning, med.evening, streak, todayDaily?.done, timeLabel, today, anbuCard]);
 
   const sendAnbu = useCallback(async () => {
     if (!canvasRef.current || !profile) return;
@@ -58,7 +79,9 @@ export function FamilyTab({
         med.morning ? "먹음" : "아직"
       }, 저녁 약 ${med.evening ? "먹음" : "아직"}) - 늘봄`,
       // 자녀가 받는 링크 — 가족 안부 상황으로 미리보기가 뜼다
-      link: shareLinkFor("family", { familyCode: code }),
+      link: shareLinkFor("family", { familyCode: code, card: preparedCardLink("family") ?? undefined }),
+      // 카톡 피드 맨 위 카드 — 미리 올려 둔 내 안부카드(없으면 가족 전용 카드)
+      imageUrl: cardImageFor("family", "family"),
     });
     show(shareMessageText(result));
   }, [profile, today, med, code, show]);

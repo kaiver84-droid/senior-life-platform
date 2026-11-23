@@ -9,8 +9,10 @@
 import { sbRequest, type DbEnv } from "../lib/db";
 import {
   groupCodeFromParams,
+  isCardImageKind,
   shareMetaFor,
   shareSituationFor,
+  SITE_ORIGIN,
   type ShareMeta,
 } from "../lib/og";
 
@@ -45,6 +47,17 @@ export async function groupNameFor(env: Env, code: string): Promise<string> {
     // 못 찾아도 초대 링크는 그대로 열린다 — 이름 없는 초대 문구를 쓴다.
     return "";
   }
+}
+
+/**
+ * 링크에 붙은 `?card=<종류>&h=<해시>` → 업로드해 둔 그 카드의 이미지 주소.
+ * 값이 없거나 형식이 틀리면 빈 문자열(호출한 쪽이 상황별 기본 카드를 쓴다).
+ */
+export function cardImageUrlFromParams(url: URL): string {
+  const kind = (url.searchParams.get("card") || "").toLowerCase();
+  const hash = (url.searchParams.get("h") || "").toLowerCase();
+  if (!isCardImageKind(kind) || !/^[a-f0-9]{8,64}$/.test(hash)) return "";
+  return `${SITE_ORIGIN}/api/share-image?k=${kind}&h=${hash}`;
 }
 
 /** 지금 요청에 내려보낼 OG 제목·설명 */

@@ -1026,3 +1026,109 @@ export async function canvasToFile(canvas: HTMLCanvasElement, filename: string):
     }, "image/png", 1);
   });
 }
+
+/**
+ * 이미 만든 카드(안부 인사카드·퀴즈 상장)를 **1200×630 카카오 피드 카드** 안에 액자처럼 넣는다.
+ * 카카오 피드는 2:1 비율이라, 세로로 긴 인사카드를 그대로 넘기면 위아래가 잘린다.
+ * 그래서 왼쪽에는 상황 문구, 오른쪽에는 ‘내가 만든 그 카드’를 그대로 담는다.
+ */
+export async function renderFramedShareCard(
+  canvas: HTMLCanvasElement,
+  card: ShareCardInput,
+  src: HTMLCanvasElement
+): Promise<void> {
+  const W = 1200;
+  const H = 630;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  await document.fonts.ready;
+
+  const pal = SHARE_PALETTE[card.kind] ?? SHARE_PALETTE.quiz;
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, pal.top);
+  bg.addColorStop(1, pal.bottom);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.shadowColor = "rgba(20,33,58,0.20)";
+  ctx.shadowBlur = 34;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = "#FFFFFF";
+  rr(ctx, 56, 56, W - 112, H - 112, 44);
+  ctx.fill();
+  ctx.restore();
+
+  // 오른쪽 액자 — 원본 카드의 비율을 지켜 넣는다
+  const boxW = 430;
+  const boxH = 470;
+  const boxX = W - 96 - boxW;
+  const boxY = (H - boxH) / 2;
+  const scale = Math.min(boxW / src.width, boxH / src.height);
+  const dw = src.width * scale;
+  const dh = src.height * scale;
+  const dx = boxX + (boxW - dw) / 2;
+  const dy = boxY + (boxH - dh) / 2;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(20,33,58,0.22)";
+  ctx.shadowBlur = 26;
+  ctx.shadowOffsetY = 10;
+  ctx.fillStyle = "#FFFDF6";
+  rr(ctx, boxX - 10, boxY - 10, boxW + 20, boxH + 20, 26);
+  ctx.fill();
+  ctx.restore();
+  ctx.drawImage(src, dx, dy, dw, dh);
+
+  // 왼쪽 글
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  const badgeText = card.badge || "늘봄";
+  ctx.font = `800 26px ${FONT}`;
+  const bw = ctx.measureText(badgeText).width + 58;
+  ctx.fillStyle = pal.soft;
+  rr(ctx, 100, 104, bw, 54, 27);
+  ctx.fill();
+  ctx.fillStyle = pal.accent;
+  ctx.textBaseline = "middle";
+  ctx.fillText(badgeText, 129, 132);
+
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#14213A";
+  ctx.font = `900 56px ${FONT}`;
+  let y = 262;
+  wrap(ctx, card.headline, 560)
+    .slice(0, 3)
+    .forEach((line) => {
+      ctx.fillText(line, 100, y);
+      y += 68;
+    });
+
+  if (card.sub) {
+    ctx.fillStyle = "#4A5670";
+    ctx.font = `600 30px ${FONT}`;
+    wrap(ctx, card.sub, 560)
+      .slice(0, 2)
+      .forEach((line) => {
+        ctx.fillText(line, 100, y + 6);
+        y += 42;
+      });
+  }
+  if (card.message) {
+    ctx.fillStyle = pal.accent;
+    ctx.font = `800 30px ${FONT}`;
+    wrap(ctx, card.message, 560)
+      .slice(0, 2)
+      .forEach((line) => {
+        ctx.fillText(line, 100, y + 8);
+        y += 42;
+      });
+  }
+
+  ctx.fillStyle = "#8A93A6";
+  ctx.font = `600 26px ${FONT}`;
+  const meta = [card.name, card.dateLabel].filter(Boolean).join(" · ");
+  if (meta) ctx.fillText(meta, 100, 528);
+}

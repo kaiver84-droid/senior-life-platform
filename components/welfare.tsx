@@ -5,8 +5,8 @@ import { matchPrograms, WELFARE_CATEGORIES } from "@/lib/welfare";
 import type { WelfareProgram } from "@/lib/types";
 import { useApp } from "@/lib/storage";
 import { REGIONS, sigunguList, shortSido } from "@/lib/regions";
-import { shareText } from "@/lib/share";
-import { shareLinkFor } from "@/lib/og";
+import { shareLink } from "@/lib/share";
+import { shareImageUrlFor, shareLinkFor } from "@/lib/og";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { SpeakButton } from "./speak";
 import { IconBank, IconBell, IconChevron, IconPhone, IconPin, IconSend } from "./icons";
@@ -70,15 +70,18 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
   };
 
   const shareAnbu = async () => {
-    const result = await shareText({
+    // 카톡 피드로 보낸다 — 맨 위 카드가 ‘안부 인사’ 전용 그림으로 뜼다(예전엔 글자만 갔었다).
+    const result = await shareLink({
       title: "늘봄 안부 인사",
-      text: `${profile?.nickname || "부모님"} 님의 오늘 안부예요. 늘봄에서 함께 챙겨요.`,
-      link: shareLinkFor("greeting"),
+      description: `${profile?.nickname || "부모님"} 님의 오늘 안부예요. 늘봄에서 함께 챙겨요.`,
+      url: shareLinkFor("greeting"),
+      buttonTitle: "안부 보기",
+      imageUrl: shareImageUrlFor("greeting"),
     });
     show(
       result === "failed"
         ? "공유를 열지 못했어요. 가족 화면에서 안부 카드를 보내 보세요."
-        : "공유 창이 열렸어요. 카카오톡을 골라 주세요."
+        : "카카오톡으로 보냈어요. 보낼 사람을 골라 주세요."
     );
   };
 
