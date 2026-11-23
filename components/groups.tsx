@@ -31,7 +31,7 @@ import type { GroupDetail, GroupMemberInfo } from "@/lib/types";
 function inviteFeed(detail: GroupDetail, link: string) {
   return {
     title: `[늘봄] ${detail.name}에 초대합니다`,
-    description: `초대 번호 ${detail.id} · 함께 치매예방 퀴즈 풀고 순위를 겨뤄요!`,
+    description: `초대 번호 ${detail.id} · 매일 안부와 치매예방 퀴즈를 함께해요`,
     link,
     buttonTitle: "모임 들어가기",
   };

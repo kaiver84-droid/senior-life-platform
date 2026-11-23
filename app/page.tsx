@@ -26,6 +26,7 @@ import { GroupProvider, useGroup } from "@/lib/group-store";
 import { captureInviteFromUrl } from "@/lib/groups";
 import { ENABLE_DUELS, captureDuelFromUrl } from "@/lib/duels";
 import { kakaoConfig, loadKakaoSdk } from "@/lib/share";
+import { shareMetaForUrl } from "@/lib/og";
 import { GroupTab } from "@/components/groups";
 import {
   IconChevron,
@@ -83,6 +84,26 @@ function Shell() {
   });
 
   useEffect(() => {
+    // 카톡으로 보낸 링크(?tab=quiz·?tab=welfare…)는 그 탭으로 바로 열린다.
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = (params.get("tab") || "").trim().toLowerCase();
+    const shareParam = (params.get("share") || "").trim().toLowerCase();
+
+    if (tabParam === "groups") {
+      setTab("group");
+      return;
+    }
+    if (TABS.some((t) => t.key === tabParam)) {
+      if (tabParam === "more") setMoreView("menu");
+      setTab(tabParam as TabKey);
+      return;
+    }
+    // ?share=greeting·fortune — 홈에서 안부 인사카드/운세를 바로 보여 준다.
+    if (shareParam) {
+      setTab("home");
+      return;
+    }
+
     const fromHash = (window.location.hash || "").replace("#", "");
     if (fromHash === "tools" || fromHash === "family") {
       setMoreView(fromHash);
@@ -90,6 +111,17 @@ function Shell() {
       return;
     }
     if (TABS.some((t) => t.key === fromHash)) setTab(fromHash as TabKey);
+  }, []);
+
+  // 브라우저 탭 제목도 지금 상황의 문구로 맞춘다 — 서버가 넣은 제목과 같게.
+  // (React 가 정적 메타데이터를 다시 적용하며 제목을 되돌릴 때가 있어 한 번 더 맞춘다)
+  useEffect(() => {
+    const apply = () => {
+      document.title = shareMetaForUrl(window.location.href).title;
+    };
+    apply();
+    const t = setTimeout(apply, 400);
+    return () => clearTimeout(t);
   }, []);
 
   /**

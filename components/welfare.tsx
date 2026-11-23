@@ -6,6 +6,7 @@ import type { WelfareProgram } from "@/lib/types";
 import { useApp } from "@/lib/storage";
 import { REGIONS, sigunguList, shortSido } from "@/lib/regions";
 import { shareText } from "@/lib/share";
+import { shareLinkFor } from "@/lib/og";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { SpeakButton } from "./speak";
 import { IconBank, IconBell, IconChevron, IconPhone, IconPin, IconSend } from "./icons";
@@ -72,6 +73,7 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
     const result = await shareText({
       title: "늘봄 안부 인사",
       text: `${profile?.nickname || "부모님"} 님의 오늘 안부예요. 늘봄에서 함께 챙겨요.`,
+      link: shareLinkFor("greeting"),
     });
     show(
       result === "failed"

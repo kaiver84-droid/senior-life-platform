@@ -9,6 +9,7 @@ import { koreanDate } from "@/lib/week";
 import { shortSido } from "@/lib/regions";
 import { dayTitle, ddayLabel, kindInfo, upcomingEvents, type FamilyEvent } from "@/lib/calendar";
 import { HEALTH_CHALLENGES, HEALTH_TOTAL } from "@/lib/health";
+import { shareMetaFor } from "@/lib/og";
 import { IconCalendar, IconPhone } from "@/components/icons";
 import type { AppState } from "@/lib/types";
 
@@ -55,6 +56,16 @@ function Dashboard() {
     } catch {
       /* 저장소를 막아 둔 브라우저도 있다 */
     }
+  }, []);
+
+  // 탭 제목도 ‘가족 안부 확인’으로 — 서버가 넣은 미리보기 문구와 같게 맞춘다.
+  useEffect(() => {
+    const apply = () => {
+      document.title = shareMetaFor("family").title;
+    };
+    apply();
+    const t = setTimeout(apply, 400);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {

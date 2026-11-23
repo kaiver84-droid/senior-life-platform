@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getFortune, shortFortuneLine, type Fortune } from "@/lib/fortune";
+import { shareLinkFor } from "@/lib/og";
 import { JISIN_LINES } from "@/lib/birthtime";
 import { fetchWeather, type WeatherInfo } from "@/lib/weather";
 import { renderGreetingCard, downloadCanvas, THEMES, type GreetingTheme } from "@/lib/canvas";
@@ -766,7 +767,8 @@ function GreetingSheet({
           description: message,
           buttonTitle: "답장 보내기",
           text: `${message} - ${profile?.nickname || ""} 드림 (늘봄)`,
-          link: typeof window !== "undefined" ? window.location.origin : "",
+          // 링크는 ‘안부 인사’ 상황 주소로 — 카톡 미리보기도 안부 문구로 뜼다.
+          link: shareLinkFor("greeting"),
           filename: `인사카드_${profile?.nickname || "늘봄"}_${today}.png`,
           sheetTitle: "카카오톡으로 안부 보내기",
           sheetSubtitle: "단톡방에 이렇게 보여요",

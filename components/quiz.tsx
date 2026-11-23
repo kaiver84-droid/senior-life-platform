@@ -16,6 +16,7 @@ import { renderCertificate, downloadCanvas } from "@/lib/canvas";
 import { useApp } from "@/lib/storage";
 import { useGroup } from "@/lib/group-store";
 import { siteOrigin } from "@/lib/groups";
+import { shareLinkFor } from "@/lib/og";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { SpeakButton } from "./speak";
@@ -773,7 +774,7 @@ function ResultAndCertificate({
           link:
             share === "group" && groupDetail
               ? inviteLink(groupDetail.id) || siteOrigin()
-              : siteOrigin(),
+              : shareLinkFor("quiz", { origin: siteOrigin() }),
           filename: `상장_${profile?.nickname || "늘봄"}_${today}.png`,
           sheetTitle: share === "group" ? "모임에 결과 알리기" : "퀴즈 상장 자랑하기",
           sheetSubtitle:

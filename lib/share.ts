@@ -414,6 +414,8 @@ export async function shareCard(opts: {
   title: string;
   description: string;
   text: string;
+  /** 공유할 링크 — 상황에 맞는 주소(예: /family/?code=…)를 넣으면 미리보기도 그 상황으로 뜼다 */
+  link?: string;
 }): Promise<ShareResult> {
   const outcome = await smartShare(opts);
   return outcome.kind === "kakao" ? "kakao" : outcome.kind === "share" ? "share" : outcome.kind === "failed" ? "failed" : "downloaded";
@@ -437,8 +439,8 @@ export async function shareLink(opts: {
   return outcome.kind === "kakao" ? "kakao" : outcome.kind === "share" ? "share" : outcome.kind === "failed" ? "failed" : "downloaded";
 }
 
-export async function shareText(opts: { title: string; text: string }): Promise<ShareResult> {
-  const url = typeof window !== "undefined" ? window.location.href : "";
+export async function shareText(opts: { title: string; text: string; /** 링크 — 없으면 지금 주소 */ link?: string }): Promise<ShareResult> {
+  const url = opts.link || (typeof window !== "undefined" ? window.location.href : "");
   const outcome = await shareViaDevice({ title: opts.title, text: opts.text, link: url });
   if (outcome.kind === "share") return "share";
   const copied = await copyText(`${opts.text}\n${url}`);

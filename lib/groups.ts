@@ -77,13 +77,17 @@ export function captureInviteFromUrl() {
   if (typeof window === "undefined") return;
   try {
     const url = new URL(window.location.href);
-    const rawGroup = (url.searchParams.get("group") || "").trim().toUpperCase();
+    // ?group=(앱이 만드는 초대 링크) · ?join=(예전·외부에서 쓰던 별칭) 둘 다 받는다.
+    const rawGroup = (url.searchParams.get("group") || url.searchParams.get("join") || "")
+      .trim()
+      .toUpperCase();
     const rawRef = (url.searchParams.get("ref") || "").trim();
     let changed = false;
 
     if (/^[A-Z0-9]{6}$/.test(rawGroup)) {
       window.localStorage.setItem(INVITE_KEY, rawGroup);
       url.searchParams.delete("group");
+      url.searchParams.delete("join");
       changed = true;
     }
     if (rawRef) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useApp, medToday } from "@/lib/storage";
 import { renderAnbuCard } from "@/lib/canvas";
 import { shareCard, shareMessageText, shareText } from "@/lib/share";
+import { shareLinkFor } from "@/lib/og";
 import { koreanDate } from "@/lib/week";
 import { Badge, BigButton, Card, SectionTitle, useToast } from "./ui";
 import { FamilyCalendarCard } from "./calendar";
@@ -56,15 +57,18 @@ export function FamilyTab({
       text: `${profile.nickname} 님: 오늘도 잘 지내고 있어요. (아침 약 ${
         med.morning ? "먹음" : "아직"
       }, 저녁 약 ${med.evening ? "먹음" : "아직"}) - 늘봄`,
+      // 자녀가 받는 링크 — 가족 안부 상황으로 미리보기가 뜼다
+      link: shareLinkFor("family", { familyCode: code }),
     });
     show(shareMessageText(result));
-  }, [profile, today, med, show]);
+  }, [profile, today, med, code, show]);
 
   const sendLink = useCallback(async () => {
-    const url = `${window.location.origin}/family/?code=${code}`;
+    const url = shareLinkFor("family", { familyCode: code });
     const result = await shareText({
       title: "부모님 오늘 안부 확인",
       text: `${profile?.nickname} 님의 오늘 안부예요. 아래 링크에서 확인하세요: ${url}`,
+      link: url,
     });
     show(
       result === "failed"
