@@ -26,7 +26,7 @@ import { GroupProvider, useGroup } from "@/lib/group-store";
 import { captureInviteFromUrl } from "@/lib/groups";
 import { ENABLE_DUELS, captureDuelFromUrl } from "@/lib/duels";
 import { kakaoConfig, loadKakaoSdk } from "@/lib/share";
-import { shareMetaForUrl } from "@/lib/og";
+import { shareMetaFor, shareSituationFor, groupCodeFromParams } from "@/lib/og";
 import { GroupTab } from "@/components/groups";
 import {
   IconChevron,
@@ -89,39 +89,47 @@ function Shell() {
     const tabParam = (params.get("tab") || "").trim().toLowerCase();
     const shareParam = (params.get("share") || "").trim().toLowerCase();
 
+    // 브라우저 탭 제목 — 주소를 지우기 전에 이 링크의 상황을 먼저 읽어 둔다.
+    // (React 가 정적 메타데이터를 다시 적용하며 제목을 되돌릴 때가 있어 한 번 더 맞춘다)
+    const title = shareMetaFor(shareSituationFor(window.location.pathname, params), {
+      groupCode: groupCodeFromParams(params),
+    }).title;
+    const applyTitle = () => {
+      document.title = title;
+    };
+    applyTitle();
+    const titleTimer = setTimeout(applyTitle, 400);
+
+    // ?share= 는 한 번만 쓰고 주소에서 지운다(그 뒤 탭은 ?tab= 으로 적힌다).
+    if (shareParam) {
+      params.delete("share");
+      const qs = params.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash || ""}`);
+    }
+
     if (tabParam === "groups") {
       setTab("group");
-      return;
+      return () => clearTimeout(titleTimer);
     }
     if (TABS.some((t) => t.key === tabParam)) {
       if (tabParam === "more") setMoreView("menu");
       setTab(tabParam as TabKey);
-      return;
+      return () => clearTimeout(titleTimer);
     }
     // ?share=greeting·fortune — 홈에서 안부 인사카드/운세를 바로 보여 준다.
     if (shareParam) {
       setTab("home");
-      return;
+      return () => clearTimeout(titleTimer);
     }
 
     const fromHash = (window.location.hash || "").replace("#", "");
     if (fromHash === "tools" || fromHash === "family") {
       setMoreView(fromHash);
       setTab("more");
-      return;
+      return () => clearTimeout(titleTimer);
     }
     if (TABS.some((t) => t.key === fromHash)) setTab(fromHash as TabKey);
-  }, []);
-
-  // 브라우저 탭 제목도 지금 상황의 문구로 맞춘다 — 서버가 넣은 제목과 같게.
-  // (React 가 정적 메타데이터를 다시 적용하며 제목을 되돌릴 때가 있어 한 번 더 맞춘다)
-  useEffect(() => {
-    const apply = () => {
-      document.title = shareMetaForUrl(window.location.href).title;
-    };
-    apply();
-    const t = setTimeout(apply, 400);
-    return () => clearTimeout(t);
+    return () => clearTimeout(titleTimer);
   }, []);
 
   /**
@@ -144,6 +152,20 @@ function Shell() {
   }, []);
 
   // 예전 바로가기(도구·가족)도 그대로 열린다 — ‘더보기’ 안에서 이어서 보여 준다.
+  /** 지금 보고 있는 탭을 주소에도 적어 둔다(?tab=quiz) — 주소를 복사해 보내도 그 상황 문구로 미리보기가 뜬다 */
+  const writeTabToUrl = (k: TabKey) => {
+    try {
+      const u = new URL(window.location.href);
+      if (k === "home") u.searchParams.delete("tab");
+      else u.searchParams.set("tab", k);
+      u.searchParams.delete("share");
+      u.hash = k;
+      window.history.replaceState({}, "", `${u.pathname}${u.search}${u.hash}`);
+    } catch {
+      /* 주소를 바꾸지 못해도 화면은 그대로 */
+    }
+  };
+
   const navigate = (key: string) => {
     if (key === "tools" || key === "family") {
       setMoreView(key);
@@ -155,7 +177,7 @@ function Shell() {
     const k = (TABS.some((t) => t.key === key) ? key : "home") as TabKey;
     if (k === "more") setMoreView("menu");
     setTab(k);
-    window.location.hash = k;
+    writeTabToUrl(k);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
