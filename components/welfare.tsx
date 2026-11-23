@@ -1,12 +1,18 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { matchPrograms, WELFARE_CATEGORIES } from "@/lib/welfare";
+import { matchPrograms, WELFARE, WELFARE_CATEGORIES } from "@/lib/welfare";
 import type { WelfareProgram } from "@/lib/types";
 import { useApp } from "@/lib/storage";
 import { REGIONS, sigunguList, shortSido } from "@/lib/regions";
-import { shareLink } from "@/lib/share";
-import { shareImageUrlFor, shareLinkFor } from "@/lib/og";
+import {
+  copyText,
+  kakaoSendNow,
+  loadKakaoSdk,
+  shareLink,
+  shareOutcomeMessage,
+} from "@/lib/share";
+import { programShareMeta, shareImageUrlFor, shareLinkFor } from "@/lib/og";
 import { Badge, BigButton, Card, SectionTitle, Sheet, useToast } from "./ui";
 import { SpeakButton } from "./speak";
 import { IconBank, IconBell, IconChevron, IconPhone, IconPin, IconSend } from "./icons";
@@ -61,7 +67,22 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
   const heroId = age >= 65 ? "basic-pension" : age >= 18 ? "training-card" : "bokjiro-search";
   const hero = filtered.find((p) => p.id === heroId) ?? filtered[0];
   const others = filtered.filter((p) => p.id !== hero?.id);
-  const openProgram = matched.find((p) => p.id === openId) ?? null;
+  // 카톡으로 받은 ?program=<id> 링크는 내 나이·지역 목록에 없어도 그 혜택을 연다.
+  const openProgram = WELFARE.find((p) => p.id === openId) ?? matched.find((p) => p.id === openId) ?? null;
+
+  // 카톡에서 받은 혜택 링크(?tab=welfare&program=basic-pension)로 들어오면 그 혜택 상세를 바로 띄운다.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = (new URLSearchParams(window.location.search).get("program") || "").trim();
+    if (!id) return;
+    const hit = WELFARE.find((p) => p.id === id);
+    if (hit) setOpenId(hit.id);
+    // 문을 닫은 뒤 다시 탭을 오갈 때 또 열리지 않게 주소에서 program 만 지운다(?tab=welfare 는 남긴다).
+    const url = new URL(window.location.href);
+    url.searchParams.delete("program");
+    window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** 혜택을 자세히 열어 보면 ‘복지·생활정보 확인’ 미션이 자동으로 기록된다(늘봄왕 +10점) */
   const openDetail = (id: string) => {
@@ -292,11 +313,11 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
         onClose={() => setOpenId(null)}
         title={openProgram?.title}
         subtitle={openProgram ? `${openProgram.org} · ${openProgram.amount}` : undefined}
+        hideTopClose
       >
         {openProgram ? (
           <ProgramDetail
             program={openProgram}
-            onClose={() => setOpenId(null)}
             onFamily={() => {
               setOpenId(null);
               onNavigate?.("family");
@@ -326,13 +347,61 @@ export function WelfareTab({ onNavigate }: { onNavigate?: (tab: string) => void 
 
 function ProgramDetail({
   program,
-  onClose,
   onFamily,
 }: {
   program: WelfareProgram;
-  onClose: () => void;
   onFamily: () => void;
 }) {
+  const { show } = useToast();
+
+  /**
+   * 이 혜택을 카카오톡으로 보낸다 — 혜택 이름·금액·문의와 `?tab=welfare&program=<id>` 링크,
+   * 그리고 ‘복지 혜택’ 전용 카드(share-welfare.png).
+   * iOS 사파리는 클릭과 같은 작업에서 동기로 불러야 카톡이 열리므로 kakaoSendNow 를 바로 부른다.
+   */
+  const shareProgram = () => {
+    const link = shareLinkFor("welfare", { program: program.id });
+    const meta = programShareMeta(program);
+    const feed = {
+      title: meta.title,
+      description: meta.description,
+      link,
+      buttonTitle: meta.buttonTitle,
+      imageUrl: shareImageUrlFor("welfare"),
+    };
+
+    const copyFallback = async () => {
+      const text = `[늘봄] ${program.title} — ${program.amount} · ${program.org}${
+        program.phone ? ` · ${program.phone}` : ""
+      }\n${link}`;
+      const copied = await copyText(text);
+      show(
+        copied
+          ? "카카오톡을 열지 못해 혜택 링크를 복사했어요. 대화창에 붙여넣어 보내세요."
+          : "카카오톡을 열지 못했어요. 잠시 뒤 다시 눌러 주세요."
+      );
+    };
+
+    const immediate = kakaoSendNow(feed, (failed) => {
+      show(shareOutcomeMessage(failed));
+      void copyFallback();
+    });
+    if (immediate?.kind === "kakao") {
+      show("카카오톡이 열렸어요. 보낼 사람(단톡방)을 골라 주세요.");
+      return;
+    }
+
+    void (async () => {
+      const loaded = await loadKakaoSdk();
+      const again = loaded ? kakaoSendNow(feed) : null;
+      if (again?.kind === "kakao") {
+        show("카카오톡이 열렸어요. 보낼 사람(단톡방)을 골라 주세요.");
+        return;
+      }
+      await copyFallback();
+    })();
+  };
+
   return (
     <div className="space-y-3">
       <div className="rounded-[1.5rem] bg-white p-5 shadow-soft">
@@ -408,10 +477,13 @@ function ProgramDetail({
           <IconBank size={20} /> 신청 페이지
         </a>
       </div>
+      {/* 닫기는 시트 아래 고정 버튼 하나만 — 본문에 또 두지 않는다 */}
       <div className="grid grid-cols-2 gap-2">
-        <BigButton variant="white" onClick={onClose}>
-          닫기
-        </BigButton>
+        <div data-welfare-share>
+          <BigButton variant="sun" full onClick={shareProgram}>
+            <IconSend size={20} /> 카톡 공유
+          </BigButton>
+        </div>
         <BigButton variant="teal" onClick={onFamily}>
           가족과 상의
         </BigButton>

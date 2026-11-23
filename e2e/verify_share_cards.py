@@ -88,8 +88,13 @@ KAKAO_STUB = """
 """ % json.dumps(json.dumps(STATE))
 
 
+UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+
+
 def http(url, method="GET", body=None, headers=None):
-    req = urllib.request.Request(url, method=method, data=body, headers=headers or {})
+    h = {"User-Agent": UA}
+    h.update(headers or {})
+    req = urllib.request.Request(url, method=method, data=body, headers=h)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return r.status, dict(r.headers), r.read()
@@ -125,6 +130,16 @@ def main():
     print("서로 다른 카드 수:", len({v for v in seen.values()}), "/", len(SITUATIONS))
     check("상황마다 다른 카드(중복 없이 6종 이상)", len({v for v in seen.values()}) >= 6)
 
+    # 혜택 하나를 가리키는 링크 — 그 혜택의 이름·금액이 미리보기에 뜨는지
+    status, _, body = http(BASE + "/?tab=welfare&program=basic-pension")
+    html = body.decode("utf-8", "ignore")
+    og_title = (re.search(r'<meta property="og:title" content="([^"]*)"', html) or [None, ""])[1]
+    og_desc = (re.search(r'<meta property="og:description" content="([^"]*)"', html) or [None, ""])[1]
+    og_img = (re.search(r'<meta property="og:image" content="([^"]*)"', html) or [None, ""])[1]
+    check("혜택 링크 og:title 에 혜택 이름", "기초연금" in og_title, og_title)
+    check("혜택 링크 og:description 에 금액·문의", "349,700" in og_desc and "주민센터" in og_desc, og_desc)
+    check("혜택 링크 og:image = 복지 카드", og_img.endswith("/images/share-welfare.png"), og_img)
+
     # ---------- 2) 업로드 API ----------
     print("\n== /api/share-image ==")
     png = open("/workspace/work/senior-platform/public/images/share-quiz.png", "rb").read()
@@ -140,9 +155,21 @@ def main():
         check("업로드 카드 주소 200 image/png", code == 200 and "image/png" in headers.get("Content-Type", ""),
               f"{code} {headers.get('Content-Type')} {len(data)}B")
         check("올린 바이트와 같은 이미지", len(data) == len(png))
-        code2, headers2, _ = http(BASE + "/api/share-image?k=quiz&h=000000000000000000000000")
-        check("없는 카드는 상황별 기본 카드로 302", code2 == 302 and headers2.get("Location", "").endswith("/images/share-quiz.png"),
-              f"{code2} {headers2.get('Location')}")
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k):
+                return None
+
+        opener = urllib.request.build_opener(NoRedirect)
+        try:
+            r = opener.open(
+                urllib.request.Request(BASE + "/api/share-image?k=quiz&h=000000000000000000000000", headers={"User-Agent": UA}),
+                timeout=20,
+            )
+            code2, loc2 = r.status, r.headers.get("Location", "")
+        except urllib.error.HTTPError as e:
+            code2, loc2 = e.code, e.headers.get("Location", "")
+        check("없는 카드는 상황별 기본 카드로 302", code2 == 302 and loc2.endswith("/images/share-quiz.png"),
+              f"{code2} {loc2}")
 
     # ---------- 3) 앱 → 카톡 payload ----------
     print("\n== 카톡 보내기 payload ==")
@@ -174,7 +201,7 @@ def main():
         page.wait_for_timeout(1500)
 
         # 홈 → 인사카드 만들기 → 카톡으로 보내기
-        page.get_by_role("button", name=re.compile("인사카드 만들기")).first.click()
+        page.locator("[data-home-greeting]").first.click()
         page.wait_for_selector("[data-sheet-close]", timeout=15000)
         page.wait_for_timeout(2200)
         page.get_by_role("button", name=re.compile("카톡으로 보내기")).first.click()
@@ -194,19 +221,62 @@ def main():
         os.makedirs(SHOT_DIR, exist_ok=True)
         page.screenshot(path=f"{SHOT_DIR}/home-greeting-sent-{TAG}.png")
 
-        # 가족 탭 → 안부 카드 보내기
-        page.evaluate("window.__kakaoCalls = []")
-        page.get_by_role("button", name=re.compile("가족")).first.click()
+        # 더보기 → 가족 확인 화면 → 안부 카드 보내기 (가족은 탭이 아니라 더보기 안에 있다)
+        page.goto(BASE + "/?tab=more", wait_until="domcontentloaded")
+        page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=45000)
+        page.wait_for_timeout(1500)
+        page.get_by_role("button", name=re.compile("가족 확인 화면")).first.click()
         page.wait_for_timeout(2500)
         btn = page.get_by_role("button", name=re.compile("안부 카드 보내기")).first
+        check("가족 탭 안부 카드 보내기 버튼 있음", btn.count() > 0)
         if btn.count():
+            before_uploads = len(uploads)
             btn.click()
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(1800)
             calls2 = page.evaluate("window.__kakaoCalls") or []
             check("가족 안부 sendDefault 호출", len(calls2) >= 1, f"{len(calls2)}회")
             if calls2:
                 img = str(calls2[0]["payload"].get("content", {}).get("imageUrl", ""))
-                check("가족 안부 imageUrl = 업로드 카드/가족 카드", "/api/share-image?k=family&h=" in img or "/images/share-family.png" in img, img)
+                check(
+                    "가족 안부 imageUrl = 업로드 카드/가족 카드",
+                    "/api/share-image?k=family&h=" in img or "/images/share-family.png" in img,
+                    img,
+                )
+                print("  family uploads:", uploads[before_uploads:])
+
+        # ---------- 혜택 상세 모달: 중복 닫기 정리 + 카톡 공유 ----------
+        print("\n== 혜택 상세 모달 ==")
+        page.goto(BASE + "/?tab=welfare&program=basic-pension", wait_until="domcontentloaded")
+        page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=45000)
+        page.wait_for_selector("text=이렇게 하세요 (3단계)", timeout=20000)
+        page.wait_for_timeout(900)
+
+        close_btns = page.locator("button:text-is('닫기')")
+        check("시트 안 ‘닫기’ 버튼 1개(중복 없음)", close_btns.count() == 1, f"{close_btns.count()}개")
+        check("상단 ✕ 닫기 감춤", page.locator("[data-sheet-close]").count() == 0)
+        share_btn = page.locator("[data-welfare-share] button").first
+        check("혜택 모달에 ‘카톡 공유’ 버튼", share_btn.count() > 0 and "카톡" in share_btn.inner_text())
+        page.screenshot(path=f"{SHOT_DIR}/welfare-detail-share-{TAG}.png")
+
+        page.evaluate("window.__kakaoCalls = []")
+        share_btn.click()
+        page.wait_for_timeout(1200)
+        calls3 = page.evaluate("window.__kakaoCalls") or []
+        check("혜택 카톡 공유 sendDefault 호출", len(calls3) >= 1, f"{len(calls3)}회")
+        if calls3:
+            c = calls3[0]
+            content = c["payload"].get("content", {})
+            img = str(content.get("imageUrl", ""))
+            link = str((content.get("link") or {}).get("mobileWebUrl", ""))
+            check("혜택 제목이 카드 제목에", "기초연금" in str(content.get("title", "")), str(content.get("title")))
+            check(
+                "금액·문의가 카드 설명에",
+                "349,700" in str(content.get("description", "")) and "주민센터" in str(content.get("description", "")),
+                str(content.get("description")),
+            )
+            check("혜택 카드 이미지 = share-welfare.png", img.endswith("/images/share-welfare.png"), img)
+            check("링크에 program=<id>", "program=basic-pension" in link, link)
+            check("클릭과 같은 콜스택(동기) 호출", c["inClick"] is True)
         browser.close()
 
     if httpd:

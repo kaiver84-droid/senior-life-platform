@@ -230,6 +230,23 @@ export function shareMetaFor(
   }
 }
 
+/** 복지 혜택 하나를 카톡으로 보낼 때의 제목·설명 — 앱 공유 버튼과 worker 의 OG 가 같은 문구를 쓴다 */
+export function programShareMeta(program: {
+  title: string;
+  amount: string;
+  org: string;
+  phone?: string;
+}): ShareMeta {
+  const phone = (program.phone || "").trim();
+  const contact = `${program.org}${phone ? ` · ${phone}` : ""}`.trim();
+  return {
+    title: `${program.title} | 늘봄`,
+    description: `${program.amount} · ${contact}`.slice(0, 120),
+    buttonTitle: "혜택 보기",
+    image: shareImageFor("welfare"),
+  };
+}
+
 /**
  * 상황에 맞는 ‘그 링크’ — 이 주소로 보내야 카톡 미리보기도 그 상황으로 뜬다.
  * card 를 넘기면 그 카드(이미 올려 둔 내 카드 PNG)를 미리보기 이미지로 쓰도록
@@ -237,7 +254,15 @@ export function shareMetaFor(
  */
 export function shareLinkFor(
   situation: ShareSituation,
-  opts: { origin?: string; groupCode?: string; ref?: string; familyCode?: string; card?: { kind: CardImageKind; hash: string } } = {}
+  opts: {
+    origin?: string;
+    groupCode?: string;
+    ref?: string;
+    familyCode?: string;
+    /** 복지 혜택 상세를 바로 열 링크(?tab=welfare&program=<id>) */
+    program?: string;
+    card?: { kind: CardImageKind; hash: string };
+  } = {}
 ): string {
   const origin = (opts.origin || siteOrigin()).replace(/\/+$/, "");
   const code = (opts.groupCode || "").trim().toUpperCase();
@@ -264,8 +289,10 @@ export function shareLinkFor(
     }
     case "quiz":
       return withRef(`${origin}/?tab=quiz`);
-    case "welfare":
-      return withRef(`${origin}/?tab=welfare`);
+    case "welfare": {
+      const id = (opts.program || "").trim();
+      return withRef(`${origin}/?tab=welfare${id ? `&program=${encodeURIComponent(id)}` : ""}`);
+    }
     case "ranking":
       return withRef(`${origin}/?tab=ranking`);
     case "groups":

@@ -7,7 +7,10 @@
  * 모임 초대 링크면 Supabase 에서 모임 이름까지 찾아 넣는다.
  */
 import { sbRequest, type DbEnv } from "../lib/db";
+import { WELFARE } from "../lib/welfare";
+import type { WelfareProgram } from "../lib/types";
 import {
+  programShareMeta,
   groupCodeFromParams,
   isCardImageKind,
   shareMetaFor,
@@ -60,9 +63,26 @@ export function cardImageUrlFromParams(url: URL): string {
   return `${SITE_ORIGIN}/api/share-image?k=${kind}&h=${hash}`;
 }
 
+/**
+ * `?tab=welfare&program=<id>` → 그 혜택. 링크를 카톡에 붙였을 때
+ * “늘봄 오늘의 복지 혜택”이 아니라 그 혜택의 이름·금액·문의가 미리보기에 뜽다.
+ */
+export function welfareProgramFromParams(url: URL): WelfareProgram | null {
+  const id = (url.searchParams.get("program") || "").trim();
+  if (!id) return null;
+  return WELFARE.find((p) => p.id === id) ?? null;
+}
+
 /** 지금 요청에 내려보낼 OG 제목·설명 */
 export async function shareMetaForRequest(env: Env, url: URL): Promise<ShareMeta> {
   const situation = shareSituationFor(url.pathname, url.searchParams);
+
+  // 혜택 하나를 가리키는 링크면 그 혜택 문구·카드를 쓴다.
+  if (situation === "welfare") {
+    const program = welfareProgramFromParams(url);
+    if (program) return programShareMeta(program);
+  }
+
   const groupCode = groupCodeFromParams(url.searchParams);
   const groupName = situation === "invite" && groupCode ? await groupNameFor(env, groupCode) : "";
   return shareMetaFor(situation, { groupCode, groupName });

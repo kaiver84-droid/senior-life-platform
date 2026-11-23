@@ -326,6 +326,7 @@ export function Sheet({
   children,
   footer,
   hideBottomClose,
+  hideTopClose,
 }: {
   open: boolean;
   onClose: () => void;
@@ -335,6 +336,8 @@ export function Sheet({
   footer?: React.ReactNode;
   /** 시트 안에 이미 큰 닫기 버튼이 있으면(공유 시트 등) 아래 고정 닫기를 겹쳐 그리지 않는다 */
   hideBottomClose?: boolean;
+  /** 닫기 버튼을 아래 고정 버튼 하나로만 두고 상단 ‘✕ 닫기’는 감춘다(버튼이 세 번 보이지 않게) */
+  hideTopClose?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -373,16 +376,18 @@ export function Sheet({
                   <p className="mt-0.5 truncate text-[0.84rem] font-semibold text-ink/55">{subtitle}</p>
                 ) : null}
               </div>
-              <button
-                type="button"
-                data-sheet-close
-                onClick={onClose}
-                aria-label="닫기"
-                className="flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-[1rem] font-extrabold text-white shadow-soft active:bg-[#0F2C48]"
-              >
-                <IconClose size={20} />
-                닫기
-              </button>
+              {hideTopClose ? null : (
+                <button
+                  type="button"
+                  data-sheet-close
+                  onClick={onClose}
+                  aria-label="닫기"
+                  className="flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-[1rem] font-extrabold text-white shadow-soft active:bg-[#0F2C48]"
+                >
+                  <IconClose size={20} />
+                  닫기
+                </button>
+              )}
             </div>
           </div>
 

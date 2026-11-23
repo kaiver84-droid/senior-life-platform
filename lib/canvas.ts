@@ -1097,19 +1097,27 @@ export async function renderFramedShareCard(
 
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#14213A";
-  ctx.font = `900 56px ${FONT}`;
+  // 제목은 두 줄 안에 들어오게 크기를 줄여 가며 맞춘다 — 마지막 한 글자만 다음 줄로
+  // 떨어지는 어색한 줄바꿈(예: ‘…안 / 부’)을 막는다.
+  const TEXT_W = 596;
+  let headSize = 56;
+  let headLines: string[] = [];
+  for (const size of [56, 50, 45, 40]) {
+    headSize = size;
+    ctx.font = `900 ${size}px ${FONT}`;
+    headLines = wrap(ctx, card.headline, TEXT_W);
+    if (headLines.length <= 2) break;
+  }
   let y = 262;
-  wrap(ctx, card.headline, 560)
-    .slice(0, 3)
-    .forEach((line) => {
-      ctx.fillText(line, 100, y);
-      y += 68;
-    });
+  headLines.slice(0, 2).forEach((line) => {
+    ctx.fillText(line, 100, y);
+    y += Math.round(headSize * 1.2);
+  });
 
   if (card.sub) {
     ctx.fillStyle = "#4A5670";
     ctx.font = `600 30px ${FONT}`;
-    wrap(ctx, card.sub, 560)
+    wrap(ctx, card.sub, TEXT_W)
       .slice(0, 2)
       .forEach((line) => {
         ctx.fillText(line, 100, y + 6);
@@ -1119,7 +1127,7 @@ export async function renderFramedShareCard(
   if (card.message) {
     ctx.fillStyle = pal.accent;
     ctx.font = `800 30px ${FONT}`;
-    wrap(ctx, card.message, 560)
+    wrap(ctx, card.message, TEXT_W)
       .slice(0, 2)
       .forEach((line) => {
         ctx.fillText(line, 100, y + 8);
