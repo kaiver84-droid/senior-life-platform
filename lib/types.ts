@@ -33,6 +33,9 @@ export type QuizLog = {
   seconds: number;
   types: QuizType[];
   at: string; // ISO
+  /** 그날 연습 모드(무한 연습 포함)에서 맞힌 문제 수 — 맞힌 만큼 points 에 1점씩 더해진다.
+   *  이 값이 있어도 하루 미션을 마친 것(total > 0)은 아니다. */
+  practice?: number;
 };
 
 export type DailyQuiz = {

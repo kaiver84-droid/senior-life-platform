@@ -49,8 +49,8 @@ create table if not exists public.quiz_logs (
   user_code   text not null references public.users(code) on delete cascade,
   quiz_date   date not null default (now() at time zone 'Asia/Seoul')::date,
   week_id     text not null,                        -- 2026-W47
-  correct     int  not null check (correct between 0 and 3),
-  total       int  not null check (total between 1 and 3),
+  correct     int  not null check (correct between 0 and 20),
+  total       int  not null check (total between 0 and 20),  -- 0 = 연습 모드만 푼 날(하루 미션 전), 5 = 하루 미션
   points      int  not null default 0,
   seconds     int  not null default 0,
   types       text[] not null default '{}',

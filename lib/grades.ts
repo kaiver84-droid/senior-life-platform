@@ -283,7 +283,8 @@ export function localLifetime(
     if (d > opts.today) return;
     points += dayLeagueScore({
       attend: visits.includes(d),
-      quiz: quizLogs.some((q) => q.date === d) || (d === opts.today && Boolean(state.quizLogs?.some((q) => q.date === d))),
+      // 연습 모드로 생긴 기록(total 0)은 하루 미션 완료로 보지 않는다.
+      quiz: quizLogs.some((q) => q.date === d && (Number(q.total) || 0) > 0),
       health: (health[d] ?? []).length > 0,
       welfare: (missions[d] ?? []).includes("welfare"),
       group: (missions[d] ?? []).includes("group"),

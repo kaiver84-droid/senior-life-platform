@@ -96,7 +96,10 @@ export const onRequestPost = async ({ request, env }: Ctx) => {
   try {
     await upsertUser(env, body.code, body.profile);
     if (body.invitedBy) await rememberInviter(env, body.code, body.profile.id, body.invitedBy);
-    const latest = body.quizLogs?.[body.quizLogs.length - 1];
+    // 오늘 기록을 저장한다 — 연습 모드 점수가 쌓인 날도 같은 줄(user_code+quiz_date)로 올라간다.
+    // (배열 끝이 오늘이 아닐 수 있어 날짜로 찾고, 없으면 마지막 기록을 쓴다.)
+    const latest =
+      body.quizLogs?.find((l) => l?.date === today) ?? body.quizLogs?.[body.quizLogs.length - 1];
     if (latest) await saveQuizLog(env, body.code, latest);
     const med = body.med?.[today];
     if (med) await saveMed(env, body.code, today, med.morning, med.evening);

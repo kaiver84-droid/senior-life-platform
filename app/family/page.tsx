@@ -161,6 +161,8 @@ function Dashboard() {
   const medicineDone = todayHealth.includes("medicine");
   const todayLogs = data.quizLogs.filter((q) => q.date === today);
   const todayPoints = todayLogs.reduce((a, b) => a + b.points, 0);
+  /** 오늘 하루 미션(5문제)을 마친 기록 — 연습 모드만 푼 날(total 0)은 ‘아직’으로 보인다 */
+  const todayMission = todayLogs.find((q) => (Number(q.total) || 0) > 0) ?? null;
   const visitedToday = data.visits.includes(today);
   const parentStreak = calcStreak({ ...state, quizLogs: data.quizLogs, med: data.med, visits: data.visits }, today);
   const familyUpcoming = upcomingEvents(data.familyEvents, today, 180, 4);
@@ -349,10 +351,10 @@ function Dashboard() {
           오늘의 기억 활동
         </SectionTitle>
         <p className="text-[1rem] font-black">
-          {todayLogs.length > 0 ? `퀴즈 ${todayLogs[0].correct}/${todayLogs[0].total} 정답` : "아직 퀴즈를 하지 않았어요"}
+          {todayMission ? `퀴즈 ${todayMission.correct}/${todayMission.total} 정답` : "아직 퀴즈를 하지 않았어요"}
         </p>
         <p className="text-[0.86rem] font-semibold text-ink/55">
-          {todayLogs.length > 0 ? `오늘 ${todayPoints}점 획득` : "1분이면 충분해요"}
+          {todayPoints > 0 ? `오늘 ${todayPoints}점 획득` : "1분이면 충분해요"}
         </p>
         <Divider />
         <p className="mb-2 text-[0.82rem] font-extrabold text-ink/50">최근 7일</p>

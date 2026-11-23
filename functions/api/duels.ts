@@ -82,9 +82,9 @@ async function dayStats(env: DbEnv, date: string, codes: string[]): Promise<Map<
     sbGet<{ user_code: string }>(env, `daily_visits?visit_date=eq.${enc(date)}&user_code=${inList}&select=user_code`).catch(
       () => []
     ),
-    sbGet<{ user_code: string; points: number }>(
+    sbGet<{ user_code: string; points: number; total: number }>(
       env,
-      `quiz_logs?quiz_date=eq.${enc(date)}&user_code=${inList}&select=user_code,points`
+      `quiz_logs?quiz_date=eq.${enc(date)}&user_code=${inList}&select=user_code,points,total`
     ).catch(() => []),
     sbGet<{ user_code: string; challenges: string[] }>(
       env,
@@ -109,7 +109,8 @@ async function dayStats(env: DbEnv, date: string, codes: string[]): Promise<Map<
     const s = out.get(q.user_code);
     if (!s) return;
     s.quizPoints += Number(q.points || 0);
-    s.quizDone = true;
+    // 연습 모드 기록(total 0)은 점수만 더하고 ‘퀴즈 미션 완료’로는 세지 않는다.
+    if ((Number(q.total) || 0) > 0) s.quizDone = true;
   });
   health.forEach((h) => {
     const s = out.get(h.user_code);

@@ -4572,7 +4572,7 @@ function pickRandom(pool: Question[], avoid: Set<string>): Question {
  * 연습 모드용 3문제.
  * - `only` 를 주면 그 주제에서 3문제를 고른다(‘주제 골라 풀기’).
  * - 주지 않으면 서로 다른 유형 5가지 중 무작위 3가지를 골라 하나씩 낸다.
- * 점수·연속 출석·순위와는 무관한 기억 훈련용이고,
+ * 점수는 연습 화면에서 맞힌 문제마다 1점씩 따로 더해지고(하루 미션 점수와는 별개),
  * excludeIds 에 방금 푼 문제 id 를 넣으면 같은 문제가 바로 다시 나오지 않는다.
  */
 export function practiceQuestions(excludeIds: string[] = [], only?: QuizType): Question[] {

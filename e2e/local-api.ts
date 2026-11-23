@@ -7,6 +7,7 @@
  */
 import http from "node:http";
 import { onRequestGet, onRequestPost } from "../functions/api/state";
+import { onRequestGet as rankingsGet } from "../functions/api/rankings";
 
 const env = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -28,8 +29,13 @@ const server = http.createServer(async (req, res) => {
       body: req.method === "GET" || req.method === "HEAD" ? undefined : body,
     });
     const ctx = { request, env };
+    const path = new URL(url).pathname;
     const response =
-      req.method === "POST" ? await onRequestPost(ctx as never) : await onRequestGet(ctx as never);
+      path.startsWith("/api/rankings") && req.method === "GET"
+        ? await rankingsGet(ctx as never)
+        : req.method === "POST"
+          ? await onRequestPost(ctx as never)
+          : await onRequestGet(ctx as never);
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));
     res.end(Buffer.from(await response.arrayBuffer()));

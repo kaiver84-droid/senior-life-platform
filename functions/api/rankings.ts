@@ -226,7 +226,8 @@ async function leagueAggregate(
     if (i < 0) return;
     const f = of(q.user_code);
     f.quiz[i] += Number(q.points || 0);
-    f.done[i] = true;
+    // 하루 미션(5문제)을 마친 기록만 ‘퀴즈 미션 완료’로 센다 — 연습 모드 기록(total 0)은 점수만 더한다.
+    if ((Number(q.total) || 0) > 0) f.done[i] = true;
     const acc = accuracy.get(q.user_code) || { correct: 0, total: 0 };
     acc.correct += Number(q.correct || 0);
     acc.total += Number(q.total || 0);
@@ -466,10 +467,10 @@ async function groupBattleScores(
       env,
       `daily_visits?visit_date=gte.${start}&visit_date=lte.${end}&select=user_code,visit_date&limit=8000`
     ).catch(() => [] as { user_code: string; visit_date: string }[]),
-    sbGet<{ user_code: string; quiz_date: string }>(
+    sbGet<{ user_code: string; quiz_date: string; total: number }>(
       env,
-      `quiz_logs?week_id=eq.${enc(weekId)}&select=user_code,quiz_date&limit=8000`
-    ).catch(() => [] as { user_code: string; quiz_date: string }[]),
+      `quiz_logs?week_id=eq.${enc(weekId)}&select=user_code,quiz_date,total&limit=8000`
+    ).catch(() => [] as { user_code: string; quiz_date: string; total: number }[]),
     sbGet<{ user_code: string; check_date: string; challenges: string[] }>(
       env,
       `health_checks?check_date=gte.${start}&check_date=lte.${end}&select=user_code,check_date,challenges&limit=8000`
@@ -500,7 +501,8 @@ async function groupBattleScores(
   });
   quiz.forEach((q) => {
     const i = dates.indexOf(q.quiz_date);
-    if (i >= 0) of(q.user_code).quiz[i] = true;
+    if (i < 0) return;
+    if ((Number(q.total) || 0) > 0) of(q.user_code).quiz[i] = true;
   });
   health.forEach((h) => {
     const i = dates.indexOf(h.check_date);

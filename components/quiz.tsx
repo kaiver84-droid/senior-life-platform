@@ -54,7 +54,7 @@ function questionSpeech(q: Question): string {
 }
 
 export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
-  const { today, todayDaily, completeQuiz, weekPoints, streak } = useApp();
+  const { today, todayDaily, completeQuiz, addPracticePoint, weekPoints, streak } = useApp();
   const { detail: groupDetail, active: activeGroup } = useGroup();
   const { show } = useToast();
   const dailyQs = useMemo(() => dailyQuestions(today), [today]);
@@ -111,7 +111,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   const start = () => startSet(dailyQs, false);
 
   /**
-   * 연습 모드: 점수·연속 출석·순위와 무관한 기억 훈련용 3문제.
+   * 연습 모드: 3문제. 맞힌 문제마다 1점씩 이번 주 점수에 더해진다(하루 미션 완료와는 별개).
    * `only` 를 주면 그 주제(초성·노래·그림·OX·넌센스)에서만 3문제를 낸다.
    */
   const startPractice = (excludeFrom?: Question[], only?: QuizType) => {
@@ -120,7 +120,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   };
 
   /**
-   * 무한 연습 — 주제(또는 전체) 문제를 섞어 하나씩 계속 낸다.
+   * 무한 연습 — 주제(또는 전체) 문제를 섞어 하나씩 계속 내고, 맞힌 문제마다 1점씩 오른다.
    * `only` 를 주면 그 주제에서만, 주지 않으면 전체에서 섞어서 낸다.
    */
   const startEndless = (only?: QuizType) => {
@@ -152,7 +152,11 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
     if (picked === null || checked || !q) return;
     setChecked(true);
     setAnswered((n) => n + 1);
-    if (picked === q.answer) setCorrectCount((c) => c + 1);
+    if (picked === q.answer) {
+      setCorrectCount((c) => c + 1);
+      // 연습 모드(무한 연습 포함)는 맞힌 문제마다 바로 +1점 — 하루 미션 점수와는 따로 쌓인다.
+      if (isPractice) addPracticePoint();
+    }
   };
 
   const next = () => {
@@ -197,7 +201,10 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
         <div>
           <p className="text-[0.86rem] font-extrabold tracking-tight text-brand-dark/80">오늘의 기억 건강</p>
           <h1 className="mt-0.5 text-[1.5rem] font-black leading-tight text-ink">1분 치매예방 퀴즈</h1>
-          <p className="mt-1 text-[0.88rem] font-semibold text-ink/55">
+          <p
+            data-week-points={weekPoints}
+            className="mt-1 text-[0.88rem] font-semibold text-ink/55"
+          >
             하루 5문제 · 이번 주 {weekPoints}점 {streak > 0 ? `· 🔥 ${streak}일 연속` : ""}
           </p>
         </div>
@@ -247,11 +254,11 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
             </BigButton>
           </div>
 
-          {/* 주제 골라 바로 풀기 — 고른 주제로 문제를 끝없이 이어서 낸다(점수·순위와 무관) */}
+          {/* 주제 골라 바로 풀기 — 고른 주제로 문제를 끝없이 이어서 내고, 맞힌 문제마다 1점씩 오른다 */}
           <div className="mt-5">
             <p className="text-[0.92rem] font-extrabold text-ink/65">주제 골라 바로 풀기</p>
             <p className="mt-0.5 text-[0.78rem] font-semibold text-ink/45">
-              점수와 상관없이 좋아하는 주제로 계속 풀어 볼 수 있어요.
+              좋아하는 주제로 계속 풀어요. 맞힌 문제마다 1점씩 이번 주 점수에 더해져요.
             </p>
             <div className="mt-2.5 grid grid-cols-2 gap-2.5" data-quiz-topics>
               {QUIZ_TYPE_ORDER.map((t) => (
@@ -494,6 +501,11 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
                     {picked === q.answer ? "정답이에요! 참 잘하셨어요 👏" : "아쉽지만 괜찮아요. 정답을 확인해요"}
                   </p>
                   <p className="mt-1 text-[0.95rem] font-semibold leading-snug text-ink/75">{q.explain}</p>
+                  {isPractice && picked === q.answer ? (
+                    <p data-practice-point className="mt-1.5 text-[0.9rem] font-extrabold text-leaf-dark">
+                      이번 주 점수에 +1점 더했어요
+                    </p>
+                  ) : null}
                 </div>
                 <div className="mt-3">
                   <BigButton variant="ink" size="lg" full onClick={next}>
@@ -545,7 +557,7 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   );
 }
 
-/** 연습 모드 결과 — 점수·순위에 들어가지 않는다는 점을 분명히 안내 */
+/** 연습 모드 결과 — 맞힌 문제만큼 이번 주 점수에 1점씩 더해졌다는 걸 안내 */
 function QuizCheerBanner() {
   return (
     <div className="relative flex items-end justify-between gap-1 overflow-hidden rounded-[1.6rem] bg-gradient-to-r from-[#FFF6E2] via-[#FFFCF2] to-[#F8F4E6] pl-4 pr-0.5 shadow-soft">
@@ -607,13 +619,13 @@ function PracticeResult({
           <>
             여기까지 {total}문제를 풀었어요.
             <br />
-            점수와 순위에는 들어가지 않아요.
+            {correct > 0 ? `이번 연습으로 ${correct}점을 더 얻었어요.` : "이번에는 점수가 더해지지 않았어요."}
           </>
         ) : (
           <>
-            연습 모드는 점수와 순위에 들어가지 않아요.
+            {correct > 0 ? `이번 연습으로 ${correct}점을 더 얻었어요.` : "이번에는 점수가 더해지지 않았어요."}
             <br />
-            마음 편히 기억 훈련으로 즐겨 주세요.
+            맞힌 문제마다 +1점씩 이번 주 점수에 더해져요.
           </>
         )}
       </p>
@@ -702,7 +714,7 @@ function ResultAndCertificate({
           <div className="flex-1">
             <p className="text-[1.02rem] font-black leading-snug text-ink">다른 문제 더 풀어보기</p>
             <p className="mt-1 text-[0.85rem] font-semibold leading-relaxed text-ink/55">
-              연습 모드로 계속 풀 수 있어요. 점수·순위에는 들어가지 않아요.
+              연습 모드로 계속 풀 수 있어요. 맞힌 문제마다 1점씩 이번 주 점수에 더해져요.
             </p>
           </div>
         </div>

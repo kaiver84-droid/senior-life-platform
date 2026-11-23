@@ -20,7 +20,8 @@ raw as (
   select user_code, visit_date as d, 10 as pts, 0 as health, 0 as inv
   from public.daily_visits
   union all
-  select user_code, quiz_date, 30, 0, 0 from public.quiz_logs
+  -- 하루 미션(5문제)을 마친 날만 퀴즈 30점 — 연습 모드만 푼 날(total = 0)은 세지 않는다.
+  select user_code, quiz_date, 30, 0, 0 from public.quiz_logs where total > 0
   union all
   select user_code, check_date, 0, coalesce(array_length(challenges, 1), 0), 0
   from public.health_checks
@@ -44,7 +45,7 @@ select
   u.code,
   coalesce(sum(s.pts), 0)::int as lifetime_points,
   (select count(*) from public.daily_visits v where v.user_code = u.code)::int as attend_days,
-  (select count(*) from public.quiz_logs q where q.user_code = u.code)::int as quiz_days,
+  (select count(*) from public.quiz_logs q where q.user_code = u.code and q.total > 0)::int as quiz_days,
   (select coalesce(sum(q.correct), 0) from public.quiz_logs q where q.user_code = u.code)::int as quiz_correct,
   (select count(*) from public.health_checks h
     where h.user_code = u.code and coalesce(array_length(h.challenges, 1), 0) > 0)::int as health_days,

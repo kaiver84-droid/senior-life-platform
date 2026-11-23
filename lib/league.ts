@@ -223,8 +223,10 @@ export function activityOfDay(
   return {
     date: today,
     attend: Array.isArray(state.visits) && state.visits.includes(today),
+    // 하루 미션(5문제)을 마친 기록만 센다 — 연습 모드로 생긴 기록(total 0)은 미션 완료가 아니다.
     quiz:
-      (Array.isArray(state.quizLogs) && state.quizLogs.some((q) => q.date === today)) ||
+      (Array.isArray(state.quizLogs) &&
+        state.quizLogs.some((q) => q.date === today && (Number(q.total) || 0) > 0)) ||
       Boolean(state.daily && state.daily.date === today && state.daily.done),
     health: Array.isArray(healthIds) && healthIds.length > 0,
     welfare: done.includes("welfare"),

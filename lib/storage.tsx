@@ -58,6 +58,36 @@ function write(state: AppState) {
   }
 }
 
+/**
+ * 서버(다른 기기)에 남은 퀴즈 기록을 이 기기 기록과 합친다 — 날짜당 한 줄.
+ * 같은 날짜는 하루 미션을 마친 기록(total > 0)을 남기고, 점수는 두 쪽 중 큰 쪽을 쓴다
+ * (연습으로 모은 점수와 미션 점수가 한 줄에 쌓이므로 작은 쪽으로 덮어쓰지 않는다).
+ */
+function mergeQuizLogs(local: QuizLog[], remote: QuizLog[]): QuizLog[] {
+  const byDate = new Map<string, QuizLog>();
+  local.forEach((q) => {
+    if (q?.date) byDate.set(q.date, q);
+  });
+  remote.forEach((r) => {
+    if (!r?.date) return;
+    const cur = byDate.get(r.date);
+    if (!cur) {
+      byDate.set(r.date, r);
+      return;
+    }
+    const mission = (Number(cur.total) || 0) > 0 ? cur : (Number(r.total) || 0) > 0 ? r : cur;
+    const practice = Math.max(Number(cur.practice) || 0, Number(r.practice) || 0);
+    byDate.set(r.date, {
+      ...mission,
+      points: Math.max(Number(cur.points) || 0, Number(r.points) || 0),
+      ...(practice ? { practice } : {}),
+    });
+  });
+  return Array.from(byDate.values())
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    .slice(-120);
+}
+
 /** 오늘 또는 어제까지 이어진 활동 일수를 센다 */
 export function calcStreak(state: AppState, today: string = kstDate()): number {
   const days = new Set<string>();
@@ -132,6 +162,9 @@ type Ctx = {
   logout: () => void;
   toggleMed: (slot: "morning" | "evening") => void;
   completeQuiz: (input: CompleteInput) => void;
+  /** 연습 모드(무한 연습 포함)에서 정답 하나를 맞힐 때마다 그날 기록에 1점을 더한다.
+   *  하루 미션(daily.done)은 건드리지 않는다. */
+  addPracticePoint: () => void;
   addFamilyEvent: (input: FamilyEventInput) => FamilyEvent | null;
   updateFamilyEvent: (id: string, patch: Partial<FamilyEventInput>) => void;
   removeFamilyEvent: (id: string) => void;
@@ -238,15 +271,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const today = kstDate();
     setState((s) => {
       if (s.daily?.date === today && s.daily.done) return s;
+      // 그날 연습 모드로 먼저 모은 점수가 있으면 그 위에 하루 미션 점수를 더한다.
+      // 하루 기록은 날짜당 한 줄로 유지해 서버(quiz_logs · user_code+quiz_date)와도 어긋나지 않는다.
+      const idx = s.quizLogs.findIndex((q) => q.date === today);
+      const prev = idx >= 0 ? s.quizLogs[idx] : null;
       const log: QuizLog = {
         date: today,
         weekId: weekIdOf(today),
         correct: input.correct,
         total: input.total,
-        points: input.points,
+        points: (Number(prev?.points) || 0) + Math.max(0, Number(input.points) || 0),
         seconds: input.seconds,
         types: input.types,
         at: new Date().toISOString(),
+        ...(prev?.practice ? { practice: prev.practice } : {}),
       };
       const daily: DailyQuiz = {
         date: today,
@@ -258,9 +296,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       return {
         ...s,
-        quizLogs: [...s.quizLogs, log].slice(-120),
+        quizLogs: prev
+          ? s.quizLogs.map((q, i) => (i === idx ? log : q))
+          : [...s.quizLogs, log].slice(-120),
         daily,
         visits: s.visits.includes(today) ? s.visits : [...s.visits, today].slice(-60),
+      };
+    });
+  }, []);
+
+  /** 연습 모드 정답 1개 = 1점 — 오늘 기록에 바로 더한다 */
+  const addPracticePoint = useCallback(() => {
+    const today = kstDate();
+    setState((s) => {
+      const idx = s.quizLogs.findIndex((q) => q.date === today);
+      const prev = idx >= 0 ? s.quizLogs[idx] : null;
+      const log: QuizLog = prev
+        ? {
+            ...prev,
+            points: (Number(prev.points) || 0) + 1,
+            practice: (Number(prev.practice) || 0) + 1,
+          }
+        : {
+            date: today,
+            weekId: weekIdOf(today),
+            correct: 0,
+            total: 0,
+            points: 1,
+            seconds: 0,
+            types: [],
+            at: new Date().toISOString(),
+            practice: 1,
+          };
+      return {
+        ...s,
+        quizLogs: prev
+          ? s.quizLogs.map((q, i) => (i === idx ? log : q))
+          : [...s.quizLogs, log].slice(-120),
       };
     });
   }, []);
@@ -363,10 +435,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setState((s) => {
         const health = mergeHealth(s.health, remote.health);
         const med = { ...(remote.med ?? {}), ...s.med };
-        const have = new Set(s.quizLogs.map((q) => q.date));
-        const extra = Array.isArray(remote.quizLogs)
-          ? remote.quizLogs.filter((q: QuizLog) => q?.date && !have.has(q.date))
-          : [];
+        const quizLogs = mergeQuizLogs(
+          s.quizLogs,
+          Array.isArray(remote.quizLogs) ? (remote.quizLogs as QuizLog[]) : []
+        );
         const familyEvents =
           s.familyEvents.length === 0 && Array.isArray(remote.familyEvents) ? remote.familyEvents : s.familyEvents;
         // 다른 기기에서 카톡으로 로그인해 사진이 저장됐으면 내 프로필에도 붙여 준다.
@@ -389,7 +461,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           missions,
           rankingVisible:
             typeof remote.rankingVisible === "boolean" ? remote.rankingVisible : s.rankingVisible,
-          quizLogs: [...s.quizLogs, ...extra].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-120),
+          quizLogs,
           familyEvents,
         };
       });
@@ -439,6 +511,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     logout,
     toggleMed,
     completeQuiz,
+    addPracticePoint,
     addFamilyEvent,
     updateFamilyEvent,
     removeFamilyEvent,
