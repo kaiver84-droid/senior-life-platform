@@ -625,11 +625,6 @@ function PracticeResult({
           {endless ? "퀴즈 홈으로 돌아가기" : "오늘의 퀴즈로 돌아가기"}
         </BigButton>
       </div>
-      <p className="mt-2 text-[0.78rem] font-medium text-ink/40">
-        {endless
-          ? `전체 ${QUIZ_TOTAL_COUNT}문제를 섞어서 계속 내드려요`
-          : `전체 ${QUIZ_TOTAL_COUNT}문제 중에서 새로 골라 드려요`}
-      </p>
     </Card>
   );
 }
