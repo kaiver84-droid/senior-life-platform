@@ -689,12 +689,12 @@ function GreetingSheet({
               }}
               aria-pressed={on}
               data-greeting-theme={t.key}
-              className={`flex w-[6rem] shrink-0 flex-col items-center gap-1 rounded-2xl border-2 p-1.5 transition ${
+              className={`flex w-[5.4rem] shrink-0 flex-col items-center gap-1 rounded-2xl border-2 p-1.5 transition ${
                 on ? "border-brand bg-brand-light" : "border-ink/8 bg-white"
               }`}
             >
               <span
-                className="relative block h-[5rem] w-full overflow-hidden rounded-xl"
+                className="relative block h-[4.9rem] w-full overflow-hidden rounded-xl"
                 style={t.thumb ? undefined : { background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
               >
                 {t.thumb ? (
