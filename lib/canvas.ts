@@ -72,7 +72,7 @@ export const THEMES: {
     emoji: "🌼",
     colors: ["#CFE8F8", "#FFE9A8"],
     photo: "/images/greeting-chrysanthemum-large.jpg",
-    thumb: "/images/greeting-chrysanthemum.jpg",
+    thumb: "/images/greeting-chrysanthemum-thumb.jpg",
   },
   { key: "spring", label: "봄꽃", emoji: "🌸", colors: ["#FFD9E4", "#FFF6EE"] },
   { key: "summer", label: "여름바다", emoji: "🌊", colors: ["#9BD7F5", "#EAF9FF"] },
