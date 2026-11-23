@@ -10,8 +10,9 @@
 4. 틀린 그림: 9칸, 서로 다른 그림은 정확히 1개, 그 위치가 answer
 5. OX: 보기 정확히 2개(⭕ 맞아요 / ❌ 아니에요), answer 0~1, 힌트·해설 비어 있지 않음
 6. 넌센스: 4지선다·보기 중복 없음·answer 범위 유효·힌트·해설 비어 있지 않음
-7. 보기 순서: 정답 인덱스가 보기 수에 고르게 분포 (한 곳에 40% 이상 몰리면 경고)
-8. 해설·힌트 비어 있지 않음, 전체 문항 200개 이상
+7. 추억·보이스피싱·제철(4지선다): 보기 4개·중복 없음·answer 범위·힌트·해설 유무
+8. 보기 순서: 정답 인덱스가 보기 수에 고르게 분포 (한 곳에 40% 이상 몰리면 경고)
+9. 해설·힌트 비어 있지 않음, 전체 문항 200개 이상
 
 사용: python3 scripts/audit_quiz.py
 """
@@ -189,6 +190,25 @@ def check_nonsense(items, errors, warnings):
             warnings.append(f"{q['id']}: prompt 길이 {len(q['prompt'])}자 (화면 확인 권장)")
 
 
+def check_choice4(name, items, errors, warnings):
+    """4지선다 주제(넌센스·추억·보이스피싱·제철) 공통 검사."""
+    for q in items:
+        opts = q["options"]
+        ans = q["answer"]
+        if len(opts) != 4:
+            errors.append(f"{q['id']}: {name} 보기 개수 {len(opts)} (4개여야 함)")
+        if len(set(opts)) != len(opts):
+            errors.append(f"{q['id']}: {name} 보기에 중복이 있음 {opts}")
+        if not (0 <= ans < len(opts)):
+            errors.append(f"{q['id']}: {name} answer 범위 오류 {ans}")
+        if not q["prompt"].strip():
+            errors.append(f"{q['id']}: prompt 비어 있음")
+        if not q["explain"].strip() or not q["hint"].strip():
+            errors.append(f"{q['id']}: 힌트/해설이 비어 있음")
+        if len(q["prompt"]) > 80:
+            warnings.append(f"{q['id']}: prompt 길이 {len(q['prompt'])}자 (화면 확인 권장)")
+
+
 def main():
     src = read(SRC)
     choseong = parse_blocks(src, "CHOSEONG")
@@ -196,7 +216,10 @@ def main():
     spot = parse_blocks(src, "SPOT")
     ox = parse_blocks(src, "OX")
     nonsense = parse_blocks(src, "NONSENSE")
-    everything = choseong + lyrics + spot + ox + nonsense
+    nostalgia = parse_blocks(src, "NOSTALGIA")
+    safety_slang = parse_blocks(src, "SAFETY_SLANG")
+    seasonal = parse_blocks(src, "SEASONAL")
+    everything = choseong + lyrics + spot + ox + nonsense + nostalgia + safety_slang + seasonal
 
     errors, warnings = [], []
 
@@ -214,7 +237,16 @@ def main():
         if n > 1:
             errors.append(f"질문 중복: {prompt[:40]!r} x{n}")
 
-    groups = (("choseong", choseong), ("lyrics", lyrics), ("spot", spot), ("ox", ox), ("nonsense", nonsense))
+    groups = (
+        ("choseong", choseong),
+        ("lyrics", lyrics),
+        ("spot", spot),
+        ("ox", ox),
+        ("nonsense", nonsense),
+        ("nostalgia", nostalgia),
+        ("safety_slang", safety_slang),
+        ("seasonal", seasonal),
+    )
     for q in everything:
         expect_type = next((name for name, items in groups if any(x is q for x in items)), "?")
         if q["type"] != expect_type:
@@ -225,6 +257,22 @@ def main():
     check_spot(spot, errors, warnings)
     check_ox(ox, errors, warnings)
     check_nonsense(nonsense, errors, warnings)
+    check_choice4("추억", nostalgia, errors, warnings)
+    check_choice4("보이스피싱", safety_slang, errors, warnings)
+    check_choice4("제철", seasonal, errors, warnings)
+
+    # 주제별 최소 문항 수 — 새로 더한 세 주제는 35문항 이상이어야 한다.
+    for name, items, least in (
+        ("nostalgia", nostalgia, 35),
+        ("safety_slang", safety_slang, 35),
+        ("seasonal", seasonal, 35),
+    ):
+        if len(items) < least:
+            errors.append(f"{name}: {len(items)}문항 (최소 {least}문항 필요)")
+    # 세 주제 묶음이 105~120문항인지
+    added = len(nostalgia) + len(safety_slang) + len(seasonal)
+    if not (105 <= added <= 120):
+        warnings.append(f"새 주제 3종 합계 {added}문항 (목표 105~120)")
 
     # 정답 위치 분포
     dist_report = {}
@@ -234,6 +282,9 @@ def main():
         ("spot", spot, 9),
         ("ox", ox, 2),
         ("nonsense", nonsense, 4),
+        ("nostalgia", nostalgia, 4),
+        ("safety_slang", safety_slang, 4),
+        ("seasonal", seasonal, 4),
     ):
         c = Counter(q["answer"] for q in items)
         dist_report[name] = [c.get(i, 0) for i in range(size)]
@@ -247,7 +298,8 @@ def main():
         errors.append(f"전체 문항 {len(everything)}개 — 200개 이상이어야 함")
     print(
         f"초성 {len(choseong)} · 노래 {len(lyrics)} · 그림 {len(spot)} · "
-        f"OX {len(ox)} · 넌센스 {len(nonsense)} · 합계 {len(everything)}"
+        f"OX {len(ox)} · 넌센스 {len(nonsense)} · 추억 {len(nostalgia)} · "
+        f"보이스피싱 {len(safety_slang)} · 제철 {len(seasonal)} · 합계 {len(everything)}"
     )
     print("정답 위치 분포:", json.dumps(dist_report, ensure_ascii=False))
     for w in warnings:

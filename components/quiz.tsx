@@ -267,20 +267,25 @@ export function QuizTab({ onNavigate }: { onNavigate?: (tab: string) => void }) 
                   type="button"
                   data-quiz-topic={t}
                   onClick={() => startEndless(t)}
-                  className="flex min-h-[54px] w-full items-center gap-1.5 rounded-2xl border-2 border-ink/10 bg-white px-3 py-2 text-left text-[0.86rem] font-extrabold leading-tight text-ink/75"
+                  className="flex min-h-[62px] w-full flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-ink/10 bg-white px-2 py-2 text-center text-[0.8rem] font-extrabold leading-snug text-ink/75"
                 >
-                  <span aria-hidden className="shrink-0 text-[1.05rem]">
+                  <span aria-hidden className="text-[1.15rem] leading-none">
                     {QUIZ_TYPE_EMOJI[t]}
                   </span>
-                  <span className="min-w-0 break-words">{QUIZ_TYPE_LABEL[t]}</span>
+                  <span className="min-w-0 max-w-full break-words">
+                    {QUIZ_TYPE_LABEL[t].split("·").map((part, i, arr) => (
+                      <span key={part} className="block">
+                        {i < arr.length - 1 ? `${part}·` : part}
+                      </span>
+                    ))}
+                  </span>
                 </button>
               ))}
               <button
                 type="button"
                 data-quiz-topic="mix"
                 onClick={() => startEndless()}
-                className="flex min-h-[54px] w-full items-center gap-1.5 rounded-2xl border-2 border-brand/30 bg-brand-light px-3 py-2 text-left text-[0.86rem] font-extrabold leading-tight text-brand-dark"
-              >
+                className="col-span-2 flex min-h-[54px] w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-brand/30 bg-brand-light px-3 py-2 text-left text-[0.84rem] font-extrabold leading-snug text-brand-dark"              >
                 <span aria-hidden className="shrink-0 text-[1.05rem]">
                   🎲
                 </span>

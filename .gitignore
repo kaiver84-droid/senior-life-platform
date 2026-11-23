@@ -23,3 +23,6 @@ supabase/cleanup-*.json
 
 # wrangler 배포 캐시
 .wrangler/
+
+# 퀴즈 은행 점검 번들 결과물
+e2e/.quizbank.mjs

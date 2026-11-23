@@ -19,7 +19,15 @@ export type Profile = {
 
 import type { FamilyEvent } from "./calendar";
 
-export type QuizType = "choseong" | "lyrics" | "spot" | "ox" | "nonsense";
+export type QuizType =
+  | "choseong"
+  | "lyrics"
+  | "spot"
+  | "ox"
+  | "nonsense"
+  | "nostalgia"
+  | "safety_slang"
+  | "seasonal";
 
 /** 날짜별 건강생활 챌린지 체크인 — { "2026-11-16": ["water", "walk"] } */
 export type HealthChecks = Record<string, string[]>;

@@ -41,6 +41,13 @@ const NEW_IDS = [
   "ns-namhan-peak",
   "ns-newspaper",
   "ns-stone-pear",
+  // 새 주제 3종 — 추억·보이스피싱/손주 말·제철
+  "nos-01",
+  "nos-24",
+  "saf-01",
+  "saf-16",
+  "sea-01",
+  "sea-33",
 ];
 
 const byId = new Map(ALL_QUESTIONS.map((q) => [q.id, q]));
@@ -51,7 +58,7 @@ function check(cond: boolean, label: string, extra = "") {
   if (!cond) failed += 1;
 }
 
-check(QUIZ_TOTAL_COUNT >= 310, "전체 문항 310개 이상", `${QUIZ_TOTAL_COUNT}문항`);
+check(QUIZ_TOTAL_COUNT >= 433, "전체 문항 433개 이상", `${QUIZ_TOTAL_COUNT}문항`);
 for (const type of QUIZ_TYPE_ORDER) {
   check(QUIZ_POOLS[type].length > 0, `${type} 문제 있음`, `${QUIZ_POOLS[type].length}문항`);
 }
