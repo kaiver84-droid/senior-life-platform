@@ -218,6 +218,9 @@ supabase/groups.sql 모임 테이블 + 체험 모임 시드
 - 저장: Supabase Storage 공개 버킷 `share-cards`(서비스 키로만 쓰기). 파일명이 내용 해시라 같은 카드는 덮어쓰기(중복 없음),
   7일 지난 임시 카드는 올릴 때 가끔 정리합니다. 카카오는 `GET /api/share-image?k=…&h=…` 로 200 image/png 를 받습니다.
 - 링크에도 `?card=<종류>&h=<해시>` 가 붙어, 링크를 그대로 붙여 넣어도 같은 카드가 미리보기로 뜹니다(worker `functions/og.ts`).
+- 혜택 상세 모달의 **[카톡 공유]** — 그 혜택의 이름·금액·문의와 `/?tab=welfare&program=<id>` 링크를 `share-welfare.png` 카드로 보냅니다.
+  받은 링크는 그 혜택 상세를 바로 열고, 미리보기(og:title·og:description)도 그 혜택 문구로 뜨게 worker 가 `?program=` 을 읽습니다.
+  (혜택 상세 시트의 닫기는 **아래 고정 [✕ 닫기] 하나**만 둡니다 — 상단 닫기·본문 닫기를 겹치지 않게.)
 
 ## 검증
 
@@ -226,7 +229,8 @@ supabase/groups.sql 모임 테이블 + 체험 모임 시드
   `/?group=`·`/?join=`·`/family/`·`/?tab=quiz`·`/?share=greeting` 등 주소별 og:title·og:description 확인
   (모임 이름 조회는 `SUPABASE_SERVICE_ROLE_KEY` 가 있을 때 실제 Supabase 로 돈다)
 - 공유 카드 이미지 검증: `BASE=https://senior-life-platform.pages.dev python3 e2e/verify_share_cards.py`
-  (상황별 og:image 가 서로 다른 카드인지 + 그 주소 200 image/png + 카드 업로드/조회 + 카톡 payload 의 imageUrl 이 그 카드인지)
+  (상황별 og:image 가 서로 다른 카드인지 + 그 주소 200 image/png + 카드 업로드/조회 + 카톡 payload 의 imageUrl 이 그 카드인지
+   + 혜택 상세 모달의 중복 닫기 정리·[카톡 공유] 의 제목·금액·문의·링크·이미지)
 - 문제 감사: `python3 scripts/audit_quiz.py` — 초성·노래·그림·**OX 2지선다·넌센스 4지선다** 검증(208문항, 0 errors)
 - 모임 API 검증(실제 Supabase): `node e2e/test_groups_api.mjs` — 만들기·가입·글쓰기·응원·선택·나가기·오류 처리 24항목
 - 건강 챌린지 저장·모임 반영 검증(실제 Supabase): `node e2e/test_health_api.mjs` — 저장·복원·줄이기·모임 health 요약 12항목

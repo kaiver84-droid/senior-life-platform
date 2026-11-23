@@ -1102,11 +1102,15 @@ export async function renderFramedShareCard(
   const TEXT_W = 596;
   let headSize = 56;
   let headLines: string[] = [];
-  for (const size of [56, 50, 45, 40]) {
-    headSize = size;
+  for (const size of [56, 50, 45, 40, 36]) {
     ctx.font = `900 ${size}px ${FONT}`;
-    headLines = wrap(ctx, card.headline, TEXT_W);
-    if (headLines.length <= 2) break;
+    const lines = wrap(ctx, card.headline, TEXT_W);
+    headSize = size;
+    headLines = lines;
+    if (lines.length > 2) continue; // 두 줄을 넘으면 더 작게
+    // 마지막 줄에 한두 글자만 남는 ‘외톨이 줄’(예: … 안보 / 부)은 한 단계 더 줄여서 피한다.
+    const orphan = lines.length > 1 && lines[lines.length - 1].replace(/\s/g, "").length <= 2;
+    if (!orphan) break;
   }
   let y = 262;
   headLines.slice(0, 2).forEach((line) => {

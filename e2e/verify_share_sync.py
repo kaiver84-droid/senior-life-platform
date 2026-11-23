@@ -2,7 +2,7 @@
 
 로컬 out/ 정적 빌드를 띄우고(또는 BASE 로 라이브), 카카오 SDK 자리에 가짜 객체를 넣어
 - '카카오톡으로 바로 보내기' 클릭과 **같은 작업(task)** 안에서 sendDefault 가 불렸는지
-- payload.installTalk 가 false 인지, 이미지가 /share-card.png 인지
+- payload.installTalk 가 false 인지, 이미지가 ‘안부 인사’ 카드(share-greeting.png 또는 올려 둔 내 카드)인지
 - talk-apps.kakao.com 으로 이동하는 요청이 없는지
 - 홈에서 '가족안부달력' 배너가 '오늘의 운세' 카드보다 위에 있는지
 를 확인한다. 홈 스크린샷도 저장한다.
@@ -156,7 +156,12 @@ def main():
             payload = calls[0]["payload"]
             check("클릭과 같은 작업(동기)에서 호출", calls[0]["inClick"] is True)
             check("installTalk === false", payload.get("installTalk") is False, str(payload.get("installTalk")))
-            check("imageUrl = /share-card.png", str(payload.get("content", {}).get("imageUrl", "")).endswith("/share-card.png"))
+            img = str(payload.get("content", {}).get("imageUrl", ""))
+            check(
+                "imageUrl = 안부 인사 카드(올린 카드/상황 카드)",
+                "/api/share-image?k=greeting&h=" in img or img.endswith("/images/share-greeting.png"),
+                img,
+            )
             check("feed 카드 제목 있음", bool(payload.get("content", {}).get("title")))
         check("talk-apps.kakao.com 이동 없음", len(navigations) == 0, str(navigations[:3]))
         check("새 콘솔 오류 없음", len(errors) == before, str(errors[before:]))
