@@ -1,15 +1,94 @@
 /** Canvas 로 그리는 이미지들 (인사카드 · 상장 · 안부카드) */
 
-export type GreetingTheme = "chrysanthemum" | "spring" | "summer" | "autumn" | "winter" | "sunset";
+export type GreetingTheme =
+  | "christmas"
+  | "golden_sunrise"
+  | "peony"
+  | "autumn_path"
+  | "hanok_tea"
+  | "chrysanthemum"
+  | "spring"
+  | "summer"
+  | "autumn"
+  | "winter"
+  | "sunset";
 
-export const THEMES: { key: GreetingTheme; label: string; emoji: string; colors: [string, string] }[] = [
-  { key: "chrysanthemum", label: "국화", emoji: "🌼", colors: ["#CFE8F8", "#FFE9A8"] },
+/**
+ * 안부 인사카드 테마 목록.
+ * `photo` 가 있으면 그 사진을 카드 배경으로 쓰고(초고화질 사진 카드), 없으면 아래 `paintScene` 이 그린다.
+ * `thumb` 은 고르는 칸에 보여 줄 작은 사진(320×400, 약 30KB)이다.
+ */
+export const THEMES: {
+  key: GreetingTheme;
+  label: string;
+  emoji: string;
+  colors: [string, string];
+  photo?: string;
+  thumb?: string;
+}[] = [
+  {
+    key: "christmas",
+    label: "크리스마스",
+    emoji: "🎄",
+    colors: ["#27406E", "#FFD98A"],
+    photo: "/images/greeting-christmas-large.jpg",
+    thumb: "/images/greeting-christmas-thumb.jpg",
+  },
+  {
+    key: "golden_sunrise",
+    label: "황금 해돋이",
+    emoji: "🌅",
+    colors: ["#FFC266", "#FFE9C9"],
+    photo: "/images/greeting-golden-sunrise-large.jpg",
+    thumb: "/images/greeting-golden-sunrise-thumb.jpg",
+  },
+  {
+    key: "peony",
+    label: "모란 꽃다발",
+    emoji: "🌺",
+    colors: ["#FFC9DA", "#FFF1E4"],
+    photo: "/images/greeting-peony-large.jpg",
+    thumb: "/images/greeting-peony-thumb.jpg",
+  },
+  {
+    key: "autumn_path",
+    label: "숲속 산책길",
+    emoji: "🍂",
+    colors: ["#E9A45B", "#FFF0D6"],
+    photo: "/images/greeting-autumn-path-large.jpg",
+    thumb: "/images/greeting-autumn-path-thumb.jpg",
+  },
+  {
+    key: "hanok_tea",
+    label: "한옥 찻잔",
+    emoji: "🍵",
+    colors: ["#B98A5E", "#F4E3CB"],
+    photo: "/images/greeting-hanok-tea-large.jpg",
+    thumb: "/images/greeting-hanok-tea-thumb.jpg",
+  },
+  {
+    key: "chrysanthemum",
+    label: "국화",
+    emoji: "🌼",
+    colors: ["#CFE8F8", "#FFE9A8"],
+    photo: "/images/greeting-chrysanthemum-large.jpg",
+    thumb: "/images/greeting-chrysanthemum.jpg",
+  },
   { key: "spring", label: "봄꽃", emoji: "🌸", colors: ["#FFD9E4", "#FFF6EE"] },
   { key: "summer", label: "여름바다", emoji: "🌊", colors: ["#9BD7F5", "#EAF9FF"] },
   { key: "autumn", label: "가을단풍", emoji: "🍁", colors: ["#FFCE8A", "#FFF3E0"] },
   { key: "winter", label: "겨울설경", emoji: "❄️", colors: ["#CFE3F7", "#F8FCFF"] },
   { key: "sunset", label: "노을", emoji: "🌇", colors: ["#FFB07C", "#FFE6C7"] },
 ];
+
+/** 사진이 없거나 못 불러왔을 때 대신 그릴 손그림 장면 */
+const SCENE_FALLBACK: Partial<Record<GreetingTheme, GreetingTheme>> = {
+  christmas: "winter",
+  golden_sunrise: "sunset",
+  peony: "spring",
+  autumn_path: "autumn",
+  hanok_tea: "sunset",
+};
 
 const FONT = '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
 
@@ -567,10 +646,10 @@ function paintScene(ctx: CanvasRenderingContext2D, theme: GreetingTheme, w: numb
   }
 }
 
-/* 사진을 그대로 배경으로 쓰는 테마 (고화질 국화 사진) */
-const PHOTO_SCENES: Partial<Record<GreetingTheme, string>> = {
-  chrysanthemum: "/images/greeting-chrysanthemum-large.jpg",
-};
+/* 사진을 그대로 배경으로 쓰는 테마 (테마 목록의 photo 와 같은 출처) */
+const PHOTO_SCENES: Partial<Record<GreetingTheme, string>> = Object.fromEntries(
+  THEMES.filter((t) => t.photo).map((t) => [t.key, t.photo as string])
+);
 
 function loadPhoto(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -598,6 +677,65 @@ async function paintPhotoScene(
   return true;
 }
 
+/**
+ * 여러 줄로 나누되 ① 낱말(공백)에서 끊고 ② 줄마다 길이를 고르게 맞춘다 —
+ * ‘…연말 보 / 내세요’ 나 ‘행 / 복한’ 처럼 어색하게 떨어지는 줄을 피한다.
+ * maxLines 안에 담을 수 없으면 null.
+ */
+function wrapNice(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] | null {
+  const widthOf = (line: string) => ctx.measureText(line.trim()).width;
+  const plain = wrapWords(ctx, text, maxWidth);
+  if (plain.length > maxLines) return null;
+  if (plain.length <= 1) return plain;
+
+  let best = plain;
+  let bestMin = Math.min(...plain.map(widthOf));
+  // 줄 수를 유지하는 선에서 폭을 좀더 좁혀 다시 나누어 보고, 가장 고른 나눔을 쓴다.
+  for (const f of [0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.46]) {
+    const lines = wrapWords(ctx, text, maxWidth * f);
+    if (lines.length !== plain.length) continue;
+    const shortest = Math.min(...lines.map(widthOf));
+    if (shortest > bestMin + 8) {
+      best = lines;
+      bestMin = shortest;
+    }
+  }
+  return best;
+}
+
+/** 낱말 단위로 나누고, 한 낱말이 폭보다 길면 글자 단위로 쪼갠다 */
+function wrapWords(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  for (const para of text.split("\n")) {
+    let cur = "";
+    for (const word of para.split(/\s+/).filter(Boolean)) {
+      if (ctx.measureText(word).width > maxWidth) {
+        const pieces = wrap(ctx, word, maxWidth);
+        if (cur) {
+          lines.push(cur);
+          cur = "";
+        }
+        if (pieces.length > 1) lines.push(...pieces.slice(0, -1));
+        cur = pieces[pieces.length - 1] ?? "";
+        continue;
+      }
+      if (!cur) {
+        cur = word;
+        continue;
+      }
+      const test = `${cur} ${word}`;
+      if (ctx.measureText(test).width > maxWidth) {
+        lines.push(cur);
+        cur = word;
+      } else {
+        cur = test;
+      }
+    }
+    if (cur) lines.push(cur);
+  }
+  return lines;
+}
+
 export async function renderGreetingCard(
   canvas: HTMLCanvasElement,
   opts: { theme: GreetingTheme; name: string; message: string; dateLabel: string; fortuneLine: string }
@@ -613,7 +751,10 @@ export async function renderGreetingCard(
 
   const photo = PHOTO_SCENES[opts.theme];
   const drewPhoto = photo ? await paintPhotoScene(ctx, photo, W, H) : false;
-  if (!drewPhoto) paintScene(ctx, opts.theme === "chrysanthemum" ? "autumn" : opts.theme, W, H);
+  if (!drewPhoto) {
+    const scene = SCENE_FALLBACK[opts.theme] ?? (opts.theme === "chrysanthemum" ? "autumn" : opts.theme);
+    paintScene(ctx, scene, W, H);
+  }
 
   // 하단 가독성용 그라데이션
   const shade = ctx.createLinearGradient(0, H * 0.38, 0, H);
@@ -653,10 +794,23 @@ export async function renderGreetingCard(
   ctx.fillText(`${nameText} 님`, W / 2, cardY + 200);
 
   ctx.fillStyle = "#3C4A63";
-  ctx.font = `500 44px ${FONT}`;
-  const lines = wrap(ctx, opts.message, cardW - 150);
-  lines.slice(0, 3).forEach((line, i) => {
-    ctx.fillText(line, W / 2, cardY + 278 + i * 60);
+  // 글이 길면 글씨를 한 단계씩 줄여 카드 안(세 줄)에 담고, 마지막 줄이 한 글자로 떨어지지 않게 나눈다.
+  const msgMaxW = cardW - 150;
+  let msgSize = 44;
+  let lines: string[] = [];
+  for (const size of [44, 40, 36, 32]) {
+    ctx.font = `500 ${size}px ${FONT}`;
+    msgSize = size;
+    const fitted = wrapNice(ctx, opts.message, msgMaxW, 3);
+    if (fitted) {
+      lines = fitted;
+      break;
+    }
+  }
+  if (!lines.length) lines = wrap(ctx, opts.message, msgMaxW).slice(0, 3);
+  const msgGap = Math.round(msgSize * 1.36);
+  lines.forEach((line, i) => {
+    ctx.fillText(line, W / 2, cardY + 278 + i * msgGap);
   });
 
   ctx.fillStyle = "#0F6F76";

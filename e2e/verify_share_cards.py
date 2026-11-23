@@ -24,7 +24,7 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 
 LIVE = os.environ.get("BASE", "").strip()
 BASE = LIVE.rstrip("/") if LIVE else "http://127.0.0.1:8099"
-CHROME = "/workspace/.cache/ms-playwright/chromium-1255/chrome-linux64/chrome"
+CHROME = os.environ.get("CHROME_PATH", "/workspace/.cache/ms-playwright/chromium-1255/chrome-linux64/chrome")
 SHOT_DIR = "/workspace/downloads/neulbom_share_cards"
 TAG = "live" if LIVE else "local"
 

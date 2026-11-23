@@ -26,6 +26,9 @@ import { IconChevron, IconDownload, IconShare, IconSparkle } from "./icons";
 
 const PRESETS = ["오늘도 건강하세요", "행복한 하루 보내세요", "손주가 보고 싶은 날", "우리 함께 힘내요"];
 
+/** 크리스마스 카드를 골랐을 때만 함께 보여 주는 인사말 */
+const CHRISTMAS_PRESETS = ["메리 크리스마스! 행복한 연말 보내세요", "성탄절에도 늘 건강하세요", "따뜻한 연말 보내세요"];
+
 /** 오늘의 운세를 소리로 읽어 줄 글 */
 function fortuneSpeech(fortune: Fortune): string {
   const parts = [
@@ -666,31 +669,57 @@ function GreetingSheet({
 
   return (
     <Sheet open onClose={onClose} title="오늘의 안부 인사카드" subtitle="내 이름이 들어간 카드를 만들어 보내요">
-      <div className="grid grid-cols-3 gap-2">
-        {THEMES.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTheme(t.key)}
-            aria-pressed={theme === t.key}
-            className={`flex flex-col items-center gap-1 rounded-2xl border-2 px-1 py-1.5 transition ${
-              theme === t.key ? "border-brand bg-brand-light" : "border-ink/8 bg-white"
-            }`}
-          >
-            {t.key === "chrysanthemum" ? (
-              <span className="h-9 w-full overflow-hidden rounded-xl bg-[#CFE8F8]">
-                <AssetImage name="greeting-chrysanthemum" alt="" className="h-full w-full object-cover" />
-              </span>
-            ) : (
+      {/* 카드 고르기 — 열한 가지가 한 줄에 다 들어가지 않으므로 옆으로 넘겨 고른다.
+          칸 너비를 rem 으로 두어 ‘아주 크게’에서도 글씨가 넘치지 않고 함께 커진다. */}
+      <div
+        role="group"
+        aria-label="카드 그림 고르기"
+        className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-1.5 pt-0.5"
+      >
+        {THEMES.map((t) => {
+          const on = theme === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => {
+                setTheme(t.key);
+                // 크리스마스 카드를 고르면, 아직 손대지 않은 기본 문구를 성탄 인사로 바꿔 준다.
+                if (t.key === "christmas" && message === PRESETS[0]) setMessage(CHRISTMAS_PRESETS[0]);
+              }}
+              aria-pressed={on}
+              data-greeting-theme={t.key}
+              className={`flex w-[6rem] shrink-0 flex-col items-center gap-1 rounded-2xl border-2 p-1.5 transition ${
+                on ? "border-brand bg-brand-light" : "border-ink/8 bg-white"
+              }`}
+            >
               <span
-                className="h-9 w-full rounded-xl"
-                style={{ background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
-              />
-            )}
-            <span className="whitespace-nowrap text-[0.66rem] font-extrabold tracking-tight">
-              {t.emoji} {t.label}
-            </span>
-          </button>
-        ))}
+                className="relative block h-[5rem] w-full overflow-hidden rounded-xl"
+                style={t.thumb ? undefined : { background: `linear-gradient(160deg, ${t.colors[0]}, ${t.colors[1]})` }}
+              >
+                {t.thumb ? (
+                  <img
+                    src={t.thumb}
+                    alt=""
+                    width={320}
+                    height={400}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+                {on ? (
+                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[0.72rem] font-black leading-none text-white shadow">
+                    ✓
+                  </span>
+                ) : null}
+              </span>
+              <span className="w-full text-center text-[0.68rem] font-extrabold leading-[1.15] tracking-tight">
+                {t.thumb ? t.label : `${t.emoji} ${t.label}`}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-3 overflow-hidden rounded-[1.4rem] bg-[#F4EEE1] shadow-soft">
@@ -720,7 +749,7 @@ function GreetingSheet({
           onChange={(e) => setMessage(e.target.value)}
         />
         <div className="mt-2 flex flex-wrap gap-2">
-          {PRESETS.map((p) => (
+          {(theme === "christmas" ? [...CHRISTMAS_PRESETS, ...PRESETS] : PRESETS).map((p) => (
             <button
               key={p}
               onClick={() => setMessage(p)}
@@ -811,5 +840,12 @@ function GreetingPreview({
     };
   }, [canvasRef, theme, name, message, dateLabel, fortuneLine, onState]);
 
-  return <canvas ref={canvasRef} className="block w-full" style={{ aspectRatio: "1080 / 1350" }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      data-greeting-card=""
+      className="block w-full"
+      style={{ aspectRatio: "1080 / 1350" }}
+    />
+  );
 }

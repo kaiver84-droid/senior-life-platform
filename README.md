@@ -36,6 +36,11 @@ Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Page
 - `public/images/onboarding-hero.*` — 접속 첫 화면 상단 배너(맑은 봄 하늘·노란 국화·웃는 가족, 글자 없음) 1600×879.
 - `public/images/home-hero.*` — 로그인 후 홈 첫 화면 인사 히어로(봄 마을 정원에서 손 흔드는 어르신,
   1600×900, 글자 없음). 글자 자리에만 딥네이비 그라디언트를 얹어 그림 본체는 원본 그대로 보입니다.
+- `public/images/greeting-<id>-large.jpg` — **오늘의 안부 인사카드 배경(초고화질 사진 6종)**. 1080×1350(카드와 같은 4:5),
+  위쪽 2/3 에 그림의 주인공(트리·해·꽃·숲길·찻잔)을 두고 아래쪽은 흰 인사말 카드가 덮는 구도. 약한 샤픈 후 JPEG q90~94.
+  `christmas`(크리스마스 나무·눈 풍경) · `golden-sunrise`(바다 위 해돋이) · `peony`(모란 꽃다발) ·
+  `autumn-path`(단풍 숲길) · `hanok-tea`(한옥 마루의 찻잔) · `chrysanthemum`(기존 국화).
+  고르는 칸에 쓰는 작은 사진은 `greeting-<id>-thumb.jpg`(320×400, 30~50KB).
 - `public/share-card.png` — 카카오톡 공유 썸네일 2400×1260(2배 렌더). `work/neulbom_assets/share-card.html`을
   브라우저에서 1200×630·DPR2 로 찍어 만듭니다(글자가 벡터처럼 선명).
 - `public/images/icon-3d-*.png|webp` — 클레이·글래스 질감의 **3D 입체 아이콘 15종**(WebP 1024px · PNG 768px 폴백,
@@ -44,7 +49,9 @@ Next.js(App Router) + TypeScript + Tailwind CSS 로 만들고, **Cloudflare Page
   공유 카드: `work/neulbom_assets/share-card.html`
 - 검증: `python3 e2e/capture_4k_neulbom.py` (390×844 · DPR 3, 히어로 naturalWidth 1536~1600px · 아이콘 768px+ ·
   깨진 이미지·콘솔 오류 확인 + `downloads/neulbom_uhd_*.png` 스크린샷),
-  `python3 e2e/preview_uhd.py` (로컬 화면 빠른 확인)
+  `python3 e2e/preview_uhd.py` (로컬 화면 빠른 확인),
+  `python3 e2e/verify_greeting_new_cards.py` (인사카드 새 사진 6종 — 완성 카드 1080×1350 저장 · 고르기 줄 가로 넘침 ·
+  크리스마스 문구 · 카톡 공유 카드 확인. 라이브는 `BASE=https://senior-life-platform.pages.dev` 로 올리면 업로드까지 검사)
 
 ## 실행
 ```bash
