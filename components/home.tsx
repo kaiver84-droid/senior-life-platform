@@ -20,6 +20,7 @@ import { BigButton, Stars, Sheet, useToast } from "./ui";
 import { TodayAlarmCard } from "./calendar";
 import { HealthChallengeCard } from "./health";
 import { SharePreviewSheet } from "./share-sheet";
+import { MemoryBox } from "./memory-box";
 import { SpeakButton } from "./speak";
 import { AssetImage, Icon3D, NeulbomMark, RaisedTile, WeatherArt } from "./art";
 import { IconChevron, IconDownload, IconShare, IconSparkle } from "./icons";
@@ -159,6 +160,9 @@ export function HomeTab({
 
   return (
     <div className="space-y-2 pb-2">
+      {/* 🎁 추억 상자 — 오늘 처음 접속하면 화면 가운데에 한 번 떠오른다 */}
+      <MemoryBox />
+
       {/* 🔔 오늘 일정 알람 — 알람 시간이 되면 홈 맨 위에 먼저 보인다 */}
       <TodayAlarmCard where="home" />
 
