@@ -172,10 +172,13 @@ export function memoryEraTitle(era: MemoryEra): string {
   return `${era.label} · 20~30대 시절의 추억`;
 }
 
-/** 같은 시대 안에서도 날마다 다른 사진이 뜨게 날짜로 고른다 */
+/** 같은 시대 안에서도 날마다 다른 사진이 뜨게 날짜로 고른다(하루씩 번갈아) */
 export function memoryPhotoFor(era: MemoryEra, dateKey: string): MemoryPhoto {
-  const seed = [...`${era.key}|${dateKey}`].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  return era.photos[seed % era.photos.length];
+  const day = Math.floor(Date.parse(`${dateKey}T00:00:00Z`) / 86400000);
+  // 시대마다 시작 사진을 달리해, 같은 날이라도 시대가 다르면 다른 사진이 뜨게
+  const offset = [...era.key].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const idx = Number.isFinite(day) ? (day + offset) % era.photos.length : 0;
+  return era.photos[idx] || era.photos[0];
 }
 
 /** 오늘 이미 상자를 열었는지 — 저장소를 못 쓰는 브라우저는 '아직 안 열었다'로 본다 */

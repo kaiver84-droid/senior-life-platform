@@ -16,6 +16,7 @@ BASE=https://senior-life-platform.pages.dev python3 e2e/check_memory_box.py  # �
 import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, "/workspace/work/senior-platform/e2e")
 from harness import PORT, onboard, start_server  # noqa: E402
@@ -242,6 +243,31 @@ def main():
             if again:
                 problems.append((label, "같은 날 새로고침에 상자가 다시 떴다", again))
             page.screenshot(path=os.path.join(OUT, f"neulbom_memory_box_after_{label}.png"))
+
+            # ── 4) 날짜가 바뀌면 다시 뜨고, 사진도 바뀐다(어제 열었다고 적어 두고 확인)
+            kst = timezone(timedelta(hours=9))
+            yesterday = (datetime.now(kst) - timedelta(days=1)).strftime("%Y-%m-%d")
+            page.evaluate(
+                "(d) => localStorage.setItem('neulbom.memoryBoxSeenDate', d)", yesterday
+            )
+            page.reload(wait_until="networkidle")
+            back = page.locator("[data-memory-box-card]")
+            try:
+                back.wait_for(state="visible", timeout=4000)
+                returned = True
+            except Exception:
+                returned = False
+            res["nextDayShowsAgain"] = returned
+            if not returned:
+                problems.append((label, "날짜가 바뀌었는데 상자가 다시 뜨지 않았다", yesterday))
+            else:
+                page.click("[data-memory-box-open]")
+                page.wait_for_selector("[data-memory-box-photo]", state="visible", timeout=5000)
+                page.wait_for_timeout(500)
+                pr4 = page.evaluate(PROBE)
+                res["nextDayPhoto"] = [i["src"] for i in pr4["imgs"] if "/images/memory-box/era" in i["src"]]
+                page.click("[data-memory-box-close]")
+                page.wait_for_timeout(200)
 
             res["consoleErrors"] = console_errors
             res["httpErrors"] = http_errors
