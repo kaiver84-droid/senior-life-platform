@@ -9,6 +9,9 @@ BASE=https://senior-life-platform.pages.dev python3 e2e/check_memory_box.py  # �
 2) 상자를 누르면 Web Audio 오르골이 실제로 울리는지(OscillatorNode.start 호출 수) +
    태어난 해(1952)에 맞는 1970~1980년대 추억 사진이 로드되는지 · 콘솔 오류 0건
 3) 닫은 뒤 새로고침해도 같은 날에는 다시 뜨지 않는지
+4) 50대 이상 네 시대 — 1946·1955·1965·1975·1985년생에게 각각 1960~1970년대 /
+   1970~1980년대 / 1980~1990년대 초반 / 1990~2000년대 초반(1975·1985년생) 사진이 나오는지
+   (2000년대·2010년대 구간은 없음)
 스크린샷: downloads/neulbom_memory_box_{normal,large,xlarge}.png
           downloads/neulbom_memory_box_photo_{...}.png
 결과: downloads/memory-box-check.json
@@ -29,6 +32,47 @@ CHROME = os.environ.get("CHROME_PATH", "/workspace/.cache/ms-playwright/chromium
 BIRTH = os.environ.get("BIRTH", "1952")
 ERA = os.environ.get("ERA", "1970~1980년대")  # 1952년생 → 1970~1980년대
 NOTE = os.environ.get("NOTE", "")
+
+# 50대 이상 네 시대 — 출생연도, 기대 시대 이름, 기대 사진 접두어
+ERA_MATRIX = [
+    (1946, "1960~1970년대", "era1"),
+    (1955, "1970~1980년대", "era2"),
+    (1965, "1980~1990년대 초반", "era3"),
+    (1975, "1990~2000년대 초반", "era4"),
+    (1985, "1990~2000년대 초반", "era4"),  # 1985년생도 시니어 기본 시대(1990~2000년대 초반)
+]
+
+
+def profile_script(birth, size=18):
+    """카카오 로그인 없이 '이미 초기 설정을 마친 기기' 상태를 만드는 localStorage 스크립트."""
+    return "localStorage.setItem('seniorLife.v1', %s)" % json.dumps(
+        json.dumps(
+            {
+                "version": 1,
+                "profile": {
+                    "id": "demo_memorybox_check",
+                    "nickname": "순자",
+                    "birthYear": int(birth),
+                    "birthTime": "묘시",
+                    "sido": "충청북도",
+                    "sigungu": "옥천군",
+                    "createdAt": "2026-11-24T00:00:00.000Z",
+                    "source": "demo",
+                    "profileCompleted": True,
+                },
+                "quizLogs": [],
+                "med": {},
+                "visits": [],
+                "familyEvents": [],
+                "health": {},
+                "missions": {},
+                "rankingVisible": True,
+                "fontSize": size,
+                "lastVisit": "",
+            },
+            ensure_ascii=False,
+        )
+    )
 
 # 상자 그림·사진·글자 폭 측정 (넘침·잘림)
 PROBE = """
@@ -143,37 +187,7 @@ def main():
             else:
                 # 라이브: 카카오 로그인 없이 '이미 초기 설정을 마친 기기' 상태를 만들어
                 # 이 기기에 이미 저장된 설정과 똑같이 홈부터 연다(서버·DB에는 아무것도 쓰지 않는다).
-                page.add_init_script(
-                    "localStorage.setItem('seniorLife.v1', %s)"
-                    % json.dumps(
-                        json.dumps(
-                            {
-                                "version": 1,
-                                "profile": {
-                                    "id": "demo_memorybox_check",
-                                    "nickname": "순자",
-                                    "birthYear": int(BIRTH),
-                                    "birthTime": "묘시",
-                                    "sido": "충청북도",
-                                    "sigungu": "옥천군",
-                                    "createdAt": "2026-11-24T00:00:00.000Z",
-                                    "source": "demo",
-                                    "profileCompleted": True,
-                                },
-                                "quizLogs": [],
-                                "med": {},
-                                "visits": [],
-                                "familyEvents": [],
-                                "health": {},
-                                "missions": {},
-                                "rankingVisible": True,
-                                "fontSize": size,
-                                "lastVisit": "",
-                            },
-                            ensure_ascii=False,
-                        )
-                    )
-                )
+                page.add_init_script(profile_script(BIRTH, size))
                 page.goto(BASE + "/", wait_until="domcontentloaded")
                 page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
 
@@ -280,6 +294,67 @@ def main():
                 problems.append((label, "콘솔 오류", real_console[:5]))
             report[label] = res
             ctx.close()
+
+        # ── 5) 50대 이상 네 시대 — 출생연도별로 맞는 추억 사진이 나오는지
+        matrix = []
+        for birth, want_label, want_era in ERA_MATRIX:
+            ctx = browser.new_context(
+                viewport={"width": 390, "height": 844},
+                device_scale_factor=2,
+                is_mobile=True,
+                has_touch=True,
+                user_agent=(
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+                ),
+            )
+            page = ctx.new_page()
+            merr = []
+            page.on("console", lambda m: merr.append(m.text) if m.type == "error" else None)
+            page.on("pageerror", lambda e: merr.append(f"pageerror: {e}"))
+            page.route(
+                "**/api/state",
+                lambda route: route.fulfill(status=200, content_type="application/json", body='{"ok":true}')
+                if route.request.method != "GET"
+                else route.continue_(),
+            )
+            if LOCAL:
+                onboard(page, birth=str(birth))
+            else:
+                page.add_init_script(profile_script(birth))
+                page.goto(BASE + "/", wait_until="domcontentloaded")
+                page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
+            page.wait_for_selector("[data-memory-box-card]", state="visible", timeout=15000)
+            page.click("[data-memory-box-open]")
+            page.wait_for_selector("[data-memory-box-photo]", state="visible", timeout=5000)
+            page.wait_for_timeout(500)
+            text = page.locator("[data-memory-box-photo]").inner_text()
+            srcs = page.evaluate(
+                "() => [...document.querySelectorAll('[data-memory-box-photo] img')]"
+                ".map((i) => i.currentSrc || i.src)"
+            )
+            row = {
+                "birth": birth,
+                "wantLabel": want_label,
+                "wantEra": want_era,
+                "labelOk": want_label in text,
+                "photoOk": any(f"/images/memory-box/{want_era}-" in u for u in srcs),
+                "noRetiredEra": not any("/images/memory-box/era5-" in u or "/images/memory-box/era6-" in u for u in srcs),
+                "srcs": [u.split("/")[-1] for u in srcs],
+                "text": text[:160],
+            }
+            matrix.append(row)
+            if not row["labelOk"]:
+                problems.append((f"birth {birth}", "시대 라벨이 맞지 않음", row["text"]))
+            if not row["photoOk"]:
+                problems.append((f"birth {birth}", "시대 사진이 맞지 않음", row["srcs"]))
+            if not row["noRetiredEra"]:
+                problems.append((f"birth {birth}", "은퇴한 era5·era6 사진이 뜸", row["srcs"]))
+            page.screenshot(path=os.path.join(OUT, f"neulbom_memory_box_era_{birth}.png"))
+            page.click("[data-memory-box-close]")
+            page.wait_for_timeout(200)
+            ctx.close()
+        report["eras"] = matrix
 
         browser.close()
 

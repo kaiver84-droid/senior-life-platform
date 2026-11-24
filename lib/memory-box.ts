@@ -48,6 +48,9 @@ const photo = (name: string, alt: string, line: string): MemoryPhoto => ({
 /**
  * 시대별 추억 사진 — 태어난 해로 그 사람이 20~30대였던 때를 고른다.
  * 사진은 시대마다 두 장씩 두고, 날짜로 골라 같은 시대라도 날마다 다른 사진이 뜬다.
+ *
+ * 늘봄은 50대 이상 시니어를 위한 서비스라, 구간은 1960~1990년대 네 개만 둔다.
+ * (1960년대생도 20~30대는 1990~2000년대 초반이라 마지막 구간이 1970년생 이후를 모두 받는다)
  */
 export const MEMORY_ERAS: MemoryEra[] = [
   {
@@ -108,7 +111,8 @@ export const MEMORY_ERAS: MemoryEra[] = [
     key: "1990s",
     label: "1990~2000년대 초반",
     from: 1970,
-    to: 1979,
+    // 1970년생 이후는 모두 여기 — 1977년 이후 출생자·출생연도 미입력자도 시니어 시대로 모인다
+    to: 9999,
     photos: [
       photo(
         "era4-a",
@@ -122,49 +126,15 @@ export const MEMORY_ERAS: MemoryEra[] = [
       ),
     ],
   },
-  {
-    key: "2000s",
-    label: "2000~2010년대",
-    from: 1980,
-    to: 1989,
-    photos: [
-      photo(
-        "era5-a",
-        "2000년대 카페 테이블 위 은색 디지털 카메라와 아이스커피",
-        "찍고 또 찍어 지우던 디카 속 우리 모습"
-      ),
-      photo(
-        "era5-b",
-        "2000년대 저녁 거리, 불 켜진 가게들 사이를 걷는 사람들",
-        "불 켜진 골목을 걷다 보면 마음이 풀리던 밤"
-      ),
-    ],
-  },
-  {
-    key: "2010s",
-    label: "2010~2020년대",
-    from: 1990,
-    to: 9999,
-    photos: [
-      photo(
-        "era6-a",
-        "벚꽃 아래 돗자리를 펴고 둘러앉은 젊은 사람들",
-        "벚꽃 아래 돗자리 펴고 웃음꽃 피던 봄"
-      ),
-      photo(
-        "era6-b",
-        "햇살 드는 카페 창가, 필름 카메라와 커피 한 잔",
-        "햇살 좋은 창가에서 커피 한 잔 나누던 오후"
-      ),
-    ],
-  },
 ];
 
 /** 태어난 해로 그 사람이 20~30대였던 시대를 고른다 */
 export function memoryEraFor(birthYear?: number): MemoryEra {
+  // 출생연도를 모르면 1950년대생(1970~1980년대)으로 — 늘봄의 기본 시니어 나이대
   const year = Number(birthYear) || 1955;
   const found = MEMORY_ERAS.find((e) => year >= e.from && year <= e.to);
-  return found || MEMORY_ERAS[1];
+  // 어느 구간에도 안 걸리는 값이 오더라도 2000년대 이후가 아니라 가장 가까운 시니어 시대로
+  return found || MEMORY_ERAS[MEMORY_ERAS.length - 1];
 }
 
 /** 시대 이름 + '20~30대 시절의 추억' */
