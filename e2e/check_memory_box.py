@@ -16,9 +16,9 @@ BASE=https://senior-life-platform.pages.dev python3 e2e/check_memory_box.py  # �
           downloads/neulbom_memory_box_photo_{...}.png
 결과: downloads/memory-box-check.json
 
-5) 네 시대 × 사진 일곱 장 — 등록된 사진 파일(.png·.webp)이 모두 있고 빠진 것이 없는지
-6) 일주일 순환 — 월말(11-28)→월초(12-04)를 넘겨도 연속 7일에 매일 다른 사진,
-   8일째는 첫 사진으로 돌아오는지
+5) 네 시대 × 사진 열다섯 장 — 등록된 사진 파일(.png·.webp)이 모두 있고 빠진 것이 없는지
+6) 보름 순환 — 월말(11-28)→월초(12-12)를 넘겨도 연속 15일에 매일 다른 사진,
+   16일째는 첫 사진으로 돌아오는지
 """
 import json
 import os
@@ -81,7 +81,7 @@ def profile_script(birth, size=18):
 
 
 def date_script(day):
-    """브라우저의 '오늘'을 지정한 날(서울 낮 12시)로 고정한다 — 7일 순환을 하루씩 넘겨 보기 위해."""
+    """브라우저의 '오늘'을 지정한 날(서울 낮 12시)로 고정한다 — 보름 순환을 하루씩 넘겨 보기 위해."""
     return (
         "const __fixed = new Date('%sT12:00:00+09:00').getTime();"
         "const __RealDate = Date;"
@@ -184,8 +184,8 @@ def main():
     report["photos"] = {k: len(v) for k, v in sorted(per_era.items())}
     report["photosMissing"] = missing
     for k, v in sorted(per_era.items()):
-        if len(v) != 7:
-            problems.append((k, "사진이 일곱 장이 아님", v))
+        if len(v) != 15:
+            problems.append((k, "사진이 열다섯 장이 아님", v))
         if len(set(v)) != len(v):
             problems.append((k, "사진 이름 중복", v))
     if missing:
@@ -401,11 +401,13 @@ def main():
             ctx.close()
         report["eras"] = matrix
 
-        # ── 6) 일주일 순환 — 연속 7일(월말→월초를 넘기는 날짜)에 매일 다른 사진, 8일째는 첫 사진
+        # ── 6) 보름 순환 — 연속 15일(월말→월초를 넘기는 날짜)에 매일 다른 사진, 16일째는 첫 사진
         #    1952년생(1970~1980년대)으로 확인한다.
         rotation_days = ["2026-11-28", "2026-11-29", "2026-11-30",
                          "2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04",
-                         "2026-12-05"]  # 마지막 날은 첫날과 같은 사진이어야 한다
+                         "2026-12-05", "2026-12-06", "2026-12-07", "2026-12-08",
+                         "2026-12-09", "2026-12-10", "2026-12-11", "2026-12-12",
+                         "2026-12-13"]  # 마지막 날은 첫날과 같은 사진이어야 한다
         picked = []
         for day in rotation_days:
             ctx = browser.new_context(
@@ -441,18 +443,18 @@ def main():
             picked.append(name)
             page.close()
             ctx.close()
-        first_seven = picked[:7]
+        first_fifteen = picked[:15]
         rotation = {
             "days": rotation_days,
             "picked": picked,
-            "sevenDistinct": len(set(first_seven)) == 7 and all(first_seven),
-            "eighthSameAsFirst": bool(picked[7]) and picked[7] == picked[0],
+            "fifteenDistinct": len(set(first_fifteen)) == 15 and all(first_fifteen),
+            "sixteenthSameAsFirst": bool(picked[15]) and picked[15] == picked[0],
         }
         report["rotation"] = rotation
-        if not rotation["sevenDistinct"]:
-            problems.append(("rotation", "7일 안에 같은 사진이 다시 나왔다", picked))
-        if not rotation["eighthSameAsFirst"]:
-            problems.append(("rotation", "8일째가 첫 사진으로 돌아오지 않았다", picked))
+        if not rotation["fifteenDistinct"]:
+            problems.append(("rotation", "15일 안에 같은 사진이 다시 나왔다", picked))
+        if not rotation["sixteenthSameAsFirst"]:
+            problems.append(("rotation", "16일째가 첫 사진으로 돌아오지 않았다", picked))
 
         browser.close()
 
