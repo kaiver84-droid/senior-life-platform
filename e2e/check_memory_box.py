@@ -4,8 +4,8 @@ python3 e2e/check_memory_box.py                                            # 로
 BASE=https://senior-life-platform.pages.dev python3 e2e/check_memory_box.py  # 라이브
 
 확인
-1) 첫 접속(초기 설정 직후)에 화면 가운데 '추억 상자'가 뜨고, 상자 그림이 실제로 로드되는지
-   (naturalWidth > 0) · 가로 넘침/잘림 0건
+1) 첫 접속(초기 설정 직후)에 화면 가운데 '오늘의 추억상자'가 뜨고, 상자 그림이 실제로 로드되는지
+   (naturalWidth > 0) · 가로 넘침/잘림 0건 · 예전 제목 '추억 상자'는 남아 있지 않은지
 2) 상자를 누르면 Web Audio 오르골이 실제로 울리는지(OscillatorNode.start 호출 수) +
    태어난 해(1952)에 맞는 1970~1980년대 추억 사진이 로드되는지 · 콘솔 오류 0건
 3) 닫은 뒤 새로고침해도 같은 날에는 다시 뜨지 않는지
@@ -15,9 +15,14 @@ BASE=https://senior-life-platform.pages.dev python3 e2e/check_memory_box.py  # �
 스크린샷: downloads/neulbom_memory_box_{normal,large,xlarge}.png
           downloads/neulbom_memory_box_photo_{...}.png
 결과: downloads/memory-box-check.json
+
+5) 네 시대 × 사진 일곱 장 — 등록된 사진 파일(.png·.webp)이 모두 있고 빠진 것이 없는지
+6) 일주일 순환 — 월말(11-28)→월초(12-04)를 넘겨도 연속 7일에 매일 다른 사진,
+   8일째는 첫 사진으로 돌아오는지
 """
 import json
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -73,6 +78,20 @@ def profile_script(birth, size=18):
             ensure_ascii=False,
         )
     )
+
+
+def date_script(day):
+    """브라우저의 '오늘'을 지정한 날(서울 낮 12시)로 고정한다 — 7일 순환을 하루씩 넘겨 보기 위해."""
+    return (
+        "const __fixed = new Date('%sT12:00:00+09:00').getTime();"
+        "const __RealDate = Date;"
+        "class __FakeDate extends __RealDate {"
+        "  constructor(...a){ if (a.length === 0) { super(__fixed); } else { super(...a); } }"
+        "  static now(){ return __fixed; }"
+        "}"
+        "window.Date = __FakeDate;"
+    ) % day
+
 
 # 상자 그림·사진·글자 폭 측정 (넘침·잘림)
 PROBE = """
@@ -151,6 +170,27 @@ def main():
     report = {}
     problems = []
 
+    # ── 0) 등록된 사진 파일 — lib/memory-box.ts 의 photo("eraX-y") 마다 .png·.webp 가 실제로 있는지
+    root = "/workspace/work/senior-platform"
+    lib_src = open(os.path.join(root, "lib/memory-box.ts"), encoding="utf-8").read()
+    names = re.findall(r'photo\(\s*"([^"]+)"', lib_src)
+    per_era, missing = {}, []
+    for n in names:
+        per_era.setdefault(n.split("-")[0], []).append(n)
+        for ext in ("png", "webp"):
+            p = os.path.join(root, "public/images/memory-box", f"{n}.{ext}")
+            if not os.path.exists(p) or os.path.getsize(p) < 20000:
+                missing.append(f"{n}.{ext}")
+    report["photos"] = {k: len(v) for k, v in sorted(per_era.items())}
+    report["photosMissing"] = missing
+    for k, v in sorted(per_era.items()):
+        if len(v) != 7:
+            problems.append((k, "사진이 일곱 장이 아님", v))
+        if len(set(v)) != len(v):
+            problems.append((k, "사진 이름 중복", v))
+    if missing:
+        problems.append(("files", "사진 파일이 없거나 너무 작음", missing))
+
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"])
         for label, size in (("normal", 18), ("large", 21), ("xlarge", 24)):
@@ -196,7 +236,8 @@ def main():
             page.wait_for_timeout(700)  # 상자 그림 로드·애니메이션
             pr = page.evaluate(PROBE)
             res["box"] = {
-                "hasTitle": "추억 상자" in pr["text"],
+                "hasTitle": "오늘의 추억상자" in pr["text"],
+                "hasOldTitle": "추억 상자" in pr["text"],
                 "hasGuide": "눌러서 열어보세요" in pr["text"],
                 "card": pr["card"],
                 "vh": pr["vh"],
@@ -211,6 +252,10 @@ def main():
             }
             if not pr["imgs"] or pr["imgs"][0]["nw"] <= 0:
                 problems.append((label, "상자 그림이 로드되지 않음", pr["imgs"]))
+            if not res["box"]["hasTitle"]:
+                problems.append((label, "제목이 '오늘의 추억상자'가 아님", pr["text"][:120]))
+            if res["box"]["hasOldTitle"]:
+                problems.append((label, "예전 제목 '추억 상자'가 남아 있음", pr["text"][:120]))
             if pr["overCount"]:
                 problems.append((label, "가로 넘침", pr["over"]))
             page.screenshot(path=os.path.join(OUT, f"neulbom_memory_box_{label}.png"))
@@ -355,6 +400,59 @@ def main():
             page.wait_for_timeout(200)
             ctx.close()
         report["eras"] = matrix
+
+        # ── 6) 일주일 순환 — 연속 7일(월말→월초를 넘기는 날짜)에 매일 다른 사진, 8일째는 첫 사진
+        #    1952년생(1970~1980년대)으로 확인한다.
+        rotation_days = ["2026-11-28", "2026-11-29", "2026-11-30",
+                         "2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04",
+                         "2026-12-05"]  # 마지막 날은 첫날과 같은 사진이어야 한다
+        picked = []
+        for day in rotation_days:
+            ctx = browser.new_context(
+                viewport={"width": 390, "height": 844},
+                device_scale_factor=2,
+                is_mobile=True,
+                has_touch=True,
+                user_agent=(
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+                ),
+            )
+            page = ctx.new_page()
+            page.add_init_script(profile_script(BIRTH))
+            page.add_init_script(date_script(day))
+            page.route(
+                "**/api/state",
+                lambda route: route.fulfill(status=200, content_type="application/json", body='{"ok":true}')
+                if route.request.method != "GET"
+                else route.continue_(),
+            )
+            page.goto(BASE + "/", wait_until="domcontentloaded")
+            page.wait_for_selector("nav[aria-label='주요 메뉴']", timeout=30000)
+            page.wait_for_selector("[data-memory-box-card]", state="visible", timeout=15000)
+            page.click("[data-memory-box-open]")
+            page.wait_for_selector("[data-memory-box-photo]", state="visible", timeout=5000)
+            page.wait_for_timeout(500)
+            srcs = page.evaluate(
+                "() => [...document.querySelectorAll('[data-memory-box-photo] img')]"
+                ".map((i) => i.currentSrc || i.src)"
+            )
+            name = next((u.split("/")[-1] for u in srcs if "/images/memory-box/era" in u), None)
+            picked.append(name)
+            page.close()
+            ctx.close()
+        first_seven = picked[:7]
+        rotation = {
+            "days": rotation_days,
+            "picked": picked,
+            "sevenDistinct": len(set(first_seven)) == 7 and all(first_seven),
+            "eighthSameAsFirst": bool(picked[7]) and picked[7] == picked[0],
+        }
+        report["rotation"] = rotation
+        if not rotation["sevenDistinct"]:
+            problems.append(("rotation", "7일 안에 같은 사진이 다시 나왔다", picked))
+        if not rotation["eighthSameAsFirst"]:
+            problems.append(("rotation", "8일째가 첫 사진으로 돌아오지 않았다", picked))
 
         browser.close()
 

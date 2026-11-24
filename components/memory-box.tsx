@@ -14,7 +14,7 @@ import {
 } from "@/lib/memory-box";
 
 /**
- * 추억 상자 — 오늘 처음 접속했을 때 화면 가운데에 한 번 떠오른다.
+ * 오늘의 추억상자 — 오늘 처음 접속했을 때 화면 가운데에 한 번 떠오른다.
  * 상자를 누르면 소리가 나고, 그 사람이 20~30대였던 시절의 추억 사진이 열린다.
  * 화면에는 이름·그림·한 줄 안내·닫기 하나만 둔다(중간 부연설명 없음).
  */
@@ -90,7 +90,7 @@ export function MemoryBox() {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="추억 상자"
+      aria-label="오늘의 추억상자"
       className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto px-4"
       style={{
         paddingTop: "max(28px, calc(env(safe-area-inset-top, 0px) + 16px))",
@@ -147,12 +147,12 @@ export function MemoryBox() {
             stage === "opening" ? "memory-box-away" : "pop"
           }`}
         >
-          <p className="text-center text-[1.3rem] font-black leading-tight tracking-tight text-[#6B3F05]">추억 상자</p>
+          <p className="text-center text-[1.3rem] font-black leading-tight tracking-tight text-[#6B3F05]">오늘의 추억상자</p>
 
           <button
             type="button"
             onClick={openBox}
-            aria-label="추억 상자 열어보기"
+            aria-label="오늘의 추억상자 열어보기"
             data-memory-box-open
             className="relative mt-1.5 block w-full rounded-[1.4rem] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#E8B44A]/70"
           >
