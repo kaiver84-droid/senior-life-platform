@@ -44,7 +44,8 @@ def main():
 
     # --- sitemap / robots ------------------------------------------------
     for path, key in (("/sitemap.xml", "sitemap"), ("/robots.txt", "robots")):
-        with urllib.request.urlopen(f"{BASE}{path}", timeout=30) as res:
+        req = urllib.request.Request(f"{BASE}{path}", headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as res:
             body = res.read().decode("utf-8")
             report[key]["status"] = res.status
             if res.status != 200:

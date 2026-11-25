@@ -186,8 +186,15 @@ JS SDK 간편로그인을 쓰려면 **플랫폼 > Web > 사이트 도메인**에
 app/
   page.tsx          탭 셸(홈/퀴즈/랭킹/혜택/도구/가족) · 늘봄 로고 헤더 · 설정 시트
   family/page.tsx   자녀 확인 대시보드
+  privacy/page.tsx  공개 개인정보처리방침
+  guide/page.tsx    검색 유입 허브 — 혜택 17가지 카테고리별 목록
+  guide/[id]/page.tsx  혜택 상세 안내(빌드 때 17개 자동 생성) · guide/quiz/page.tsx 퀴즈 소개
+  sitemap.ts        sitemap.xml 자동 생성(/ · /guide/ · 상세 17 · /guide/quiz/ · /privacy/)
+  robots.ts         robots.txt (모두 허용 + Sitemap 줄)
   layout.tsx        메타데이터 · OG 이미지
-components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, calendar, onboarding, groups, health, share-sheet, ui, icons, art)
+components/         화면별 컴포넌트 (home, quiz, ranking, welfare, tools, family, calendar, onboarding, groups, health, share-sheet, guide, ui, icons, art)
+lib/
+  guide.ts          안내 페이지 문구·제목·설명·관련 혜택 · SITE_URL 의 단일 출처
 lib/
   fortune.ts        띠·운세 결정론(날짜+생년월일 시드)
   weather.ts        Open-Meteo 실시간 날씨 + 생활 팁(실패 시 폴백)
@@ -214,6 +221,22 @@ supabase/schema.sql DB 스키마
 supabase/groups.sql 모임 테이블 + 체험 모임 시드
 ```
 
+## 검색 유입 안내 페이지 (SEO, 2026-11-26)
+
+로그인 없이 열리는 공개 페이지를 `lib/welfare.ts`·`lib/quiz.ts` 에서 **빌드 때 자동 생성**합니다.
+매주 월요일 `🎁-늘봄-오늘의-혜택-주간-자동-업데이트` 가 `lib/welfare.ts` 를 갱신하고 재배포하면 안내 페이지와 사이트맵도 함께 최신이 됩니다(따로 손댈 목록 없음).
+
+| 주소 | 내용 |
+| --- | --- |
+| `/guide/` | 혜택 17가지를 카테고리별로 + 신청 기간이 정해진 혜택 모음 |
+| `/guide/<id>/` | 혜택별 상세 — 금액·지원 대상·신청 순서·준비 서류·전화·공식 링크·JSON-LD(GovernmentService·Breadcrumb) |
+| `/guide/quiz/` | 치매예방 퀴즈(433문항·8주제)와 오늘의 추억상자 소개 + FAQ |
+| `/sitemap.xml`·`/robots.txt` | 위 주소 전부 자동 포함, robots 에 Sitemap 연결 |
+
+- 모든 페이지에 `title`·`description`·`canonical`·`og:*` 를 넣고, 위·아래에 **[늘봄에서 무료로 이용하기 →]**(`/`) 버튼을 둡니다.
+- 글씨는 앱과 같은 시니어 기준(본문 19px 이상·고대비·버튼 56px 이상)이고, 앱에서 고른 글씨 크기(보통·크게·아주 크게)를 그대로 씁니다.
+- `functions-entry.ts` 는 이 주소들을 건드리지 않고 정적 파일(ASSETS)로 그대로 내려보냅니다(OG 는 빌드 때 구운 정적 메타).
+
 ## 카카오톡 공유 카드 이미지 (2026-11-23)
 
 - 카톡 맨 위 카드는 **상황마다 다른 그림**입니다 — `public/images/share-{greeting,quiz,welfare,group,family,fortune}.png`
@@ -232,6 +255,8 @@ supabase/groups.sql 모임 테이블 + 체험 모임 시드
 ## 검증
 
 - `npm run typecheck`, `npm run build` 통과
+- 검색 유입 안내 페이지: `python3 e2e/check_guide_seo.py` (로컬) / `BASE=https://senior-life-platform.pages.dev python3 e2e/check_guide_seo.py` (라이브)
+  — 390×844 에서 `/guide/`·상세·`/guide/quiz/` 200 · 가로 넘침 0 · 콘솔 오류 0 · 위·아래 CTA 2개 · sitemap 21개 URL · robots Sitemap 줄
 - 공유 미리보기(OG) 검증: `node e2e/worker-meta-test.mjs` — out/_worker.js 를 그대로 불러
   `/?group=`·`/?join=`·`/family/`·`/?tab=quiz`·`/?share=greeting` 등 주소별 og:title·og:description 확인
   (모임 이름 조회는 `SUPABASE_SERVICE_ROLE_KEY` 가 있을 때 실제 Supabase 로 돈다)
