@@ -149,6 +149,42 @@ def blocked_font_inject(page, size):
     )
 
 
+def block_font_path():
+    for p in (
+        "/usr/share/fonts/pickle-hwp/NotoSansCJKkr-Regular.otf",
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    ):
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def compose(shots, out_path, caption_left="늘봄 홈 · 2026-11-27 추억상자 숨김 배포",
+            caption_right="글씨 보통 / 크게 / 아주 크게 · 390×844"):
+    """글씨 3단계 스크린샷을 가로로 붙이고 한글 캡션을 단다."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    imgs = [Image.open(s).convert("RGB") for s in shots]
+    pad, top = 24, 74
+    total_w = sum(i.width for i in imgs) + pad * (len(imgs) + 1)
+    h = max(i.height for i in imgs)
+    canvas = Image.new("RGB", (total_w, h + top), (245, 241, 232))
+    draw = ImageDraw.Draw(canvas)
+    font_path = block_font_path()
+    font = ImageFont.truetype(font_path, 26) if font_path else ImageFont.load_default()
+    draw.text((pad, 20), f"{caption_left} — 오늘의 추억상자 팝업·버튼 없음",
+              fill=(60, 50, 40), font=font)
+    if caption_right:
+        w = draw.textlength(caption_right, font=font)
+        draw.text((total_w - pad - w, 20), caption_right, fill=(110, 96, 80), font=font)
+    x = pad
+    for img in imgs:
+        canvas.paste(img, (x, top))
+        x += img.width + pad
+    canvas.save(out_path)
+    return out_path
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     report = {"base": BASE, "problems": []}
@@ -266,25 +302,10 @@ def main():
     # ── 글씨 3단계를 한 장으로 합친 증빙(보통·크게·아주 크게)
     main_shot = os.path.join(OUT, f"{STEM}.png")
     try:
-        from PIL import Image, ImageDraw
-
-        imgs = [Image.open(s).convert("RGB") for s in normal_panels]
-        h = max(i.height for i in imgs)
-        total_w = sum(i.width for i in imgs) + 24 * (len(imgs) + 1)
-        canvas = Image.new("RGB", (total_w, h + 76), (245, 241, 232))
-        draw = ImageDraw.Draw(canvas)
-        draw.text((24, 20), "늘봄 홈 — 오늘의 추억상자 숨김(2026-11-27) · 글씨 보통 / 크게 / 아주 크게 · 390×844",
-                  fill=(60, 50, 40))
-        x = 24
-        for img in imgs:
-            canvas.paste(img, (x, 60))
-            x += img.width + 24
-        canvas.save(main_shot)
-        report["mainShot"] = main_shot
+        report["mainShot"] = compose(normal_panels, main_shot)
     except Exception as e:  # 합성 실패해도 개별 스크린샷은 남는다
         report["composeError"] = str(e)
-        main_shot = normal_panels[0]
-        report["mainShot"] = main_shot
+        report["mainShot"] = normal_panels[0]
 
     with open(os.path.join(OUT, f"{STEM}.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
