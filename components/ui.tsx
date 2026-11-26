@@ -327,6 +327,7 @@ export function Sheet({
   footer,
   hideBottomClose,
   hideTopClose,
+  layer = "default",
 }: {
   open: boolean;
   onClose: () => void;
@@ -338,6 +339,8 @@ export function Sheet({
   hideBottomClose?: boolean;
   /** 닫기 버튼을 아래 고정 버튼 하나로만 두고 상단 ‘✕ 닫기’는 감춘다(버튼이 세 번 보이지 않게) */
   hideTopClose?: boolean;
+  /** ‘top’ — 화면 맨 위(z-96)에 올린다. 추억상자(z-90)처럼 이미 떠 있는 화면에서 시트를 열 때 */
+  layer?: "default" | "top";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -359,7 +362,7 @@ export function Sheet({
       {/* 아이폰 상태바·노치 아래로는 절대 올라가지 않게 위쪽 여백을 강제로 비운다
           (여백 = 최소 64px, 세이프에어리어가 더 크면 그만큼 더) */}
       <div
-        className="fixed inset-0 z-[80] flex items-end justify-center"
+        className={`fixed inset-0 ${layer === "top" ? "z-[96]" : "z-[80]"} flex items-end justify-center`}
         style={{ paddingTop: "max(64px, calc(env(safe-area-inset-top, 0px) + 20px))" }}
       >
         <button aria-label="닫기" onClick={onClose} className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]" />

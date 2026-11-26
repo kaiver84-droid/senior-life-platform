@@ -665,6 +665,25 @@ function ResultAndCertificate({
   /** 공유 미리보기 시트 — 상장 그대로 / 모임에 알리기 */
   const [share, setShare] = useState<null | "cert" | "group">(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /**
+   * 결과 화면이 뜰 때 상장을 **보이지 않는 캔버스에 미리 그려 둔다**.
+   * 그래야 ‘가족·친구에게 카톡으로 보내기’를 바로 누를 때도 상장 그대로 담긴 카드가 나간다.
+   * (상장 시트를 열어야만 캔버스가 생기던 때에는 미리보기가 평범한 카드로 나갔다.)
+   */
+  const certCard = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!profile || typeof document === "undefined") return;
+    const canvas = certCard.current ?? document.createElement("canvas");
+    certCard.current = canvas;
+    void renderCertificate(canvas, {
+      name: profile.nickname,
+      correct,
+      total,
+      points,
+      dateLabel: koreanDate(today) + " · " + new Date().getFullYear(),
+    }).catch(() => {});
+  }, [profile, correct, total, points, today]);
 
   const save = useCallback(() => {
     if (!canvasRef.current || !profile) return;
@@ -692,17 +711,28 @@ function ResultAndCertificate({
           <Badge tone="brand">이번 주 모아요</Badge>
         </div>
         <div className="mt-4">
-          <BigButton variant="ink" size="lg" full onClick={() => setCertOpen(true)}>
+          <BigButton
+            variant="sun"
+            size="lg"
+            full
+            onClick={() => setShare("cert")}
+            className="whitespace-nowrap !text-[0.98rem]"
+          >
+            <span aria-hidden className="text-[1.2rem] leading-none">
+              💬
+            </span>
+            가족·친구에게 카톡으로 보내기
+          </BigButton>
+        </div>
+        <div className="mt-2">
+          <BigButton variant="ink" full onClick={() => setCertOpen(true)}>
             🏅 금빛 상장 만들기
           </BigButton>
         </div>
         {groupDetail ? (
           <div className="mt-2">
-            <BigButton variant="sun" full onClick={() => setShare("group")}>
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#FEE500] text-[0.58rem] font-black text-[#3C1E1E]">
-                TALK
-              </span>
-              모임에 결과 알리기
+            <BigButton variant="white" full onClick={() => setShare("group")}>
+              👥 모임에 결과 알리기
             </BigButton>
           </div>
         ) : null}
@@ -759,7 +789,7 @@ function ResultAndCertificate({
       <SharePreviewSheet
         open={share !== null}
         onClose={() => setShare(null)}
-        sourceCanvas={canvasRef}
+        sourceCanvas={certCard}
         data={{
           kind: "quiz",
           badge: "오늘의 치매예방 퀴즈",

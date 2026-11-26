@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { AppProvider, useApp } from "@/lib/storage";
 import { ToastProvider, Sheet, BigButton, Divider, Badge, Avatar, useToast } from "@/components/ui";
 import { Onboarding } from "@/components/onboarding";
@@ -574,6 +575,40 @@ function MoreTab({
           onClick={() => setPrivacyOpen(true)}
         />
         <InstallGuideRow />
+      </div>
+
+      {/* 늘봄 안내 페이지 — 로그인 없이 누구나 열리는 공개 안내(검색으로도 들어온다) */}
+      <div className="fade-up rounded-[1.5rem] bg-white p-4 shadow-soft">
+        <p className="text-[1.02rem] font-black">늘봄 안내 페이지</p>
+        <p className="mt-0.5 text-[0.84rem] font-semibold text-ink/50">가족에게도 보내 줄 수 있는 공개 안내예요</p>
+        <div className="mt-2.5 space-y-2">
+          <Link
+            href="/guide/"
+            className="flex min-h-[62px] items-center gap-3 rounded-2xl bg-paper px-3.5 py-2.5 active:scale-[0.995]"
+          >
+            <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-[0.9rem] bg-brand-light text-[1.35rem]">
+              🎁
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[1rem] font-black leading-tight text-ink">어르신 복지 혜택 17가지</span>
+              <span className="mt-0.5 block truncate text-[0.84rem] font-semibold text-ink/50">지원 대상·금액·신청 방법</span>
+            </span>
+            <IconChevron size={20} className="shrink-0 text-ink/25" />
+          </Link>
+          <Link
+            href="/guide/quiz/"
+            className="flex min-h-[62px] items-center gap-3 rounded-2xl bg-paper px-3.5 py-2.5 active:scale-[0.995]"
+          >
+            <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-[0.9rem] bg-gold-light text-[1.35rem]">
+              🧠
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[1rem] font-black leading-tight text-ink">치매예방 퀴즈 소개</span>
+              <span className="mt-0.5 block truncate text-[0.84rem] font-semibold text-ink/50">하루 5문제 · 433문항</span>
+            </span>
+            <IconChevron size={20} className="shrink-0 text-ink/25" />
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">

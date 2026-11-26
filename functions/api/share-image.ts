@@ -21,7 +21,7 @@ const BUCKET = "share-cards";
 const PREFIX = "cards/";
 const MAX_BYTES = 1_500_000; // 카카오가 받아 가기 좋은 선 (1200×630 PNG 는 보통 150~400KB)
 const KEEP_DAYS = 7;
-const KINDS = ["greeting", "quiz", "welfare", "group", "family", "fortune"] as const;
+const KINDS = ["greeting", "quiz", "welfare", "group", "family", "fortune", "memory"] as const;
 type Kind = (typeof KINDS)[number];
 
 const DEFAULT_CARD: Record<Kind, string> = {
@@ -31,6 +31,7 @@ const DEFAULT_CARD: Record<Kind, string> = {
   group: "/images/share-group.png",
   family: "/images/share-family.png",
   fortune: "/images/share-fortune.png",
+  memory: "/share-card.png",
 };
 
 function siteOrigin(request: Request): string {

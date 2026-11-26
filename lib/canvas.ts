@@ -987,7 +987,7 @@ export async function renderAnbuCard(
 /* 공유 카드 (카카오톡 미리보기 · 공유 시트) — 1200×630 고화질           */
 /* ------------------------------------------------------------------ */
 
-export type ShareCardKind = "quiz" | "health" | "greeting" | "invite";
+export type ShareCardKind = "quiz" | "health" | "greeting" | "invite" | "memory";
 
 export type ShareCardInput = {
   kind: ShareCardKind;
@@ -1016,6 +1016,8 @@ const SHARE_PALETTE: Record<
   health: { top: "#EDF9F1", bottom: "#CDEBD9", accent: "#1B6B45", soft: "#E3F5E9", dot: "rgba(62,156,107,0.20)" },
   greeting: { top: "#FFF2F6", bottom: "#FFDCE8", accent: "#A84066", soft: "#FFE9F0", dot: "rgba(214,109,146,0.18)" },
   invite: { top: "#EAF7F8", bottom: "#CDEDEF", accent: "#0F6F76", soft: "#E1F3F4", dot: "rgba(24,147,155,0.18)" },
+  /* 오늘의 추억상자 — 금빛 리본 상자와 같은 크림·황토빛 */
+  memory: { top: "#FFFBEE", bottom: "#F7E6C2", accent: "#8A5A10", soft: "#FFF1CE", dot: "rgba(201,162,39,0.20)" },
 };
 
 export async function renderShareCard(canvas: HTMLCanvasElement, input: ShareCardInput): Promise<void> {
@@ -1179,6 +1181,80 @@ export async function canvasToFile(canvas: HTMLCanvasElement, filename: string):
       resolve(new File([blob], filename, { type: "image/png" }));
     }, "image/png", 1);
   });
+}
+
+/**
+ * 오늘의 추억상자 — 그날의 추억 사진을 ‘세로 카드(1080×1350)’로 담는다.
+ * 이 카드를 피드 카드(1200×630) 안에 액자처럼 넣어 카톡으로 보낸다(renderFramedShareCard).
+ * 사진을 못 불러와도 글·틀은 그대로 그린다(빈 사진 자리만 비운다).
+ */
+export async function renderMemoryPhotoCard(
+  canvas: HTMLCanvasElement,
+  opts: { src: string; title: string; subtitle?: string; line: string }
+): Promise<void> {
+  const W = 1080;
+  const H = 1350;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  await document.fonts.ready;
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#FFFCF3");
+  bg.addColorStop(1, "#F7E6C2");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 위 — 시대 이름과 한 줄 설명
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#6B3F05";
+  ctx.font = `900 46px ${FONT}`;
+  ctx.fillText(opts.title, W / 2, 92);
+  if (opts.subtitle) {
+    ctx.fillStyle = "#8A5A10";
+    ctx.font = `800 30px ${FONT}`;
+    ctx.fillText(opts.subtitle, W / 2, 138);
+  }
+
+  // 사진 — 비율을 지켜 가운데를 기준으로 꽉 채운다
+  const px = 48;
+  const py = 176;
+  const pw = W - px * 2;
+  const ph = 898;
+  ctx.save();
+  ctx.beginPath();
+  rr(ctx, px, py, pw, ph, 40);
+  ctx.clip();
+  ctx.translate(px, py);
+  const painted = await paintPhotoScene(ctx, opts.src, pw, ph);
+  if (!painted) {
+    ctx.fillStyle = "#EFDFBC";
+    ctx.fillRect(0, 0, pw, ph);
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(138,90,16,0.22)";
+  ctx.lineWidth = 6;
+  rr(ctx, px, py, pw, ph, 40);
+  ctx.stroke();
+
+  // 아래 — 그날의 한 줄
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#5A3A12";
+  ctx.font = `700 38px ${FONT}`;
+  let y = 1160;
+  wrap(ctx, opts.line, W - 160)
+    .slice(0, 2)
+    .forEach((line) => {
+      ctx.fillText(line, W / 2, y);
+      y += 52;
+    });
+
+  ctx.fillStyle = "#A9803F";
+  ctx.font = `800 26px ${FONT}`;
+  ctx.fillText("늘봄 · 오늘의 추억상자", W / 2, 1300);
 }
 
 /**

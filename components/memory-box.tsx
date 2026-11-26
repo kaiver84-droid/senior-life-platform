@@ -12,6 +12,10 @@ import {
   memoryPhotoFor,
   playMemoryChime,
 } from "@/lib/memory-box";
+import { renderMemoryPhotoCard } from "@/lib/canvas";
+import { siteOrigin } from "@/lib/og";
+import { BigButton } from "./ui";
+import { SharePreviewSheet } from "./share-sheet";
 
 /**
  * 오늘의 추억상자 — 오늘 처음 접속했을 때 화면 가운데에 한 번 떠오른다.
@@ -25,6 +29,10 @@ export function MemoryBox() {
   /** box(상자) → opening(열리는 중) → photo(추억 사진) */
   const [stage, setStage] = useState<"box" | "opening" | "photo">("box");
   const timer = useRef<number | null>(null);
+  /** 카톡 공유 시트 — 사진을 본 뒤 가족·친구에게 바로 보낼 수 있다 */
+  const [shareOpen, setShareOpen] = useState(false);
+  /** 공유 카드(사진 + 시대 + 한 줄)를 미리 그려 두는 캔버스 — 버튼을 누를 때 기다리지 않게 */
+  const cardRef = useRef<HTMLCanvasElement | null>(null);
 
   const era = useMemo(() => memoryEraFor(profile?.birthYear), [profile?.birthYear]);
   const photo = useMemo(() => memoryPhotoFor(era, today), [era, today]);
@@ -67,6 +75,20 @@ export function MemoryBox() {
     },
     []
   );
+
+  /* 사진이 열리면 카톡에 보낼 카드도 미리 그려 둔다(사진·시대·한 줄) */
+  useEffect(() => {
+    if (stage !== "photo" || typeof document === "undefined") return;
+    const canvas = cardRef.current ?? document.createElement("canvas");
+    cardRef.current = canvas;
+    void renderMemoryPhotoCard(canvas, {
+      src: photo.src,
+      title: era.label,
+      subtitle: "20~30대 시절의 추억",
+      line: photo.line,
+    })
+      .catch(() => {});
+  }, [stage, photo, era.label]);
 
   /** 상자를 누른 순간 — 소리는 반드시 이 클릭 핸들러 안에서 낸다(iOS 사파리) */
   const openBox = useCallback(() => {
@@ -128,7 +150,19 @@ export function MemoryBox() {
             “{photo.line}”
           </p>
 
-          <div className="px-4 pb-4 pt-2.5">
+          <div className="space-y-2 px-4 pb-4 pt-2.5">
+            <BigButton
+              variant="sun"
+              full
+              height={56}
+              className="rounded-full !text-[1.02rem]"
+              onClick={() => setShareOpen(true)}
+            >
+              <span aria-hidden className="text-[1.2rem] leading-none">
+                💬
+              </span>
+              가족·친구에게 카톡으로 보내기
+            </BigButton>
             <button
               type="button"
               data-memory-box-close
@@ -205,6 +239,31 @@ export function MemoryBox() {
           </button>
         </div>
       )}
+
+      {/* 가족·친구에게 카톡으로 보내기 — 이미 있는 카카오 공유 시트를 그대로 쓴다(사진 카드를 피드 카드로) */}
+      <SharePreviewSheet
+        open={shareOpen}
+        layer="top"
+        onClose={() => setShareOpen(false)}
+        sourceCanvas={cardRef}
+        data={{
+          kind: "memory",
+          cardKind: "memory",
+          badge: "오늘의 추억상자",
+          emoji: "🎞️",
+          headline: `${era.label}, 그 시절의 추억`,
+          sub: photo.line,
+          name: profile?.nickname,
+          title: `${era.label}의 추억 사진이 도착했어요`,
+          description: `${photo.line} — 늘봄 오늘의 추억상자`,
+          buttonTitle: "나도 추억상자 열기",
+          text: `오늘 열린 추억 사진이에요.\n“${photo.line}” (늘봄 오늘의 추억상자)`,
+          link: `${siteOrigin()}/`,
+          filename: `추억상자_${today}.png`,
+          sheetTitle: "가족·친구에게 보내기",
+          sheetSubtitle: "가족 단톡방에 추억 사진 카드가 이렇게 보여요",
+        }}
+      />
     </div>,
     document.body
   );

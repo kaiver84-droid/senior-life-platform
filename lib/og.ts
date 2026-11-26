@@ -52,7 +52,7 @@ export const SHARE_IMAGE_BY_SITUATION: Record<ShareSituation, string> = {
 };
 
 /** 업로드한 ‘내가 만든 카드’를 가리킬 때 쓰는 종류 — 이 이름들이 저장 경로·주소에 들어간다 */
-export const CARD_IMAGE_KINDS = ["greeting", "quiz", "welfare", "group", "family", "fortune"] as const;
+export const CARD_IMAGE_KINDS = ["greeting", "quiz", "welfare", "group", "family", "fortune", "memory"] as const;
 export type CardImageKind = (typeof CARD_IMAGE_KINDS)[number];
 
 export function isCardImageKind(value: string): value is CardImageKind {

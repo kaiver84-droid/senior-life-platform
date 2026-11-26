@@ -16,6 +16,14 @@ import type { AppState } from "@/lib/types";
 /** 자녀가 한 번 연결한 부모님 번호 — 다음부터는 주소 없이 /family/ 만 열어도 이어진다 */
 const FAMILY_CODE_KEY = "neulbom.familyCode.v1";
 
+/**
+ * 부모님 번호 조회 상태.
+ * - notfound: 서버에 그런 번호가 없다 → 이 기기(빈) 기록으로 대신 그리지 않고 안내만 한다.
+ *   (예전에는 오타 한 번으로 “부모님이 오늘 앱에 접속했어요”라는 없는 안부가 보였다.)
+ * - error: 통신이 잠깐 막혔다 → 역시 기록으로 대신 그리지 않고 다시 시도할 자리를 준다.
+ */
+type Lookup = "idle" | "loading" | "found" | "notfound" | "error";
+
 type RemoteState = {
   profile: { nickname: string; birthYear: number; sido: string; sigungu: string } | null;
   quizLogs: { date: string; points: number; correct: number; total: number }[];
@@ -33,13 +41,12 @@ function hhmm(d: Date | null): string {
 
 function Dashboard() {
   const { profile, state, today, streak, code, weekPoints, ready } = useApp();
-  const { show } = useToast();
   const [remote, setRemote] = useState<RemoteState | null>(null);
-  const [lookupCode, setLookupCode] = useState("");
   const [linkedCode, setLinkedCode] = useState(" ".trim());
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
   const [checkedAt, setCheckedAt] = useState<Date | null>(null);
+  const [lookup, setLookup] = useState<Lookup>("idle");
 
   const queryCode = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -69,21 +76,19 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!ready || !activeCode || activeCode === code) return;
-    // 한 번 연결하면 기억해 두고, 주소창의 ?code= 는 지워 다음부터 번호 없이 열리게 한다.
-    try {
-      if (localStorage.getItem(FAMILY_CODE_KEY) !== activeCode) {
-        localStorage.setItem(FAMILY_CODE_KEY, activeCode);
-        setLinkedCode(activeCode);
-      }
-    } catch {
-      /* 무시 */
+    if (!ready) return;
+    if (!activeCode) {
+      setLookup("idle");
+      return;
     }
-    if (queryCode) {
-      window.history.replaceState({}, "", "/family/");
+    // 내 번호를 넣은 경우에는 부모님 조회가 아니라 이 기기 기록을 그대로 본다
+    if (activeCode === code) {
+      setLookup("found");
+      return;
     }
     let alive = true;
     setLoading(true);
+    setLookup("loading");
     fetch(`/api/state?code=${encodeURIComponent(activeCode)}`)
       .then((r) => r.json())
       .then((j) => {
@@ -98,9 +103,38 @@ function Dashboard() {
             familyEvents: Array.isArray(j.state.familyEvents) ? j.state.familyEvents : [],
           });
           setCheckedAt(new Date());
+          setLookup("found");
+          // 찾았을 때만 이 휴대폰에 기억한다 — 없는 번호를 남겨 두면 다음에도 같은 안내가 뜬다.
+          try {
+            if (localStorage.getItem(FAMILY_CODE_KEY) !== activeCode) {
+              localStorage.setItem(FAMILY_CODE_KEY, activeCode);
+              setLinkedCode(activeCode);
+            }
+          } catch {
+            /* 저장소를 막아 둔 브라우저도 있다 */
+          }
+          // 주소창의 ?code= 는 지워 다음부터 번호 없이 열리게 한다.
+          if (queryCode) {
+            window.history.replaceState({}, "", "/family/");
+          }
+        } else if (j?.ok) {
+          // 서버에 없는 번호 — 빈 기록으로 대신 그리지 않고 ‘찾을 수 없음’을 알린다.
+          setRemote(null);
+          setLookup("notfound");
+          try {
+            if (localStorage.getItem(FAMILY_CODE_KEY) === activeCode) {
+              localStorage.removeItem(FAMILY_CODE_KEY);
+            }
+          } catch {
+            /* 무시 */
+          }
+        } else {
+          setLookup("error");
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (alive) setLookup("error");
+      })
       .finally(() => {
         if (alive) setLoading(false);
       });
@@ -111,10 +145,10 @@ function Dashboard() {
 
   // 1분마다 저절로 새로 고칩니다 — 자녀가 화면을 켜 두면 늘 최신 상태
   useEffect(() => {
-    if (!activeCode) return;
+    if (!activeCode || lookup !== "found") return;
     const t = setInterval(() => setTick((n) => n + 1), 60000);
     return () => clearInterval(t);
-  }, [activeCode]);
+  }, [activeCode, lookup]);
 
   /**
    * 주소에 ?code= 가 있거나 지난번에 연결한 부모님 번호가 있으면 **부모님 데이터를 보여 준다**.
@@ -177,51 +211,90 @@ function Dashboard() {
     return <div className="p-8 text-center font-bold text-ink/45">불러오는 중…</div>;
   }
 
-  if (!profile && !remote && !activeCode) {
+  /** 번호를 넣고 가족 화면을 연다 — 저장은 서버에서 찾은 뒤에 한다(없는 번호를 남기지 않게) */
+  const submitCode = (c: string) => {
+    try {
+      localStorage.setItem(FAMILY_CODE_KEY, c);
+    } catch {
+      /* 무시 */
+    }
+    window.location.href = `/family/?code=${c}`;
+  };
+
+  /* 없는 번호이거나 잠깐 못 불러왔을 때 — 이 기기 기록으로 대신 그리지 않고 그대로 알려 준다 */
+  if (activeCode && !remote && (lookup === "notfound" || lookup === "error")) {
+    const notFound = lookup === "notfound";
     return (
-      <div className="mx-auto max-w-[460px] px-4 py-8">
-        <div className="mb-5 flex justify-center">
+      <div className="mx-auto max-w-[460px] px-3 pb-10 pt-[calc(env(safe-area-inset-top,0px)+16px)]">
+        <div className="mb-4 flex justify-center">
           <NeulbomLogo size={34} tagline />
         </div>
-        <Card className="rounded-[1.75rem] p-5">
-          <p className="text-center text-[1.1rem] font-black">아직 연결된 부모님이 없어요</p>
-          <p className="mt-2 text-center text-[0.92rem] font-semibold leading-relaxed text-ink/60">
-            부모님 휴대폰의 <b className="text-ink">가족 연결</b> 화면에서 6자리 가족 연결 번호를 받아 아래에 넣어 주세요.
-          </p>
-          <Divider />
-          <input
-            className="field text-center text-[1.4rem] font-black tracking-[0.3em]"
-            placeholder="가족 연결 번호 6자리"
-            value={lookupCode}
-            maxLength={6}
-            onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
-          />
-          <div className="mt-3">
-            <BigButton
-              full
-              variant="ink"
-              onClick={() => {
-                if (lookupCode.length < 6) {
-                  show("6자리 코드를 넣어 주세요.");
-                  return;
-                }
-                const c = lookupCode.toUpperCase();
-                try {
-                  localStorage.setItem(FAMILY_CODE_KEY, c);
-                } catch {
-                  /* 무시 */
-                }
-                window.location.href = `/family/?code=${c}`;
-              }}
-            >
-              부모님 안부 확인하기
-            </BigButton>
-          </div>
-          <p className="mt-3 text-center text-[0.84rem] font-semibold leading-relaxed text-ink/50">
-            한 번만 연결하면 이 휴대폰에 기억해 두어, 다음부터는 번호 없이 <b className="text-ink">/family/</b> 만 열어도
-            부모님의 오늘 약·건강 상태가 보여요.
-          </p>
-        </Card>
+        <CodeEntryCard
+          title={notFound ? "입력하신 가족 코드를 찾을 수 없어요" : "부모님 정보를 불러오지 못했어요"}
+          desc={
+            notFound ? (
+              <>
+                코드를 다시 확인해 주세요. 부모님 휴대폰의 <b className="text-ink">가족 연결</b> 화면에 있는 6자리
+                번호예요.
+              </>
+            ) : (
+              <>잠시 뒤 다시 시도해 주세요. 인터넷이 느릴 때는 한 번 더 눌러 주면 이어져요.</>
+            )
+          }
+          initial={activeCode}
+          actionLabel={notFound ? "다시 확인하기" : "다시 불러오기"}
+          onSubmit={(c) => {
+            if (!notFound && c === activeCode) {
+              setLookup("loading");
+              setTick((n) => n + 1);
+              return;
+            }
+            submitCode(c);
+          }}
+        />
+        <Link href="/" className="mt-4 block text-center text-[0.92rem] font-bold text-brand">
+          ← 처음 화면으로
+        </Link>
+      </div>
+    );
+  }
+
+  /* 번호는 있는데 아직 서버에서 받기 전 — 빈 기록을 부모님 안부처럼 보여 주지 않는다 */
+  if (activeCode && !remote && (lookup === "loading" || lookup === "idle")) {
+    return (
+      <div className="mx-auto max-w-[460px] px-4 py-10 text-center">
+        <div className="flex justify-center">
+          <NeulbomLogo size={34} tagline />
+        </div>
+        <p className="mt-5 text-[1.05rem] font-black text-ink/70">부모님 안부를 불러오는 중…</p>
+        <p className="mt-1 text-[0.9rem] font-semibold text-ink/45">잠시만 기다려 주세요.</p>
+      </div>
+    );
+  }
+
+  if (!profile && !remote && !activeCode) {
+    return (
+      <div className="mx-auto max-w-[460px] px-3 pb-10 pt-[calc(env(safe-area-inset-top,0px)+16px)]">
+        <div className="mb-4 flex justify-center">
+          <NeulbomLogo size={34} tagline />
+        </div>
+        <CodeEntryCard
+          title="아직 연결된 부모님이 없어요"
+          desc={
+            <>
+              부모님 휴대폰의 <b className="text-ink">가족 연결</b> 화면에서 6자리 가족 연결 번호를 받아 아래에 넣어
+              주세요.
+            </>
+          }
+          actionLabel="부모님 안부 확인하기"
+          onSubmit={submitCode}
+          footer={
+            <p className="mt-3 text-center text-[0.84rem] font-semibold leading-relaxed text-ink/50">
+              한 번만 연결하면 이 휴대폰에 기억해 두어, 다음부터는 번호 없이 <b className="text-ink">/family/</b> 만
+              열어도 부모님의 오늘 약·건강 상태가 보여요.
+            </p>
+          }
+        />
         <Link href="/" className="mt-4 block text-center text-[0.92rem] font-bold text-brand">
           ← 처음 화면으로
         </Link>
@@ -452,6 +525,66 @@ function Dashboard() {
         </button>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * 가족 연결 번호를 넣는 카드.
+ * ‘아직 연결된 부모님이 없어요’ 화면과 ‘번호를 찾을 수 없어요’ 화면이 같은 모양·같은 동작을 쓴다.
+ */
+function CodeEntryCard({
+  title,
+  desc,
+  initial = "",
+  actionLabel,
+  onSubmit,
+  footer,
+}: {
+  title: string;
+  desc: React.ReactNode;
+  initial?: string;
+  actionLabel: string;
+  onSubmit: (code: string) => void;
+  footer?: React.ReactNode;
+}) {
+  const [value, setValue] = useState(initial);
+  const { show } = useToast();
+
+  const submit = () => {
+    const c = value.trim().toUpperCase();
+    if (c.length < 6) {
+      show("6자리 코드를 넣어 주세요.");
+      return;
+    }
+    onSubmit(c);
+  };
+
+  return (
+    <Card className="rounded-[1.75rem] p-5">
+      <p className="text-center text-[1.1rem] font-black leading-snug">{title}</p>
+      <p className="mt-2 text-center text-[0.92rem] font-semibold leading-relaxed text-ink/60">{desc}</p>
+      <Divider />
+      <input
+        className="field text-center text-[1.4rem] font-black tracking-[0.3em]"
+        placeholder="가족 연결 번호 6자리"
+        aria-label="가족 연결 번호 6자리"
+        autoCapitalize="characters"
+        autoComplete="off"
+        spellCheck={false}
+        value={value}
+        maxLength={6}
+        onChange={(e) => setValue(e.target.value.toUpperCase())}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+      />
+      <div className="mt-3">
+        <BigButton full variant="ink" onClick={submit}>
+          {actionLabel}
+        </BigButton>
+      </div>
+      {footer}
+    </Card>
   );
 }
 

@@ -75,12 +75,15 @@ export function SharePreviewSheet({
   onClose,
   data,
   sourceCanvas,
+  layer = "default",
 }: {
   open: boolean;
   onClose: () => void;
   data: ShareSheetData;
   /** 이미 만들어 둔 카드(상장·인사카드)를 그대로 넣고 싶을 때 */
   sourceCanvas?: React.RefObject<HTMLCanvasElement | null>;
+  /** ‘top’ — 추억상자처럼 더 위에 떠 있는 화면에서 열 때 화면 맨 위에 올린다 */
+  layer?: "default" | "top";
 }) {
   const { show } = useToast();
   const { profile } = useApp();
@@ -200,6 +203,7 @@ export function SharePreviewSheet({
       title={data.sheetTitle || "카카오톡으로 보내기"}
       subtitle={data.sheetSubtitle || "단톡방에 이렇게 보여요"}
       hideBottomClose
+      layer={layer}
       footer={
         <div data-share-close>
           <BigButton variant="white" full onClick={onClose} height={56} className="rounded-[1.1rem]">
