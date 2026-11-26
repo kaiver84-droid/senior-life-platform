@@ -1,5 +1,10 @@
 """🎁 추억 상자 검증 — 390×844 · 글씨 3단계(보통·크게·아주 크게).
 
+※ 2026-11-27 부터 이 기능은 숨김 상태다(lib/flags.ts `ENABLE_MEMORY_BOX = false`).
+   지금 이 파일을 돌리면 "상자가 없다"고 실패하는 것이 정상이므로, 아래 main() 이 플래그를 먼저 읽고
+   꺼져 있으면 그 사실만 알리고 끝난다. 숨김 상태 검사는 `e2e/check_memory_box_hidden.py` 를 쓴다.
+   다시 켜면(플래그 true) 이 파일을 그대로 돌리면 된다.
+
 python3 e2e/check_memory_box.py                                            # 로컬 out/
 BASE=https://senior-life-platform.pages.dev python3 e2e/check_memory_box.py  # 라이브
 
@@ -164,6 +169,12 @@ def set_font(page, size):
 
 
 def main():
+    flags = open("/workspace/work/senior-platform/lib/flags.ts", encoding="utf-8").read()
+    if "ENABLE_MEMORY_BOX = true" not in flags:
+        print("SKIP — 오늘의 추억상자는 숨김 상태입니다(lib/flags.ts ENABLE_MEMORY_BOX=false).")
+        print("       숨김 검사: python3 e2e/check_memory_box_hidden.py")
+        return
+
     httpd = None
     if LOCAL:
         httpd = start_server()

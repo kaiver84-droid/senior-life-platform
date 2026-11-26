@@ -21,6 +21,10 @@ import { SharePreviewSheet } from "./share-sheet";
  * 오늘의 추억상자 — 오늘 처음 접속했을 때 화면 가운데에 한 번 떠오른다.
  * 상자를 누르면 소리가 나고, 그 사람이 20~30대였던 시절의 추억 사진이 열린다.
  * 화면에는 이름·그림·한 줄 안내·닫기 하나만 둔다(중간 부연설명 없음).
+ *
+ * 지금은 숨김 — components/home.tsx 가 lib/flags.ts 의 ENABLE_MEMORY_BOX(false)로
+ * 이 컴포넌트를 그리지 않는다. 이 파일·사진·localStorage 키는 그대로 둔 채
+ * 플래그만 true 로 바꾸면 그대로 돌아온다(2026-11-27 "일단 숨겨놔 줘").
  */
 export function MemoryBox() {
   const { profile, today } = useApp();

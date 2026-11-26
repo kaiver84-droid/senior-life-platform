@@ -10,6 +10,7 @@ import { kakaoConfig } from "@/lib/share";
 import { useApp } from "@/lib/storage";
 import { koreanDate } from "@/lib/week";
 import { lunarShortOf } from "@/lib/lunar";
+import { ENABLE_MEMORY_BOX } from "@/lib/flags";
 import { shortSido } from "@/lib/regions";
 import { ddayLabel, upcomingEvents } from "@/lib/calendar";
 import { useGroup } from "@/lib/group-store";
@@ -160,8 +161,8 @@ export function HomeTab({
 
   return (
     <div className="space-y-2 pb-2">
-      {/* 🎁 오늘의 추억상자 — 오늘 처음 접속하면 화면 가운데에 한 번 떠오른다 */}
-      <MemoryBox />
+      {/* 🎁 오늘의 추억상자 — 지금은 숨김(lib/flags.ts ENABLE_MEMORY_BOX). 켜면 오늘 처음 접속에 한 번 뜬다. */}
+      {ENABLE_MEMORY_BOX ? <MemoryBox /> : null}
 
       {/* 🔔 오늘 일정 알람 — 알람 시간이 되면 홈 맨 위에 먼저 보인다 */}
       <TodayAlarmCard where="home" />

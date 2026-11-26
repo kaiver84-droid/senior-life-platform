@@ -9,6 +9,7 @@ import {
   QUIZ_TYPE_ORDER,
 } from "@/lib/quiz";
 import { GUIDE_QUIZ_DESCRIPTION, GUIDE_QUIZ_TITLE, SITE_URL } from "@/lib/guide";
+import { ENABLE_MEMORY_BOX } from "@/lib/flags";
 import {
   Breadcrumb,
   GuideCta,
@@ -165,16 +166,19 @@ export default function GuideQuizPage() {
         </ul>
       </Section>
 
-      <Section title="오늘의 추억상자" emoji="🎁">
-        <p className="rounded-2xl bg-white p-4 text-[1.02rem] font-semibold leading-relaxed text-[#22384f] shadow-soft">
-          하루에 처음 늘봄을 열면 화면 가운데에 <b className="text-ink">추억 상자</b>가 하나 떠요. 상자를
-          누르면 그 시절 사진이 오르골 소리와 함께 열립니다. 1960~1990년대 사진 60장을 15일씩 돌아가며
-          보여 드려요.
-        </p>
-        <p className="mt-2 text-[0.92rem] font-semibold text-ink/60">
-          사진은 매일 달라져요. 오늘 상자를 열어 보세요.
-        </p>
-      </Section>
+      {/* 🎁 오늘의 추억상자 소개 — 지금은 숨김(lib/flags.ts ENABLE_MEMORY_BOX) */}
+      {ENABLE_MEMORY_BOX ? (
+        <Section title="오늘의 추억상자" emoji="🎁">
+          <p className="rounded-2xl bg-white p-4 text-[1.02rem] font-semibold leading-relaxed text-[#22384f] shadow-soft">
+            하루에 처음 늘봄을 열면 화면 가운데에 <b className="text-ink">추억 상자</b>가 하나 떠요. 상자를
+            누르면 그 시절 사진이 오르골 소리와 함께 열립니다. 1960~1990년대 사진 60장을 15일씩 돌아가며
+            보여 드려요.
+          </p>
+          <p className="mt-2 text-[0.92rem] font-semibold text-ink/60">
+            사진은 매일 달라져요. 오늘 상자를 열어 보세요.
+          </p>
+        </Section>
+      ) : null}
 
       <Section title="알아 두세요" emoji="💡">
         <p className="rounded-2xl bg-sun-light p-4 text-[1rem] font-semibold leading-relaxed text-[#4a3200]">
