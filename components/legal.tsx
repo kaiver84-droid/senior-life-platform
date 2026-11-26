@@ -12,14 +12,20 @@ import { NeulbomMark } from "./art";
  * - 공개 주소: `/privacy/` (카카오 애드핏 매체 심사 때 심사자가 로그인 없이 볼 수 있는 페이지)
  *
  * 운영자 연락처는 `NEXT_PUBLIC_OPERATOR_CONTACT` 로 넣는다(이메일 또는 안내 링크).
- * 값이 없으면 연락처 줄 자체를 그리지 않는다.
+ * 값이 비어 있으면 아래 기본값(운영자 이메일)을 쓴다 — Cloudflare Pages 배포에서 환경변수가
+ * 빠져도 문의처가 사라지지 않게 코드에 고정해 둔다.
  */
-const OPERATOR_CONTACT = (process.env.NEXT_PUBLIC_OPERATOR_CONTACT || "").trim();
+const OPERATOR_CONTACT_FALLBACK = "kaiver84@gmail.com";
+const OPERATOR_CONTACT = (process.env.NEXT_PUBLIC_OPERATOR_CONTACT || "").trim() || OPERATOR_CONTACT_FALLBACK;
+/** 이메일 모양일 때만 mailto 링크로 건다(링크 주소를 넣은 경우는 글자로만 보여 준다). */
+const OPERATOR_EMAIL = /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/.test(OPERATOR_CONTACT) ? OPERATOR_CONTACT : "";
 
 export type LegalSection = {
   title: string;
   paragraphs?: string[];
   items?: string[];
+  /** true 면 운영자 연락처 줄을 제목 아래에 그린다 */
+  contact?: boolean;
 };
 
 export const PRIVACY_EFFECTIVE_DATE = "2026년 11월 22일";
@@ -97,10 +103,8 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   },
   {
     title: "10. 문의",
-    paragraphs: [
-      "개인정보와 관련해 궁금한 점이나 열람·정정·삭제 요청은 늘봄 운영자에게 보내 주세요.",
-      ...(OPERATOR_CONTACT ? [`연락처 — ${OPERATOR_CONTACT}`] : []),
-    ],
+    paragraphs: ["개인정보와 관련해 궁금한 점이나 열람·정정·삭제 요청은 늘봄 운영자에게 보내 주세요."],
+    contact: true,
   },
   {
     title: "11. 방침이 바뀌면",
@@ -144,6 +148,21 @@ function SectionList({ sections }: { sections: LegalSection[] }) {
               {p}
             </p>
           ))}
+          {s.contact && OPERATOR_CONTACT ? (
+            <p className="mt-1 break-keep text-[0.94rem] font-semibold leading-relaxed text-ink/70">
+              연락처 —{" "}
+              {OPERATOR_EMAIL ? (
+                <a
+                  href={`mailto:${OPERATOR_EMAIL}`}
+                  className="font-extrabold text-brand-dark underline decoration-brand/40 underline-offset-2"
+                >
+                  {OPERATOR_CONTACT}
+                </a>
+              ) : (
+                <span className="font-extrabold text-brand-dark">{OPERATOR_CONTACT}</span>
+              )}
+            </p>
+          ) : null}
           {s.items?.length ? (
             <ul className="mt-1.5 space-y-1">
               {s.items.map((it) => (
